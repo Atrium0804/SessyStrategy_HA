@@ -1,0 +1,75 @@
+# Home Assistant helpers for the Sessy strategy.
+#
+# Enable the packages feature in configuration.yaml:
+#
+#   homeassistant:
+#     packages: !include_dir_named packages
+#
+# then place this file at /config/packages/sessy_helpers.yaml.
+# (Or paste the input_boolean block into your existing helpers.)
+#
+# The master switch lets you pause the strategy from the HA UI without
+# restarting AppDaemon. Reference it from apps.yaml via:
+#   enable_switch: input_boolean.sessy_strategy_enabled
+
+input_boolean:
+  sessy_strategy_enabled:
+    name: Sessy strategy enabled
+    icon: mdi:battery-sync
+    initial: true
+
+input_select:
+  sessy_season_mode:
+    name: Sessy season mode
+    icon: mdi:weather-partly-snowy-rainy
+    options:
+      - auto
+      - summer
+      - winter
+    initial: auto
+
+# Optional live-tuning sliders. Reference each from apps.yaml via the matching
+# *_entity key (e.g. soc_target_entity: input_number.sessy_soc_target) to adjust
+# the value from the HA UI without restarting AppDaemon. Omit any you don't want
+# to expose — the app falls back to the static apps.yaml default.
+input_number:
+  sessy_soc_target:
+    name: Sessy SOC target
+    icon: mdi:battery-charging-90
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    initial: 90
+  sessy_soc_floor:
+    name: Sessy SOC floor
+    icon: mdi:battery-20
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    initial: 20
+  sessy_price_discharge:
+    name: Sessy discharge price threshold
+    icon: mdi:cash-plus
+    min: 0
+    max: 1
+    step: 0.01
+    unit_of_measurement: "€/kWh"
+    initial: 0.39
+  sessy_price_charge:
+    name: Sessy cheap-charge price threshold
+    icon: mdi:cash-minus
+    min: -0.5
+    max: 0.2
+    step: 0.01
+    unit_of_measurement: "€/kWh"
+    initial: -0.10
+  sessy_min_arbitrage_margin:
+    name: Sessy min arbitrage margin
+    icon: mdi:scale-balance
+    min: 0
+    max: 0.5
+    step: 0.01
+    unit_of_measurement: "€/kWh"
+    initial: 0.05

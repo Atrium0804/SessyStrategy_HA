@@ -1,0 +1,71 @@
+sessy_strategy:
+  module: sessy_strategy
+  class: SessyStrategy
+
+  # ── Battery / hardware ──────────────────────────────────────────────
+  capacity_wh: 5000          # Battery capacity in Wh
+  max_power_w: 2200          # Inverter/battery max power in W
+  c_rate_cap: 0.40           # Max C-rate for spread setpoints (0.40 = 40%)
+
+  # ── State-of-charge targets ─────────────────────────────────────────
+  soc_target: 90             # % SOC to reach before the evening peak
+  soc_floor: 20              # % SOC floor — never discharge below this
+  cheap_soc_target: 100      # % SOC ceiling for cheap-price charging
+
+  # ── Pricing ─────────────────────────────────────────────────────────
+  surcharge: 0.11            # Import surcharge €/kWh (raw export → import)
+  price_discharge: 0.39      # Raw price above which to force discharge
+  price_charge: -0.10        # Raw price below which to charge from grid
+  min_arbitrage_margin: 0.05 # Min €/kWh spread to justify pre-peak charge
+
+  # ── Time windows (local hours) ──────────────────────────────────────
+  prepeak_start: 16
+  prepeak_end: 18
+  prepeak_window_h: 2.0
+  discharge_window_h: 2.0
+  evening_peak_start: 18
+  evening_peak_end: 23
+
+  # ── Seasonal mode (auto | summer | winter) ─────────────────────────
+  # auto infers from the hour of today's minimum raw price:
+  # daytime minimum => summer, night minimum => winter.
+  season_mode: auto
+  season_day_start: 8
+  season_day_end: 18
+  season_auto_fallback: winter
+
+  # Optional winter-specific overrides. If omitted, base values are used.
+  soc_floor_winter: 30
+  prepeak_start_winter: 14
+  prepeak_end_winter: 18
+  prepeak_window_h_winter: 4.0
+
+  # ── Entity IDs (map these to your own Sessy entities) ───────────────
+  strategy_select: select.sessy_battery_alt9_power_strategy
+  grid_target: number.sessy_pwkn_grid_target
+  battery_setpoint: number.sessy_battery_alt9_power_setpoint
+  soc_sensor: sensor.sessy_battery_alt9_state_of_charge
+  price_sensor: sensor.sessy_dnhh_energy_price
+  status_sensor: sensor.sessy_strategy_status
+
+  # ── Optional master switch ──────────────────────────────────────────
+  # Reference an input_boolean (see sessy_helpers.yaml) to enable/disable
+  # the strategy from the HA UI without restarting AppDaemon. Remove this
+  # line to always run.
+  enable_switch: input_boolean.sessy_strategy_enabled
+
+  # ── Optional live-tuning helpers ────────────────────────────────────
+  # Reference input_number helpers (see sessy_helpers.yaml) to adjust these
+  # values from the HA UI without restarting AppDaemon. The app reads them
+  # each cycle and falls back to the static values above if a helper is
+  # missing or unreadable. Remove any line to keep the static value only.
+  soc_target_entity: input_number.sessy_soc_target
+  soc_floor_entity: input_number.sessy_soc_floor
+  price_discharge_entity: input_number.sessy_price_discharge
+  price_charge_entity: input_number.sessy_price_charge
+  min_arbitrage_margin_entity: input_number.sessy_min_arbitrage_margin
+
+  # Optional live season mode selector (input_select with auto/summer/winter).
+  # If set, this overrides season_mode from the UI.
+  season_mode_entity: input_select.sessy_season_mode
+

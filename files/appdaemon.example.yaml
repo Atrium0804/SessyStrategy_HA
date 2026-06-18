@@ -1,0 +1,16 @@
+# Example AppDaemon configuration.
+# Copy to /config/appdaemon/appdaemon.yaml and fill in your own details.
+#
+# Generate a long-lived access token in Home Assistant under
+# Profile → Long-lived access tokens.
+
+appdaemon:
+  time_zone: Europe/Amsterdam
+  latitude: 52.0
+  longitude: 5.1
+  elevation: 0
+  plugins:
+    HASS:
+      type: hass
+      ha_url: http://homeassistant.local:8123
+      token: YOUR_LONG_LIVED_ACCESS_TOKEN

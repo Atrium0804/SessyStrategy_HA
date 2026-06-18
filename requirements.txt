@@ -1,0 +1,3 @@
+# The runtime is provided by the AppDaemon 4 add-on; this file exists only
+# for local linting / type-checking / IDE support.
+appdaemon>=4.4
