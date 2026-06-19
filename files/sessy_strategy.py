@@ -194,6 +194,20 @@ class SessyStrategy(hass.Hass):
             self._set_battery_setpoint(-charge_w)   # negative = charge
             return
 
+        # ── Priority 3.5: post-peak excess discharge ─────────────────────────
+        if prepeak_end <= now_hour < self.evening_peak_end and soc > soc_target:
+            max_remaining_price = self._max_price_in_window(now_hour, 24)
+            if max_remaining_price is None or max_remaining_price < price_discharge:
+                hours_remaining = self.evening_peak_end - now_hour
+                discharge_w = self._post_peak_discharge_setpoint(soc, soc_target, hours_remaining)
+                self.log(
+                    f"POST-PEAK DISCHARGE: SOC {soc:.0f}% > target {soc_target:.0f}% — "
+                    f"battery setpoint {discharge_w:.0f}W "
+                    f"(spread over {hours_remaining}h remaining peak window)"
+                )
+                self._set_battery_setpoint(discharge_w)
+                return
+
         # ── Priority 4: default — grid setpoint 0W (solar absorption) ────────
         self.log("DEFAULT: grid setpoint 0W — absorb solar, block export")
         self._set_grid_setpoint(0)
@@ -234,6 +248,15 @@ class SessyStrategy(hass.Hass):
             return 0
         gap_wh   = (self.cheap_soc_target - soc) / 100.0 * self.capacity_wh
         spread_w = gap_wh / cheap_hours
+        cap_w    = self.c_rate_cap * self.capacity_wh
+        return max(50, min(spread_w, cap_w, self.max_power_w))
+
+    def _post_peak_discharge_setpoint(self, soc: float, soc_target: float, hours_remaining: float) -> float:
+        """
+        Watts to discharge excess SOC above target, spread over remaining peak hours.
+        """
+        gap_wh   = (soc - soc_target) / 100.0 * self.capacity_wh
+        spread_w = gap_wh / max(hours_remaining, 0.083)  # avoid div/0
         cap_w    = self.c_rate_cap * self.capacity_wh
         return max(50, min(spread_w, cap_w, self.max_power_w))
 

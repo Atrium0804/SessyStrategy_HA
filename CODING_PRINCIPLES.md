@@ -268,3 +268,4 @@ These principles are enforced through:
 
 **Questions or Exceptions?**
 If a situation requires deviating from these principles, add a comment in the code explaining why. Never deviate silently.
+Ask the user when making key decisions

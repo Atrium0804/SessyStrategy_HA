@@ -171,7 +171,7 @@ In winter the strategy shifts significantly: solar cannot reliably fill the batt
 ### Prerequisites
 
 - Home Assistant with the [Sessy integration](https://github.com/PimDoos/ha-sessy) installed and configured
-- [AppDaemon 4](https://appdaemon.readthedocs.io/) installed as a Home Assistant add-on
+- [AppDaemon 4](https://appdaemon.readthedocs.io/) installed as a Home Assistant add-on (HAOS) or in a separate container (docker compose)
 
 ### Step 1 — Install AppDaemon
 
