@@ -170,18 +170,24 @@ class TestCheapChargeSetpoint:
     def test_spreads_over_cheap_hours(self):
         app = make_app()
         # gap = (100-60)/100 * 5000 = 2000 Wh / 4h → 500 W
-        result = app._cheap_charge_setpoint(soc=60, cheap_hours=4)
+        result = app._cheap_charge_setpoint(soc=60, cheap_soc_target=100, cheap_hours=4)
         assert result == pytest.approx(500.0)
 
     def test_already_at_ceiling_returns_zero(self):
         app = make_app()
-        result = app._cheap_charge_setpoint(soc=100, cheap_hours=3)
+        result = app._cheap_charge_setpoint(soc=100, cheap_soc_target=100, cheap_hours=3)
         assert result == 0
 
     def test_zero_cheap_hours_returns_zero(self):
         app = make_app()
-        result = app._cheap_charge_setpoint(soc=50, cheap_hours=0)
+        result = app._cheap_charge_setpoint(soc=50, cheap_soc_target=100, cheap_hours=0)
         assert result == 0
+
+    def test_respects_lower_ceiling(self):
+        app = make_app()
+        # ceiling 80 → gap = (80-60)/100 * 5000 = 1000 Wh / 2h → 500 W
+        result = app._cheap_charge_setpoint(soc=60, cheap_soc_target=80, cheap_hours=2)
+        assert result == pytest.approx(500.0)
 
 
 # ===========================================================================
@@ -328,6 +334,141 @@ class TestEnableSwitch:
         app.update_strategy({})
         app._set_grid_setpoint.assert_not_called()
         app._set_battery_setpoint.assert_not_called()
+
+
+# ===========================================================================
+# Operating-mode selector (master control)
+# ===========================================================================
+
+class TestModeSelector:
+    """
+    The mode selector supersedes the enable switch and gates the whole cycle.
+    Each test stubs the actuators and asserts the app honours the selected mode.
+    """
+
+    def _make(self, mode_state, **overrides):
+        app = make_app(
+            mode_select="input_select.home_battery_mode",
+            grid_setpoint_entity="input_number.home_battery_grid_setpoint",
+            battery_setpoint_entity="input_number.home_battery_battery_setpoint",
+            **overrides,
+        )
+        app._set_grid_setpoint = MagicMock()
+        app._set_battery_setpoint = MagicMock()
+        app._publish_branch = MagicMock()
+        app._apply_standby = MagicMock()
+        # _get_soc/_get_current_price only needed by the optimized chain.
+        app._get_soc = MagicMock(return_value=80)
+        app._get_current_price = MagicMock(return_value=0.15)
+        app._get_prices_dict = MagicMock(return_value=None)
+        app._max_price_in_window = MagicMock(return_value=0.50)
+        app._publish_status = MagicMock()
+        # get_state resolves both the selector and any input_number reads.
+        def _get_state(entity_id=None, *a, **kw):
+            if entity_id == "input_select.home_battery_mode":
+                return mode_state
+            if entity_id == "input_number.home_battery_grid_setpoint":
+                return "-500"
+            if entity_id == "input_number.home_battery_battery_setpoint":
+                return "1200"
+            return None
+        app.get_state = MagicMock(side_effect=_get_state)
+        return app
+
+    def test_label_is_normalised(self):
+        # "Grid setpoint" → grid_setpoint
+        assert self._make("Grid setpoint")._active_mode() == "grid_setpoint"
+
+    def test_optimized_runs_priority_chain(self):
+        app = self._make("Optimized")
+        app.update_strategy({})
+        # 14:00 / SOC 80 / 0.15 → default branch sets grid 0
+        app._set_grid_setpoint.assert_called_once_with(0)
+
+    def test_grid_setpoint_mode_passes_user_value_through(self):
+        app = self._make("Grid setpoint")
+        app.update_strategy({})
+        app._set_grid_setpoint.assert_called_once_with(-500.0)
+        app._set_battery_setpoint.assert_not_called()
+
+    def test_battery_setpoint_mode_passes_user_value_through(self):
+        app = self._make("Battery setpoint")
+        app.update_strategy({})
+        app._set_battery_setpoint.assert_called_once_with(1200.0)
+        app._set_grid_setpoint.assert_not_called()
+
+    def test_sessy_dynamic_stands_down(self):
+        app = self._make("Sessy dynamic")
+        app.update_strategy({})
+        app._apply_standby.assert_called_once_with(app.sessy_dynamic_option, "sessy_dynamic")
+        app._set_grid_setpoint.assert_not_called()
+        app._set_battery_setpoint.assert_not_called()
+
+    def test_eco_stands_down(self):
+        app = self._make("Eco")
+        app.update_strategy({})
+        app._apply_standby.assert_called_once_with(app.eco_option, "eco")
+        app._set_grid_setpoint.assert_not_called()
+        app._set_battery_setpoint.assert_not_called()
+
+    def test_idle_stands_down(self):
+        app = self._make("Idle")
+        app.update_strategy({})
+        app._apply_standby.assert_called_once_with(app.idle_option, "idle")
+        app._set_grid_setpoint.assert_not_called()
+        app._set_battery_setpoint.assert_not_called()
+
+    def test_selector_supersedes_enable_switch(self):
+        # Selector set to Optimized even though enable switch would say off.
+        app = self._make("Optimized", enable_switch="input_boolean.sessy_strategy_enabled")
+        app.update_strategy({})
+        app._set_grid_setpoint.assert_called_once_with(0)
+
+    def test_unknown_label_falls_back_to_optimized(self):
+        app = self._make("Bogus")
+        assert app._active_mode() == "optimized"
+
+
+class TestApplyStandby:
+    def test_switches_strategy_when_different(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value="api")
+        app.call_service = MagicMock()
+        app._publish_branch = MagicMock()
+        app._apply_standby("roi", "sessy_dynamic")
+        app.call_service.assert_called_once_with(
+            "select/select_option",
+            entity_id=app.strategy_select,
+            option="roi",
+        )
+        app._publish_branch.assert_called_once_with("sessy_dynamic", sessy_strategy="roi")
+
+    def test_no_switch_when_already_on_option(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value="roi")
+        app.call_service = MagicMock()
+        app._publish_branch = MagicMock()
+        app._apply_standby("roi", "sessy_dynamic")
+        app.call_service.assert_not_called()
+        app._publish_branch.assert_called_once()
+
+
+class TestPublishBranch:
+    def test_writes_branch_state_and_extra(self):
+        app = make_app()
+        app.set_state = MagicMock()
+        app._publish_branch("manual_grid", grid_setpoint=-500.0)
+        kwargs = app.set_state.call_args.kwargs
+        assert kwargs["state"] == "manual_grid"
+        assert kwargs["attributes"]["active_branch"] == "manual_grid"
+        assert kwargs["attributes"]["grid_setpoint"] == pytest.approx(-500.0)
+
+    def test_skipped_when_status_sensor_unset(self):
+        app = make_app()
+        app.status_sensor = None
+        app.set_state = MagicMock()
+        app._publish_branch("idle")
+        app.set_state.assert_not_called()
 
 
 # ===========================================================================
@@ -491,6 +632,7 @@ class TestSensorReaders:
 class TestPublishStatus:
     def _call_publish(self, app):
         app._publish_status(
+            "default",
             active_season="summer",
             min_price_hour=12,
             min_price_value=0.05,
@@ -499,6 +641,7 @@ class TestPublishStatus:
             import_price=0.31,
             soc_target=90.0,
             soc_floor=20.0,
+            cheap_soc_target=100.0,
             price_discharge=0.39,
             price_charge=-0.10,
             min_arbitrage_margin=0.05,
@@ -513,8 +656,10 @@ class TestPublishStatus:
         app.set_state.assert_called_once()
         kwargs = app.set_state.call_args.kwargs
         assert kwargs["state"] == "summer"
+        assert kwargs["attributes"]["active_branch"] == "default"
         assert kwargs["attributes"]["soc"] == pytest.approx(75.0)
         assert kwargs["attributes"]["raw_price"] == pytest.approx(0.20)
+        assert kwargs["attributes"]["cheap_soc_target"] == pytest.approx(100.0)
 
     def test_skipped_when_status_sensor_unset(self):
         app = make_app()

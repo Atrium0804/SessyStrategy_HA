@@ -13,8 +13,9 @@ An AppDaemon-based charging strategy for the Sessy home battery that minimises s
 5. [Installation](#5-installation)
 6. [Configuration reference](#6-configuration-reference)
 7. [Entity reference](#7-entity-reference)
-8. [ApexCharts dashboard](#8-apexcharts-dashboard)
-9. [Troubleshooting](#9-troubleshooting)
+8. [Home battery package (modes & controls)](#8-home-battery-package-modes--controls)
+9. [ApexCharts dashboard](#9-apexcharts-dashboard)
+10. [Troubleshooting](#10-troubleshooting)
 
 ---
 
@@ -339,13 +340,12 @@ sessy_strategy:
 
 All tunables (SOC targets, price thresholds, time windows) are optional and fall back to sensible defaults — see [Configuration reference](#6-configuration-reference) for the full list.
 
-**Optional — HA helpers:** copy `sessy_helpers.yaml` into `/config/packages/` (enable `packages: !include_dir_named packages` in `configuration.yaml`) to get:
+**Optional — HA helpers:** enable `packages: !include_dir_named packages` in `configuration.yaml`, then copy into `/config/packages/`:
 
-- `input_boolean.sessy_strategy_enabled` (master on/off)
-- `input_select.sessy_season_mode` (auto/summer/winter)
-- optional live `input_number` tuning sliders
+- `home_battery.yaml` — the recommended control surface: `input_select.home_battery_mode` (master mode selector), manual setpoints, SOC target/floor/ceiling, and the logical home-battery sensors (see [section 8](#8-home-battery-package-modes--controls)).
+- `sessy_helpers.yaml` — `input_select.sessy_season_mode` (auto/summer/winter), the price-threshold sliders, and the legacy `input_boolean.sessy_strategy_enabled`.
 
-Reference these in `apps.yaml` (`enable_switch:`, `season_mode_entity:`, and the `*_entity` keys) to control behavior from the HA UI without restarting AppDaemon.
+Reference these in `apps.yaml` (`mode_select:`, `season_mode_entity:`, and the `*_entity` keys) to control behavior from the HA UI without restarting AppDaemon.
 
 ### Step 4 — Verify AppDaemon configuration
 
@@ -434,7 +434,17 @@ sessy_strategy:
   price_sensor: sensor.sessy_dnhh_energy_price
   status_sensor: sensor.sessy_strategy_status
 
-  # Optional master enable switch (see sessy_helpers.yaml):
+  # Master mode selector (see home_battery.yaml) — supersedes enable_switch:
+  mode_select: input_select.home_battery_mode
+  grid_setpoint_entity: input_number.home_battery_grid_setpoint
+  battery_setpoint_entity: input_number.home_battery_battery_setpoint
+  sessy_dynamic_option: roi      # Sessy power_strategy option for "Sessy dynamic"
+  idle_option: idle              # Sessy power_strategy option for "Idle"
+
+  # Optional live SOC ceiling for cheap-charging (see home_battery.yaml):
+  cheap_soc_target_entity: input_number.home_battery_soc_ceiling
+
+  # Legacy master enable switch — only used when mode_select is unset:
   enable_switch: input_boolean.sessy_strategy_enabled
 
   # Optional live season mode selector (input_select auto/summer/winter):
@@ -445,16 +455,17 @@ Changes to `apps.yaml` are picked up automatically by AppDaemon (it reloads the 
 
 ### Live tuning from the HA UI
 
-Five of the most frequently adjusted values can optionally be driven by `input_number` helpers instead of static `apps.yaml` values, so you can change them from a dashboard (or your phone) with no file editing and no restart:
+The most frequently adjusted values can optionally be driven by helpers instead of static `apps.yaml` values, so you can change them from a dashboard (or your phone) with no file editing and no restart:
 
-| `apps.yaml` key | Helper (from `sessy_helpers.yaml`) |
-|---|---|
-| `soc_target_entity` | `input_number.sessy_soc_target` |
-| `soc_floor_entity` | `input_number.sessy_soc_floor` |
-| `price_discharge_entity` | `input_number.sessy_price_discharge` |
-| `price_charge_entity` | `input_number.sessy_price_charge` |
-| `min_arbitrage_margin_entity` | `input_number.sessy_min_arbitrage_margin` |
-| `season_mode_entity` | `input_select.sessy_season_mode` |
+| `apps.yaml` key | Helper | Source package |
+|---|---|---|
+| `soc_target_entity` | `input_number.home_battery_soc_target` | `home_battery.yaml` |
+| `soc_floor_entity` | `input_number.home_battery_soc_floor` | `home_battery.yaml` |
+| `cheap_soc_target_entity` | `input_number.home_battery_soc_ceiling` | `home_battery.yaml` |
+| `price_discharge_entity` | `input_number.sessy_price_discharge` | `sessy_helpers.yaml` |
+| `price_charge_entity` | `input_number.sessy_price_charge` | `sessy_helpers.yaml` |
+| `min_arbitrage_margin_entity` | `input_number.sessy_min_arbitrage_margin` | `sessy_helpers.yaml` |
+| `season_mode_entity` | `input_select.sessy_season_mode` | `sessy_helpers.yaml` |
 
 The app reads each helper every cycle and **falls back to the static value** above if the helper is missing or unreadable. Omit any `*_entity` line to keep that value `apps.yaml`-only. Because the helpers are real HA entities, they can also be driven by automations (e.g. raise `soc_floor` on cold days) and graphed in history. The structural settings (`capacity_wh`, entity IDs, time windows) remain `apps.yaml`-only by design.
 
@@ -505,7 +516,7 @@ The entity IDs below are the **defaults** (this author's installation). Override
 | `sensor.sessy_battery_alt9_power` | Current battery power W | Dashboard monitoring |
 | `sensor.sessy_battery_alt9_load_power` | Household load W | Dashboard monitoring |
 | `sensor.sessy_battery_alt9_system_state` | System state (running, full, empty…) | Health monitoring |
-| `sensor.sessy_strategy_status` | App status sensor published by AppDaemon (`state` = active season) | Season/inference/debug visibility |
+| `sensor.sessy_strategy_status` | App status sensor published by AppDaemon (`state` = active season; `active_branch` attribute = decision branch) | Season/inference/debug visibility |
 
 ### Controls (write)
 
@@ -514,21 +525,81 @@ The entity IDs below are the **defaults** (this author's installation). Override
 | `select.sessy_battery_alt9_power_strategy` | Active control strategy | `nom` (grid setpoint), `api` (battery setpoint) |
 | `number.sessy_pwkn_grid_target` | Grid power target W | −20000 to +20000 (negative = import) |
 | `number.sessy_battery_alt9_power_setpoint` | Battery power setpoint W | −2200 to +2200 (negative = charge, positive = discharge) |
-| `input_boolean.sessy_strategy_enabled` | Optional master switch (`enable_switch`) | `on` = run, `off` = pause the strategy |
-| `input_number.sessy_soc_target` | Optional live SOC target (`soc_target_entity`) | 0–100 % |
-| `input_number.sessy_soc_floor` | Optional live SOC floor (`soc_floor_entity`) | 0–100 % |
+| `input_select.home_battery_mode` | Master mode selector (`mode_select`) | `Optimized`, `Grid setpoint`, `Battery setpoint`, `Sessy dynamic`, `Eco`, `Idle` |
+| `input_number.home_battery_grid_setpoint` | Manual grid target (`grid_setpoint_entity`) | W |
+| `input_number.home_battery_battery_setpoint` | Manual battery power (`battery_setpoint_entity`) | W (− = charge) |
+| `input_number.home_battery_soc_target` | Optional live SOC target (`soc_target_entity`) | 0–100 % |
+| `input_number.home_battery_soc_floor` | Optional live SOC floor (`soc_floor_entity`) | 0–100 % |
+| `input_number.home_battery_soc_ceiling` | Optional live SOC ceiling (`cheap_soc_target_entity`) | 0–100 % |
 | `input_number.sessy_price_discharge` | Optional live discharge threshold (`price_discharge_entity`) | €/kWh |
 | `input_number.sessy_price_charge` | Optional live cheap-charge threshold (`price_charge_entity`) | €/kWh |
 | `input_number.sessy_min_arbitrage_margin` | Optional live arbitrage margin (`min_arbitrage_margin_entity`) | €/kWh |
+| `input_boolean.sessy_strategy_enabled` | Legacy master switch (`enable_switch`, used only when `mode_select` unset) | `on`/`off` |
 | `input_select.sessy_season_mode` | Optional live season mode (`season_mode_entity`) | `auto`, `summer`, `winter` |
 
 ---
 
-## 8. ApexCharts dashboard
+## 8. Home battery package (modes & controls)
+
+The optional `home_battery.yaml` package (place in `/config/packages/`) turns the
+Sessy plus this strategy into one logical "home battery" with an intuitive
+control surface. It is the recommended way to drive the system from the UI.
+
+### Why a master mode selector
+
+Three actors write the **same** physical entities (`power_strategy` select +
+the two number setpoints): the Sessy firmware, this AppDaemon app (which
+reasserts control every 5 minutes), and you. Manual control therefore only
+works if the app stands down. `input_select.home_battery_mode` is the single
+master input the app reads first (`mode_select:` in `apps.yaml`):
+
+| Mode | App behavior | Sessy `power_strategy` |
+|---|---|---|
+| **Optimized** | Runs the full priority chain ([§1](#1-how-the-strategy-works)) | app picks `nom`/`api` |
+| **Grid setpoint** | Applies `home_battery_grid_setpoint` (W) | forced to `nom` |
+| **Battery setpoint** | Applies `home_battery_battery_setpoint` (W, −=charge) | forced to `api` |
+| **Sessy dynamic** | Stands down; hands control to Sessy's own ROI schedule | `sessy_dynamic_option` (default `roi`) |
+| **Eco** | Stands down; lets Sessy run in eco mode | `eco_option` (default `eco`) |
+| **Idle** | Stands down; parks the battery | `idle_option` (default `idle`) |
+
+"Optimized" is this project's price-optimisation mode — named to avoid clashing
+with Sessy's own **Dynamic** schedule, which the *Sessy dynamic* option hands
+back to. Verify the exact `power_strategy` option strings for your install in
+**Developer Tools → States** and override `sessy_dynamic_option` / `idle_option`
+in `apps.yaml` if they differ.
+
+### Controls
+
+| Control | Drives |
+|---|---|
+| `input_select.home_battery_mode` | master mode (above) |
+| `input_number.home_battery_grid_setpoint` | manual grid target (Grid setpoint mode) |
+| `input_number.home_battery_battery_setpoint` | manual battery power (Battery setpoint mode) |
+| `input_number.home_battery_soc_target` | pre-peak SOC target (`soc_target_entity`) |
+| `input_number.home_battery_soc_floor` | discharge floor (`soc_floor_entity`) |
+| `input_number.home_battery_soc_ceiling` | cheap-charge ceiling (`cheap_soc_target_entity`) |
+
+### Logical sensors
+
+| Sensor | Description |
+|---|---|
+| `sensor.home_battery_soc` | SOC % |
+| `sensor.home_battery_charge_power` | battery net power W (+ = discharge) |
+| `sensor.home_battery_grid_power` | grid net power W (− = export) |
+| `sensor.home_battery_system_state` | Sessy system state |
+| `sensor.home_battery_active_strategy` | active mode; `sessy_strategy` attribute shows the live `power_strategy` |
+| `sensor.home_battery_active_substrategy` | active decision branch (`discharge`, `cheap_charge`, `prepeak_charge`, `post_peak_discharge`, `default`, `manual_grid`, `manual_battery`, `sessy_dynamic`, `idle`) |
+
+The decision branch is published to `sensor.sessy_strategy_status` as the
+`active_branch` attribute, so it is also available without the package.
+
+---
+
+## 9. ApexCharts dashboard
 
 Install the [ApexCharts Card](https://github.com/RomRider/apexcharts-card) via HACS before using these examples.
 
-### 8.1 — Energy price with strategy triggers
+### 9.1 — Energy price with strategy triggers
 
 Shows the full day's price curve with dynamic threshold lines driven by HA helpers (`input_number.sessy_price_discharge` and `input_number.sessy_price_charge`). The price y-axis uses soft bounds around the common raw-price band.
 
@@ -577,7 +648,7 @@ series:
     stroke_dash: 5
 ```
 
-### 8.2 — Battery SOC and power flows
+### 9.2 — Battery SOC and power flows
 
 Shows SOC alongside PV production, battery power, and grid power on a shared timeline. Positive battery power = discharge, negative = charge.
 
@@ -634,7 +705,7 @@ series:
     yaxis_id: power
 ```
 
-### 8.3 — Sessy dynamic schedule vs actual battery power
+### 9.3 — Sessy dynamic schedule vs actual battery power
 
 Compares what Sessy's own dynamic strategy planned against what the battery actually did. Useful for validating that your override strategy is outperforming the default.
 
@@ -679,7 +750,7 @@ series:
     stroke_width: 2
 ```
 
-### 8.4 — Combined strategy overview dashboard
+### 9.4 — Combined strategy overview dashboard
 
 A full-width card combining price, SOC, and all power flows in a single view. Suitable as a main energy dashboard panel.
 
@@ -781,7 +852,7 @@ series:
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 **Strategy is not switching modes**
 

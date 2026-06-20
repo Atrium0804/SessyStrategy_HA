@@ -48,10 +48,24 @@ sessy_strategy:
   price_sensor: sensor.sessy_dnhh_energy_price
   status_sensor: sensor.sessy_strategy_status
 
-  # ── Optional master switch ──────────────────────────────────────────
-  # Reference an input_boolean (see sessy_helpers.yaml) to enable/disable
-  # the strategy from the HA UI without restarting AppDaemon. Remove this
-  # line to always run.
+  # ── Operating-mode selector (master control) ────────────────────────
+  # Single input_select the app obeys (see home_battery.yaml). Supersedes
+  # enable_switch when set. Options normalise to: optimized | grid_setpoint |
+  # battery_setpoint | sessy_dynamic | idle.
+  mode_select: input_select.home_battery_mode
+  # Manual setpoints applied by the app in the matching modes.
+  grid_setpoint_entity: input_number.home_battery_grid_setpoint
+  battery_setpoint_entity: input_number.home_battery_battery_setpoint
+  # Sessy power_strategy option strings used when handing control back.
+  # Defaults match the ha-sessy integration — verify in Developer Tools and
+  # override if your build uses different option strings.
+  sessy_dynamic_option: roi
+  eco_option: eco
+  idle_option: idle
+
+  # ── Optional master switch (legacy) ─────────────────────────────────
+  # Only used as a fallback when mode_select is NOT configured: off pauses
+  # the strategy. Superseded by the mode selector above.
   enable_switch: input_boolean.sessy_strategy_enabled
 
   # ── Optional live-tuning helpers ────────────────────────────────────
@@ -59,8 +73,11 @@ sessy_strategy:
   # values from the HA UI without restarting AppDaemon. The app reads them
   # each cycle and falls back to the static values above if a helper is
   # missing or unreadable. Remove any line to keep the static value only.
-  soc_target_entity: input_number.sessy_soc_target
-  soc_floor_entity: input_number.sessy_soc_floor
+  # SOC controls live in the home_battery package (see home_battery.yaml).
+  soc_target_entity: input_number.home_battery_soc_target
+  soc_floor_entity: input_number.home_battery_soc_floor
+  cheap_soc_target_entity: input_number.home_battery_soc_ceiling
+  # Price-threshold sliders remain in sessy_helpers.yaml.
   price_discharge_entity: input_number.sessy_price_discharge
   price_charge_entity: input_number.sessy_price_charge
   min_arbitrage_margin_entity: input_number.sessy_min_arbitrage_margin

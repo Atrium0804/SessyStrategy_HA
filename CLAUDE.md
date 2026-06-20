@@ -15,7 +15,8 @@ Install by copying files to the HA instance:
 ```
 files/sessy_strategy.py  →  /config/appdaemon/apps/sessy_strategy.py
 files/apps.yaml          →  /config/appdaemon/apps/apps.yaml  (merge with existing)
-files/sessy_helpers.yaml →  /config/packages/sessy_helpers.yaml  (optional, for UI)
+files/home_battery.yaml  →  /config/packages/home_battery.yaml  (logical battery UI)
+files/sessy_helpers.yaml →  /config/packages/sessy_helpers.yaml  (season + price sliders)
 ```
 
 Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
@@ -73,6 +74,10 @@ Full detail in `CODING_PRINCIPLES.md`. Key rules:
 - **All HA entity reads/writes** go through named helper calls; don't store HA state in instance variables between cycles.
 - **No magic numbers** — all tunables in `apps.yaml`.
 - **Comments explain *why*, not what** — if you need a comment to explain how the code works, simplify the code.
+
+## Environment notes
+
+- **`gh` is not on the Bash PATH.** Use the full path: `C:\Program Files\GitHub CLI\gh.exe`. Pass the PR body via `--body-file <file>` to avoid shell quoting issues with backticks and special characters.
 
 ## Known Gaps (COMPLIANCE_AUDIT.md, 2026-06-19)
 
