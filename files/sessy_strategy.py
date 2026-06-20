@@ -58,8 +58,27 @@ class SessyStrategy(hass.Hass):
         self.soc_sensor       = self.args.get("soc_sensor",       "sensor.sessy_battery_alt9_state_of_charge")
         self.price_sensor     = self.args.get("price_sensor",     "sensor.sessy_dnhh_energy_price")
         self.status_sensor    = self.args.get("status_sensor",    "sensor.sessy_strategy_status")
-        # Optional master enable switch (input_boolean). If unset, the app always runs.
+        # Optional master enable switch (input_boolean). Legacy fallback used only
+        # when no mode_select is configured. If unset, the app always runs.
         self.enable_switch    = self.args.get("enable_switch")
+
+        # ── Operating-mode selector (input_select) ──────────────────────────
+        # The single master control the app obeys. When set, it supersedes
+        # enable_switch. Options are normalised to: optimized | grid_setpoint |
+        # battery_setpoint | sessy_dynamic | idle (case- and space-insensitive).
+        #   optimized       — run the full price-optimisation priority chain
+        #   grid_setpoint   — pass user's grid target through (strategy → nom)
+        #   battery_setpoint— pass user's battery power through (strategy → api)
+        #   sessy_dynamic   — stand down, hand control to Sessy's own schedule
+        #   idle            — stand down, park the battery
+        self.mode_select       = self.args.get("mode_select")
+        self.grid_setpoint_entity    = self.args.get("grid_setpoint_entity")
+        self.battery_setpoint_entity = self.args.get("battery_setpoint_entity")
+        # Sessy power_strategy option strings to select when handing control back.
+        # Defaults match the ha-sessy integration; override if your build differs.
+        self.sessy_dynamic_option = str(self.args.get("sessy_dynamic_option", "roi"))
+        self.idle_option          = str(self.args.get("idle_option", "idle"))
+        self.eco_option           = str(self.args.get("eco_option", "eco"))
 
         # Optional live-tuning helpers (input_number). If set, these override the
         # corresponding static default each cycle, so the value can be changed
@@ -69,6 +88,7 @@ class SessyStrategy(hass.Hass):
         self.price_discharge_entity      = self.args.get("price_discharge_entity")
         self.price_charge_entity         = self.args.get("price_charge_entity")
         self.min_arbitrage_margin_entity = self.args.get("min_arbitrage_margin_entity")
+        self.cheap_soc_target_entity     = self.args.get("cheap_soc_target_entity")
         # Optional live season mode selector (input_select with auto/summer/winter)
         self.season_mode_entity          = self.args.get("season_mode_entity")
 
@@ -81,10 +101,42 @@ class SessyStrategy(hass.Hass):
     # ── Main logic ────────────────────────────────────────────────────────────
 
     def update_strategy(self, kwargs):
-        if self.enable_switch and self.get_state(self.enable_switch) == "off":
-            self.log("Strategy disabled via enable switch — skipping this cycle")
+        # ── Mode dispatch: the selector is the single master input ──────────
+        # Manual and stand-down modes return early; only "optimized" runs the
+        # price-optimisation priority chain below.
+        mode = self._active_mode()
+
+        if mode == "disabled":
+            self.log("Strategy disabled — skipping this cycle")
             return
 
+        if mode == "idle":
+            self._apply_standby(self.idle_option, "idle")
+            return
+
+        if mode == "sessy_dynamic":
+            self._apply_standby(self.sessy_dynamic_option, "sessy_dynamic")
+            return
+
+        if mode == "eco":
+            self._apply_standby(self.eco_option, "eco")
+            return
+
+        if mode == "grid_setpoint":
+            watts = self._tunable(0, self.grid_setpoint_entity)
+            self.log(f"MANUAL grid setpoint {watts:.0f}W")
+            self._set_grid_setpoint(watts)
+            self._publish_branch("manual_grid", grid_setpoint=watts)
+            return
+
+        if mode == "battery_setpoint":
+            watts = self._tunable(0, self.battery_setpoint_entity)
+            self.log(f"MANUAL battery setpoint {watts:.0f}W")
+            self._set_battery_setpoint(watts)
+            self._publish_branch("manual_battery", battery_setpoint=watts)
+            return
+
+        # ── mode == "optimized": price-optimisation priority chain ──────────
         now_hour = self.datetime().hour
         soc      = self._get_soc()
         price    = self._get_current_price()
@@ -102,6 +154,7 @@ class SessyStrategy(hass.Hass):
         # Resolve live-tunable values (input_number overrides, else apps.yaml default)
         soc_target           = self._tunable(self.soc_target, self.soc_target_entity)
         soc_floor            = self._tunable(self.soc_floor, self.soc_floor_entity)
+        cheap_soc_target     = self._tunable(self.cheap_soc_target, self.cheap_soc_target_entity)
         price_discharge      = self._tunable(self.price_discharge, self.price_discharge_entity)
         price_charge         = self._tunable(self.price_charge, self.price_charge_entity)
         min_arbitrage_margin = self._tunable(self.min_arbitrage_margin, self.min_arbitrage_margin_entity)
@@ -116,7 +169,8 @@ class SessyStrategy(hass.Hass):
         prepeak_end      = self._seasonal_value(self.prepeak_end, active_season, self.prepeak_end_winter)
         prepeak_window_h = self._seasonal_value(self.prepeak_window_h, active_season, self.prepeak_window_h_winter)
 
-        self._publish_status(
+        # Common status fields; the decided branch is attached at each return.
+        status_fields = dict(
             active_season=active_season,
             min_price_hour=min_price_hour,
             min_price_value=min_price_value,
@@ -125,6 +179,7 @@ class SessyStrategy(hass.Hass):
             import_price=import_price,
             soc_target=soc_target,
             soc_floor=soc_floor,
+            cheap_soc_target=cheap_soc_target,
             price_discharge=price_discharge,
             price_charge=price_charge,
             min_arbitrage_margin=min_arbitrage_margin,
@@ -141,25 +196,28 @@ class SessyStrategy(hass.Hass):
                 f"{price_discharge + self.surcharge:.2f} — "
                 f"battery setpoint {discharge_w:.0f}W (SOC {soc:.0f}% → floor {soc_floor:.0f}%)"
             )
+            self._publish_status("discharge", **status_fields)
             self._set_battery_setpoint(discharge_w)
             return
 
         # ── Priority 2: very cheap / negative price → charge toward ceiling ──
         if price < price_charge:
-            if soc >= self.cheap_soc_target:
+            if soc >= cheap_soc_target:
                 self.log(
                     f"CHEAP CHARGE: SOC {soc:.0f}% already at ceiling "
-                    f"{self.cheap_soc_target:.0f}% — holding grid setpoint 0W"
+                    f"{cheap_soc_target:.0f}% — holding grid setpoint 0W"
                 )
+                self._publish_status("cheap_charge_full", **status_fields)
                 self._set_grid_setpoint(0)
                 return
             cheap_hours = self._count_cheap_hours(price_charge)
-            charge_w    = self._cheap_charge_setpoint(soc, cheap_hours)
+            charge_w    = self._cheap_charge_setpoint(soc, cheap_soc_target, cheap_hours)
             self.log(
                 f"CHEAP CHARGE: raw price {price:.5f} < {price_charge} — "
-                f"battery setpoint -{charge_w:.0f}W (SOC {soc:.0f}% → {self.cheap_soc_target:.0f}% "
+                f"battery setpoint -{charge_w:.0f}W (SOC {soc:.0f}% → {cheap_soc_target:.0f}% "
                 f"over {cheap_hours}h cheap window)"
             )
+            self._publish_status("cheap_charge", **status_fields)
             self._set_battery_setpoint(-charge_w)
             return
 
@@ -170,6 +228,7 @@ class SessyStrategy(hass.Hass):
                     f"PRE-PEAK: SOC {soc:.0f}% already at target {soc_target:.0f}% — "
                     f"holding grid setpoint 0W"
                 )
+                self._publish_status("prepeak_full", **status_fields)
                 self._set_grid_setpoint(0)
                 return
 
@@ -183,6 +242,7 @@ class SessyStrategy(hass.Hass):
                     f"{import_price:.3f} (spread < margin {min_arbitrage_margin}) — "
                     f"holding grid setpoint 0W"
                 )
+                self._publish_status("prepeak_skip", **status_fields)
                 self._set_grid_setpoint(0)
                 return
 
@@ -191,6 +251,7 @@ class SessyStrategy(hass.Hass):
                 f"PRE-PEAK CHARGE: battery setpoint -{charge_w:.0f}W "
                 f"(SOC {soc:.0f}% → target {soc_target:.0f}% over {prepeak_window_h}h)"
             )
+            self._publish_status("prepeak_charge", **status_fields)
             self._set_battery_setpoint(-charge_w)   # negative = charge
             return
 
@@ -205,12 +266,51 @@ class SessyStrategy(hass.Hass):
                     f"battery setpoint {discharge_w:.0f}W "
                     f"(spread over {hours_remaining}h remaining peak window)"
                 )
+                self._publish_status("post_peak_discharge", **status_fields)
                 self._set_battery_setpoint(discharge_w)
                 return
 
         # ── Priority 4: default — grid setpoint 0W (solar absorption) ────────
         self.log("DEFAULT: grid setpoint 0W — absorb solar, block export")
+        self._publish_status("default", **status_fields)
         self._set_grid_setpoint(0)
+
+    # ── Mode helpers ──────────────────────────────────────────────────────────
+
+    _VALID_MODES = ("optimized", "grid_setpoint", "battery_setpoint",
+                    "sessy_dynamic", "eco", "idle")
+
+    def _active_mode(self) -> str:
+        """
+        Resolve the operating mode from the input_select selector, normalising
+        labels like "Grid setpoint" to "grid_setpoint". When no selector is
+        configured, fall back to the legacy enable_switch ("disabled" when off).
+        """
+        if self.mode_select:
+            state = self.get_state(self.mode_select)
+            if isinstance(state, str):
+                key = state.strip().lower().replace(" ", "_")
+                if key in self._VALID_MODES:
+                    return key
+        if self.enable_switch and self.get_state(self.enable_switch) == "off":
+            return "disabled"
+        return "optimized"
+
+    def _apply_standby(self, strategy_option: str, branch: str):
+        """
+        Hand control back to a Sessy power_strategy option (e.g. its own dynamic
+        schedule or idle) without writing any setpoint. Only switches the select
+        if it is not already on the requested option.
+        """
+        current = self.get_state(self.strategy_select)
+        if current != strategy_option:
+            self.call_service(
+                "select/select_option",
+                entity_id=self.strategy_select,
+                option=strategy_option,
+            )
+            self.log(f"Strategy → {strategy_option} ({branch})")
+        self._publish_branch(branch, sessy_strategy=strategy_option)
 
     # ── Setpoint calculators ──────────────────────────────────────────────────
 
@@ -237,16 +337,16 @@ class SessyStrategy(hass.Hass):
         cap_w    = self.c_rate_cap * self.capacity_wh
         return max(50, min(spread_w, cap_w, self.max_power_w))
 
-    def _cheap_charge_setpoint(self, soc: float, cheap_hours: int) -> float:
+    def _cheap_charge_setpoint(self, soc: float, cheap_soc_target: float, cheap_hours: int) -> float:
         """
         Watts to charge from the grid during a cheap-price window.
         Spreads the gap to cheap_soc_target over the number of remaining cheap
         hours, so a short dip charges hard and a long cheap block charges gently.
         Capped at c_rate_cap × capacity and max_power_w.
         """
-        if soc >= self.cheap_soc_target or cheap_hours <= 0:
+        if soc >= cheap_soc_target or cheap_hours <= 0:
             return 0
-        gap_wh   = (self.cheap_soc_target - soc) / 100.0 * self.capacity_wh
+        gap_wh   = (cheap_soc_target - soc) / 100.0 * self.capacity_wh
         spread_w = gap_wh / cheap_hours
         cap_w    = self.c_rate_cap * self.capacity_wh
         return max(50, min(spread_w, cap_w, self.max_power_w))
@@ -388,6 +488,7 @@ class SessyStrategy(hass.Hass):
 
     def _publish_status(
             self,
+            active_branch: str,
             active_season: str,
             min_price_hour,
             min_price_value,
@@ -396,6 +497,7 @@ class SessyStrategy(hass.Hass):
             import_price: float,
             soc_target: float,
             soc_floor: float,
+            cheap_soc_target: float,
             price_discharge: float,
             price_charge: float,
             min_arbitrage_margin: float,
@@ -419,6 +521,7 @@ class SessyStrategy(hass.Hass):
             self.status_sensor,
             state=active_season,
             attributes={
+                "active_branch": active_branch,
                 "season_mode_source": mode_source,
                 "season_day_start": self.season_day_start,
                 "season_day_end": self.season_day_end,
@@ -430,6 +533,7 @@ class SessyStrategy(hass.Hass):
                 "import_price": round(import_price, 5),
                 "soc_target": soc_target,
                 "soc_floor": soc_floor,
+                "cheap_soc_target": cheap_soc_target,
                 "price_discharge": price_discharge,
                 "price_charge": price_charge,
                 "min_arbitrage_margin": min_arbitrage_margin,
@@ -437,6 +541,20 @@ class SessyStrategy(hass.Hass):
                 "prepeak_end": prepeak_end,
                 "prepeak_window_h": prepeak_window_h,
             },
+        )
+
+    def _publish_branch(self, active_branch: str, **extra):
+        """
+        Lightweight status publish for manual and stand-down modes, where the
+        full optimisation context (season, thresholds) does not apply. Sets the
+        status state to the active branch and records any extra fields.
+        """
+        if not self.status_sensor:
+            return
+        self.set_state(
+            self.status_sensor,
+            state=active_branch,
+            attributes={"active_branch": active_branch, **extra},
         )
 
     def _get_soc(self) -> float | None:

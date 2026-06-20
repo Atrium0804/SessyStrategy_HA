@@ -15,7 +15,8 @@ Install by copying files to the HA instance:
 ```
 files/sessy_strategy.py  →  /config/appdaemon/apps/sessy_strategy.py
 files/apps.yaml          →  /config/appdaemon/apps/apps.yaml  (merge with existing)
-files/sessy_helpers.yaml →  /config/packages/sessy_helpers.yaml  (optional, for UI)
+files/home_battery.yaml  →  /config/packages/home_battery.yaml  (logical battery UI)
+files/sessy_helpers.yaml →  /config/packages/sessy_helpers.yaml  (season + price sliders)
 ```
 
 Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.

@@ -8,10 +8,15 @@
 # then place this file at /config/packages/sessy_helpers.yaml.
 # (Or paste the input_boolean block into your existing helpers.)
 #
-# The master switch lets you pause the strategy from the HA UI without
-# restarting AppDaemon. Reference it from apps.yaml via:
-#   enable_switch: input_boolean.sessy_strategy_enabled
+# NOTE: the home_battery.yaml package is now the primary control surface. It
+# owns the master mode selector (input_select.home_battery_mode) and the SOC
+# controls (soc_target / soc_floor / soc_ceiling). This file retains only the
+# season selector and the price-threshold sliders, plus the legacy enable
+# switch (used by the app only when mode_select is not configured).
 
+# Legacy master switch — superseded by input_select.home_battery_mode. The app
+# falls back to this only when apps.yaml has no mode_select. Keep it if you have
+# not adopted the home_battery package yet.
 input_boolean:
   sessy_strategy_enabled:
     name: Sessy strategy enabled
@@ -33,22 +38,8 @@ input_select:
 # the value from the HA UI without restarting AppDaemon. Omit any you don't want
 # to expose — the app falls back to the static apps.yaml default.
 input_number:
-  sessy_soc_target:
-    name: Sessy SOC target
-    icon: mdi:battery-charging-90
-    min: 0
-    max: 100
-    step: 1
-    unit_of_measurement: "%"
-    initial: 90
-  sessy_soc_floor:
-    name: Sessy SOC floor
-    icon: mdi:battery-20
-    min: 0
-    max: 100
-    step: 1
-    unit_of_measurement: "%"
-    initial: 20
+  # SOC sliders moved to home_battery.yaml (home_battery_soc_target /
+  # _soc_floor / _soc_ceiling). Price thresholds remain here.
   sessy_price_discharge:
     name: Sessy discharge price threshold
     icon: mdi:cash-plus
