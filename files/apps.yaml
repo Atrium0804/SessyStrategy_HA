@@ -49,10 +49,9 @@ sessy_strategy:
   status_sensor: sensor.sessy_strategy_status
 
   # ── Operating-mode selector (master control) ────────────────────────
-  # Single input_select the app obeys (see home_battery.yaml). Supersedes
-  # enable_switch when set. Options normalise to: optimized | grid_setpoint |
-  # battery_setpoint | sessy_dynamic | idle.
-  # Provided by the Home Battery custom integration (files/custom_components).
+  # Provided by the Home Battery custom integration (custom_components/home_battery).
+  # Supersedes enable_switch when set. Options normalise to:
+  # optimized | grid_setpoint | battery_setpoint | sessy_dynamic | eco | idle.
   mode_select: select.home_battery_mode
   # Manual setpoints applied by the app in the matching modes.
   grid_setpoint_entity: number.home_battery_grid_setpoint
@@ -70,11 +69,11 @@ sessy_strategy:
   enable_switch: input_boolean.sessy_strategy_enabled
 
   # ── Optional live-tuning helpers ────────────────────────────────────
-  # Reference input_number helpers (see sessy_helpers.yaml) to adjust these
-  # values from the HA UI without restarting AppDaemon. The app reads them
-  # each cycle and falls back to the static values above if a helper is
-  # missing or unreadable. Remove any line to keep the static value only.
-  # SOC controls live in the home_battery package (see home_battery.yaml).
+  # These let the app read live values from HA helpers each cycle so you can
+  # tune them from a dashboard without restarting AppDaemon. The app falls back
+  # to the static values above if a helper is missing or unreadable. Remove any
+  # line to keep that value static.
+  # SOC numbers come from the Home Battery integration; price sliders from sessy_helpers.yaml.
   soc_target_entity: number.home_battery_soc_target
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling

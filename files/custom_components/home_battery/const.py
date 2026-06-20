@@ -9,7 +9,7 @@ MODEL = "Logical home battery"
 
 # ── Config-entry keys: the underlying Sessy/AppDaemon entities we mirror ──────
 # These map the integration onto your own Sessy entity IDs. Defaults match the
-# suffixes documented in files/home_battery.yaml — override per install.
+# standard SessyStrategy_HA entity suffixes — override per install.
 CONF_SOC_SOURCE = "soc_source"
 CONF_BATTERY_POWER_SOURCE = "battery_power_source"
 CONF_GRID_POWER_SOURCE = "grid_power_source"

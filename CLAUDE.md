@@ -13,11 +13,13 @@ SessyStrategy HA is an **AppDaemon 4** application for Home Assistant that optim
 Install by copying files to the HA instance:
 
 ```
-files/sessy_strategy.py  →  /config/appdaemon/apps/sessy_strategy.py
-files/apps.yaml          →  /config/appdaemon/apps/apps.yaml  (merge with existing)
-files/home_battery.yaml  →  /config/packages/home_battery.yaml  (logical battery UI)
-files/sessy_helpers.yaml →  /config/packages/sessy_helpers.yaml  (season + price sliders)
+files/sessy_strategy.py                   →  /config/appdaemon/apps/sessy_strategy.py
+files/apps.yaml                           →  /config/appdaemon/apps/apps.yaml  (merge with existing)
+files/sessy_helpers.yaml                  →  /config/packages/sessy_helpers.yaml  (season + price sliders)
+files/custom_components/home_battery/     →  /config/custom_components/home_battery/  (Home Battery device)
 ```
+
+After deploying the custom component, restart Home Assistant and add the **Home Battery** integration under Settings → Devices & Services (it creates the mode select, setpoint numbers, and mirror sensors as a real device).
 
 Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
 

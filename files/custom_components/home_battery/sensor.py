@@ -1,8 +1,7 @@
 """Mirror sensors for the Home Battery device.
 
 These follow the underlying Sessy entities (and the AppDaemon status sensor) and
-re-publish them under the Home Battery device, replacing the template sensors
-that used to live in files/home_battery.yaml.
+re-publish them under the Home Battery device.
 """
 
 from __future__ import annotations

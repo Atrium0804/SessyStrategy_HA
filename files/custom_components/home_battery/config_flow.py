@@ -1,7 +1,7 @@
 """Config + options flow for Home Battery.
 
 A single screen maps the integration onto your Sessy entity IDs. Defaults match
-files/home_battery.yaml, so on a standard install you can just press Submit.
+the standard SessyStrategy_HA install, so you can just press Submit.
 """
 
 from __future__ import annotations

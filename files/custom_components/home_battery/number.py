@@ -1,7 +1,6 @@
 """User-tunable numbers for the Home Battery device.
 
-These replace the input_number helpers from files/home_battery.yaml. The
-AppDaemon app reads them each cycle (manual setpoints in the matching modes,
+The AppDaemon app reads these each cycle (manual setpoints in the matching modes,
 SOC targets always). Point apps.yaml at them, e.g.
 ``soc_target_entity: number.home_battery_soc_target``.
 """
@@ -33,7 +32,7 @@ class _Spec:
     mode: NumberMode
 
 
-# Mirrors the input_number block in files/home_battery.yaml.
+# Controls exposed on the Home Battery device.
 _NUMBERS: tuple[_Spec, ...] = (
     _Spec(
         "grid_setpoint", "Grid setpoint", "mdi:transmission-tower",
