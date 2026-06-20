@@ -16,6 +16,7 @@ if (-not $env:PKG_DIR)            { throw "Set PKG_DIR in .env or environment" }
 
 $HA_HOST            = $env:HA_HOST
 $HA_USER            = if ($env:HA_USER) { $env:HA_USER } else { "root" }
+$HA_CONFIG          = if ($env:HA_CONFIG) { $env:HA_CONFIG } else { "/config" }
 $APPDAEMON_APPS_DIR = $env:APPDAEMON_APPS_DIR
 $PKG_DIR            = $env:PKG_DIR
 
@@ -25,5 +26,10 @@ scp files/sessy_strategy.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/sessy_
 scp files/apps.yaml          "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/apps.yaml"
 scp files/sessy_helpers.yaml "${HA_USER}@${HA_HOST}:${PKG_DIR}/sessy_helpers.yaml"
 
+# Home Battery custom integration (creates the device + entities).
+ssh "${HA_USER}@${HA_HOST}" "mkdir -p ${HA_CONFIG}/custom_components/home_battery"
+scp -r files/custom_components/home_battery/* "${HA_USER}@${HA_HOST}:${HA_CONFIG}/custom_components/home_battery/"
+
 Write-Host ""
-Write-Host "Done. Restart AppDaemon in HA to pick up changes."
+Write-Host "Done. Restart AppDaemon, and restart Home Assistant once to load the"
+Write-Host "Home Battery integration (then add it under Settings -> Devices & Services)."

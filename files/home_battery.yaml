@@ -1,6 +1,15 @@
 # ============================================================
 # Home battery package
 #
+# ⚠ SUPERSEDED by the Home Battery custom integration
+# (files/custom_components/home_battery). The integration creates the same
+# controls and sensors but groups them under a real "Home Battery" DEVICE, and
+# apps.yaml now points at its entities (select.home_battery_mode,
+# number.home_battery_*). Use EITHER this package OR the integration, not both —
+# loading both creates parallel input_* and select/number entities. This file is
+# kept only as a no-device fallback for installs that can't add custom
+# integrations.
+#
 # A single logical "home battery" that wraps the Sessy battery and the
 # SessyStrategy_HA AppDaemon app into one intuitive set of controls and
 # sensors. Place at /config/packages/home_battery.yaml (enable packages with

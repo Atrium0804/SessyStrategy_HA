@@ -52,10 +52,11 @@ sessy_strategy:
   # Single input_select the app obeys (see home_battery.yaml). Supersedes
   # enable_switch when set. Options normalise to: optimized | grid_setpoint |
   # battery_setpoint | sessy_dynamic | idle.
-  mode_select: input_select.home_battery_mode
+  # Provided by the Home Battery custom integration (files/custom_components).
+  mode_select: select.home_battery_mode
   # Manual setpoints applied by the app in the matching modes.
-  grid_setpoint_entity: input_number.home_battery_grid_setpoint
-  battery_setpoint_entity: input_number.home_battery_battery_setpoint
+  grid_setpoint_entity: number.home_battery_grid_setpoint
+  battery_setpoint_entity: number.home_battery_battery_setpoint
   # Sessy power_strategy option strings used when handing control back.
   # Defaults match the ha-sessy integration — verify in Developer Tools and
   # override if your build uses different option strings.
@@ -74,9 +75,9 @@ sessy_strategy:
   # each cycle and falls back to the static values above if a helper is
   # missing or unreadable. Remove any line to keep the static value only.
   # SOC controls live in the home_battery package (see home_battery.yaml).
-  soc_target_entity: input_number.home_battery_soc_target
-  soc_floor_entity: input_number.home_battery_soc_floor
-  cheap_soc_target_entity: input_number.home_battery_soc_ceiling
+  soc_target_entity: number.home_battery_soc_target
+  soc_floor_entity: number.home_battery_soc_floor
+  cheap_soc_target_entity: number.home_battery_soc_ceiling
   # Price-threshold sliders remain in sessy_helpers.yaml.
   price_discharge_entity: input_number.sessy_price_discharge
   price_charge_entity: input_number.sessy_price_charge
