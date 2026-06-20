@@ -20,77 +20,186 @@ An AppDaemon-based charging strategy for the Sessy home battery that minimises s
 
 ## 1. How the strategy works
 
-The strategy runs every 5 minutes and decides what the Sessy should do right now, based on current state of charge and the live energy price. It follows a strict priority order:
+The app wakes every 5 minutes, reads the current state of charge (SOC) and the live energy price, and runs a single **top-down priority chain**. The first branch whose condition matches wins, sets the battery for that cycle, and stops; everything below it is skipped. If nothing matches, the default branch runs. Nothing is stored between cycles — the decision is recomputed from scratch each run, so it behaves like a proportional controller that self-corrects as SOC and prices move.
 
 ```
-Priority 1 — Price spike (import price > €0.50)
-    → Battery setpoint: discharge toward SOC floor, spread over 2 hours
-
-Priority 2 — Negative / very cheap price (raw price < −€0.10)
-    → Battery setpoint: charge toward 100% SOC, rate spread over the
-      remaining run of cheap hours
-
-Priority 3 — Pre-peak window (season-aware), SOC below target, and a
-             worthwhile evening peak ahead
-    → Battery setpoint: charge toward 90% SOC, spread over a
-      season-specific window
-      (skipped if the expected peak does not beat the current import
-       price by at least the arbitrage margin)
-
-Priority 4 — Default (all other times)
-    → Grid setpoint 0W: absorb all PV into battery, block export
+Priority 1   — Price spike       → discharge toward SOC floor
+Priority 2   — Cheap / negative  → charge toward 100% SOC
+Priority 3   — Pre-peak window   → charge toward 90% SOC (only if the peak pays)
+Priority 3.5 — Post-peak surplus → bleed excess SOC back to target
+Priority 4   — Default           → grid setpoint 0 W (absorb PV, block export)
 ```
 
-### Why grid setpoint 0W as the default?
+### Price basis: raw vs. import
 
-Exporting solar power and then reimporting it later costs an extra **€0.11/kWh** in energy tax surcharge. A grid setpoint of 0W tells the Sessy to keep the meter at zero — all available PV generation is stored in the battery first. Only when the battery is full does surplus PV flow to the grid. This eliminates the expensive export/reimport round trip during sunny hours.
+The Sessy integration exposes **raw export prices** (what the grid pays you). Your consumer **import price** is raw + €0.11/kWh surcharge (energy tax). Every threshold below is expressed as a raw price:
 
-### Why spread setpoints over 2 hours?
-
-Running the battery and inverter at partial power has two important advantages:
-
-- **Efficiency:** inverter copper losses scale with the square of current. Half power is roughly four times more efficient per watt than full power. Battery internal resistance losses also decrease at lower C-rates.
-- **PV self-consumption during the pre-peak window:** a gentle charge rate during 16:00–18:00 leaves headroom for residual solar to contribute, so the grid only fills the actual gap.
-
-### Setpoint formula
-
-Both the pre-peak charge and the price-spike discharge use the same proportional approach, recalculated every 5 minutes:
-
-```
-charge setpoint (W)    = (SOC_target − SOC_current) / 100 × capacity_Wh / window_hours
-discharge setpoint (W) = (SOC_current − SOC_floor)  / 100 × capacity_Wh / window_hours
-```
-
-Both are capped at 40% C-rate (2,000 W for a 5 kWh battery) and the hardware maximum of 2,200 W. The rate tapers naturally as SOC approaches its target, acting as a simple proportional controller.
-
-### Cheap-window charging
-
-When the raw price drops below `PRICE_CHARGE` (−€0.10), the strategy charges from the grid toward a ceiling of `CHEAP_SOC_TARGET` (100%). Rather than always pulling maximum power, it counts how many consecutive upcoming hours stay below the threshold and spreads the remaining gap across them:
-
-```
-cheap charge (W) = (CHEAP_SOC_TARGET − SOC_current) / 100 × capacity_Wh / cheap_hours_remaining
-```
-
-A short single-hour dip therefore charges hard to capture it, while a long cheap block charges gently and efficiently. The same 40% C-rate and hardware caps apply, and charging stops once the ceiling is reached. Because the rate is recalculated every 5 minutes, it self-corrects as SOC rises and the remaining cheap hours count down.
-
-### Pre-peak break-even guard
-
-Pre-peak charging (Priority 3) buys energy now to discharge it during the evening. To avoid the marginal-gain trap — buying at, say, €0.46 import only to discharge at €0.47 — the strategy first checks the expected evening peak. It scans the price schedule for the highest raw price in the evening window (`EVENING_PEAK_START`–`EVENING_PEAK_END`) and only charges if:
-
-```
-expected_peak_raw − import_price_now ≥ MIN_ARBITRAGE_MARGIN
-```
-
-If the spread is too small, it skips the charge and falls through to the 0W default, still absorbing any residual PV. This needs only a single lookup against price data the integration already provides — no forward optimisation, no extra dependencies.
-
-### Price note
-
-The Sessy integration exposes **raw export prices** (what the grid pays you). The consumer import price is raw + €0.11 surcharge. The strategy uses raw prices throughout:
-
-| Condition | Raw price threshold | Import price equivalent |
+| Condition | Raw price | Import equivalent |
 |---|---|---|
-| Discharge override | > €0.39/kWh | > €0.50/kWh |
-| Cheap charge | < −€0.10/kWh | < €0.01/kWh |
+| Discharge override (P1) | > €0.39/kWh | > €0.50/kWh |
+| Cheap charge (P2) | < −€0.10/kWh | < €0.01/kWh |
+
+### Mechanics shared by every branch
+
+- **Control mode** (full detail in [§2](#2-setpoint-types-explained)): charge and discharge branches drive the **battery setpoint** (`api` mode — exact battery power, grid balances); the default drives the **grid setpoint** (`nom` mode — meter target).
+- **Proportional spread + caps.** Active power is the SOC gap spread over a time window, then capped at 40 % C-rate (2,000 W on a 5 kWh pack) and the 2,200 W hardware limit:
+
+  ```
+  charge    (W) = (SOC_target − SOC) / 100 × capacity_Wh / window_h
+  discharge (W) = (SOC − SOC_floor)  / 100 × capacity_Wh / window_h
+  ```
+
+  Partial power is deliberate: inverter copper losses scale with the square of current, so half power is roughly 4× more efficient per watt, and a gentle charge leaves headroom for residual PV to fill the gap instead of the grid.
+
+---
+
+### Priority 1 — Price-spike discharge
+
+**What it does.** During an extreme price hour, the battery feeds the house and offsets grid import, so you ride out the spike on stored energy instead of buying at the peak.
+
+**Trigger.** Raw price > `price_discharge` (€0.39 → €0.50 import).
+
+**Battery steering.** Battery setpoint (`api`), positive = discharge:
+
+```
+discharge (W) = (SOC − soc_floor) / 100 × capacity_Wh / discharge_window_h   (capped)
+```
+
+`discharge_window_h` (2 h) is only a **rate-sizing window**, not a duration commitment: it sets how hard to discharge *this* cycle so the battery drains gently rather than dumping at full power. The branch is re-evaluated every 5 minutes against the live price, so **discharge lasts exactly as long as the price stays above the threshold** — when the spike ends the branch stops firing and the chain falls through (usually to the 0 W default), leaving any remaining energy above the floor untouched. `soc_floor` (20 %, winter 30 %) is the lower bound that zeroes the setpoint while the branch is active, not a level the strategy commits to reaching. The orange line marks the discharge trigger.
+
+```mermaid
+%%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#D55E00,#7BCAB4"}}}%%
+xychart-beta
+    title "Priority 1 — Price spike discharge"
+    x-axis ["17:00", "18:00", "19:00", "20:00", "21:00", "22:00"]
+    y-axis "Raw price (€/kWh)" -0.15 --> 0.60
+    bar [0.22, 0.31, 0.46, 0.52, 0.41, 0.18]
+    line [0.39, 0.39, 0.39, 0.39, 0.39, 0.39]
+    line [-0.10, -0.10, -0.10, -0.10, -0.10, -0.10]
+```
+
+**Rationale.** The single most valuable thing a home battery can do is avoid the most expensive kWh of the day, so this sits at the top of the chain. **Lean:** one price comparison captures essentially all of that value — no forecasting, no optimiser — and the 2-hour spread keeps the inverter in its efficient band across the typical width of an evening peak.
+
+---
+
+### Priority 2 — Cheap / negative-price charge
+
+**What it does.** When power is almost free — or you are paid to take it — fill the battery from the grid so that cheap energy covers later, pricier hours.
+
+**Trigger.** Raw price < `price_charge` (−€0.10). If SOC is already at `cheap_soc_target` (100 %), it simply holds at grid 0 W.
+
+**Battery steering.** Battery setpoint (`api`), negative = charge:
+
+```
+charge (W) = (cheap_soc_target − SOC) / 100 × capacity_Wh / cheap_hours_remaining   (capped)
+```
+
+`cheap_hours_remaining` is the count of consecutive upcoming hours still below the threshold, so a single-hour dip charges hard to grab it while a long cheap block charges gently. The green line marks the charge trigger.
+
+```mermaid
+%%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#EBB08A,#009E73"}}}%%
+xychart-beta
+    title "Priority 2 — Cheap price charge"
+    x-axis ["01:00", "02:00", "03:00", "04:00", "05:00", "06:00"]
+    y-axis "Raw price (€/kWh)" -0.20 --> 0.45
+    bar [-0.08, -0.13, -0.14, -0.11, 0.02, 0.08]
+    line [0.39, 0.39, 0.39, 0.39, 0.39, 0.39]
+    line [-0.10, -0.10, -0.10, -0.10, -0.10, -0.10]
+```
+
+**Rationale.** Cheap power is upside — every stored kWh saves money twice (cheap in, expensive avoided later). The branch earns its keep mainly **in winter**, when deeply negative prices essentially never occur but ordinary cheap prices show up *overnight* — exactly when there is no PV and the battery should be filled from the grid for the day ahead.
+
+**Lean:** counting the cheap run is a single loop over price data the integration already provides — no price prediction, no degradation model — and recomputing every 5 minutes lets the rate self-correct as the window shrinks. We deliberately do **not** chase the rare summer extreme-negative event (e.g. −€0.50): truly maximising that would mean pre-emptively dumping stored energy beforehand and curtailing the PV that is generating at full tilt at exactly that time, then charging at max rate — a far more complex strategy whose payoff is too rare to justify the added moving parts. Capturing the everyday cheap hours with one threshold is the lean 90 % of the value.
+
+---
+
+### Priority 3 — Pre-peak SOC charge
+
+**What it does.** Top the battery up to its evening target shortly before the peak — but *only* when that peak is expensive enough to be worth buying grid energy for.
+
+**Trigger.** All of: inside the pre-peak window `prepeak_start`–`prepeak_end` (16–18 h, winter 14–18 h); SOC < `soc_target` (90 %); and the break-even guard passes —
+
+```
+expected_evening_peak_raw − import_price_now ≥ min_arbitrage_margin (€0.05)
+```
+
+where `expected_evening_peak_raw` is the highest raw price in the evening window (`evening_peak_start`–`evening_peak_end`, 18–23 h). If SOC is already at target, or the spread is too thin, it falls through to grid 0 W.
+
+**Battery steering.** Battery setpoint (`api`), negative = charge, spread over `prepeak_window_h` (2 h, winter 4 h):
+
+```
+charge (W) = (soc_target − SOC) / 100 × capacity_Wh / prepeak_window_h   (capped)
+```
+
+The blue line marks the SOC target.
+
+```mermaid
+%%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#EBB08A,#0072B2,#7BCAB4"}}}%%
+xychart-beta
+    title "Priority 3 — Pre-peak SOC charge (16:00–18:00)"
+    x-axis ["16:00", "16:30", "17:00", "17:30", "18:00"]
+    y-axis "SOC (%)" 0 --> 100
+    line [65, 74, 81, 87, 90]
+    line [20, 20, 20, 20, 20]
+    line [90, 90, 90, 90, 90]
+    line [100, 100, 100, 100, 100]
+```
+
+**Rationale.** On dull days solar cannot fill the battery, so a small grid top-up is the only way to have stored energy ready for the evening. The break-even guard is the restraint that matters: buying at €0.46 to discharge at €0.47 just churns the battery for nothing. **Lean:** one max-lookup over the day's prices avoids that trap without a full arbitrage optimiser.
+
+---
+
+### Priority 3.5 — Post-peak excess discharge
+
+**What it does.** If the peak passes and the battery is still above target with no further spike coming, bleed the surplus back down to target so you don't end the night holding energy you bought for a peak that's already over.
+
+**Trigger.** Inside `prepeak_end`–`evening_peak_end` (18–23 h); SOC > `soc_target` (90 %); and no remaining hour today exceeds `price_discharge` (no spike left to save it for).
+
+**Battery steering.** Battery setpoint (`api`), positive = discharge, spread over the hours left in the evening window:
+
+```
+discharge (W) = (SOC − soc_target) / 100 × capacity_Wh / hours_until_peak_end   (capped)
+```
+
+The blue line marks the discharge destination.
+
+```mermaid
+%%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#EBB08A,#0072B2,#7BCAB4"}}}%%
+xychart-beta
+    title "Priority 3.5 — Post-peak excess discharge (18:00–23:00)"
+    x-axis ["18:00", "19:00", "20:00", "21:00", "22:00"]
+    y-axis "SOC (%)" 0 --> 100
+    line [96, 91, 90, 90, 90]
+    line [20, 20, 20, 20, 20]
+    line [90, 90, 90, 90, 90]
+    line [100, 100, 100, 100, 100]
+```
+
+**Rationale.** Holding charge past target only pays if a bigger peak is still ahead; once the schedule says it isn't, that energy is worth more used now than carried overnight. **Lean:** a single scan of the remaining prices is cheap insurance against ending the day overcharged.
+
+---
+
+### Priority 4 — Default: grid setpoint 0 W
+
+**What it does.** Whenever no price condition fires, keep the meter at zero: all PV goes into the battery first, and grid export is blocked until the battery is full.
+
+**Trigger.** None of the above — the fall-through that covers the bulk of the day.
+
+**Grid steering.** Grid setpoint (`nom`) fixed at 0 W. No formula: the battery absorbs whatever PV exceeds household load, and the grid covers any shortfall.
+
+```mermaid
+%%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#D55E00,#0072B2,#009E73"}}}%%
+xychart-beta
+    title "Priority 4 — Default: solar charges battery (grid 0 W)"
+    x-axis ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"]
+    y-axis "SOC (%)" 0 --> 100
+    line [20, 30, 45, 62, 74, 83, 88, 90]
+    line [20, 20, 20, 20, 20, 20, 20, 20]
+    line [90, 90, 90, 90, 90, 90, 90, 90]
+    line [100, 100, 100, 100, 100, 100, 100, 100]
+```
+
+**Rationale.** Exporting solar and reimporting it later pays the €0.11/kWh surcharge twice; holding the meter at 0 W kills that round-trip loss and prioritises self-consumption — almost always the cheapest kWh available. **Lean:** it is the safe do-no-harm default, so the chain only ever leaves it for a concrete, priced reason.
 
 ---
 
@@ -129,6 +238,18 @@ Controls the **battery charge/discharge power** directly. The grid covers any mi
 | 18:00–22:00 | €0.13–0.47 | Battery* | +1500 W | 90%→20% | Battery discharges to cover evening load. *If price > €0.39: discharge setpoint active. |
 | 22:00–24:00 | €0.15–0.16 | Grid | 0 W | ~20% | Battery rests. Prices moderate, no action. |
 
+```mermaid
+%%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#D55E00,#0072B2,#009E73"}}}%%
+xychart-beta
+    title "Summer day — typical SOC trajectory"
+    x-axis ["00:00", "06:00", "09:00", "12:00", "15:00", "17:00", "19:00", "22:00"]
+    y-axis "SOC (%)" 0 --> 100
+    line [20, 20, 25, 58, 85, 90, 55, 22]
+    line [20, 20, 20, 20, 20, 20, 20, 20]
+    line [90, 90, 90, 90, 90, 90, 90, 90]
+    line [100, 100, 100, 100, 100, 100, 100, 100]
+```
+
 **Example price-spike event (today's data, 20:00–21:00, raw €0.46):**
 
 At 20:00 the raw price hits €0.46 (import €0.57), triggering the discharge override. With SOC at 80%:
@@ -157,6 +278,18 @@ In winter the strategy shifts significantly: solar cannot reliably fill the batt
 | 16:00–18:00 | €0.35–0.52 | Battery | −750–1250 W | 60%→90% | Pre-peak charge. With lower starting SOC than summer, rate is higher. Watch total grid cost: buying at €0.46 import to discharge at €0.57 later only breaks even if the spike is sufficiently above the pre-peak price. |
 | 18:00–23:00 | €0.48–0.68 | Battery* | +1250–1500 W | 90%→40% | Evening heating peak. Battery covers load. *Discharge override fires if price > €0.39. |
 | 23:00–24:00 | €0.10–0.14 | Grid | 0 W | ~40% | Rest. Assess whether overnight cheap window will occur. |
+
+```mermaid
+%%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#D55E00,#0072B2,#009E73"}}}%%
+xychart-beta
+    title "Winter day — typical SOC trajectory"
+    x-axis ["00:00", "02:00", "04:00", "06:00", "10:00", "14:00", "16:00", "19:00", "23:00"]
+    y-axis "SOC (%)" 0 --> 100
+    line [40, 68, 98, 60, 43, 56, 88, 45, 30]
+    line [30, 30, 30, 30, 30, 30, 30, 30, 30]
+    line [90, 90, 90, 90, 90, 90, 90, 90, 90]
+    line [100, 100, 100, 100, 100, 100, 100, 100, 100]
+```
 
 **Winter-specific considerations:**
 
