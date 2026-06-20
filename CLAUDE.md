@@ -75,6 +75,10 @@ Full detail in `CODING_PRINCIPLES.md`. Key rules:
 - **No magic numbers** — all tunables in `apps.yaml`.
 - **Comments explain *why*, not what** — if you need a comment to explain how the code works, simplify the code.
 
+## Environment notes
+
+- **`gh` is not on the Bash PATH.** Use the full path: `C:\Program Files\GitHub CLI\gh.exe`. Pass the PR body via `--body-file <file>` to avoid shell quoting issues with backticks and special characters.
+
 ## Known Gaps (COMPLIANCE_AUDIT.md, 2026-06-19)
 
 | Priority | Issue | Fix |
