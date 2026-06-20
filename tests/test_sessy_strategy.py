@@ -306,3 +306,218 @@ class TestUpdateStrategyBranches:
         app.update_strategy({})
         app._set_grid_setpoint.assert_called_once_with(0)
         app._set_battery_setpoint.assert_not_called()
+
+    def test_priority3_prepeak_at_target_holds_grid_zero(self):
+        # SOC already at soc_target during prepeak window → no charge needed
+        app = self._make_app_with_sensors(soc=90, price=0.10, now_hour=17)
+        app.update_strategy({})
+        app._set_grid_setpoint.assert_called_once_with(0)
+        app._set_battery_setpoint.assert_not_called()
+
+
+# ===========================================================================
+# Enable switch
+# ===========================================================================
+
+class TestEnableSwitch:
+    def test_switch_off_skips_cycle(self):
+        app = make_app(enable_switch="input_boolean.sessy_strategy_enabled")
+        app.get_state = MagicMock(return_value="off")
+        app._set_grid_setpoint = MagicMock()
+        app._set_battery_setpoint = MagicMock()
+        app.update_strategy({})
+        app._set_grid_setpoint.assert_not_called()
+        app._set_battery_setpoint.assert_not_called()
+
+
+# ===========================================================================
+# Tunable live-override helper
+# ===========================================================================
+
+class TestTunable:
+    def test_no_entity_returns_default(self):
+        assert make_app()._tunable(90.0, None) == pytest.approx(90.0)
+
+    def test_entity_readable_returns_float(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value="85.5")
+        assert app._tunable(90.0, "input_number.foo") == pytest.approx(85.5)
+
+    def test_entity_unreadable_returns_default(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value="unavailable")
+        assert app._tunable(90.0, "input_number.foo") == pytest.approx(90.0)
+
+
+# ===========================================================================
+# Season mode inference
+# ===========================================================================
+
+class TestActiveSeasonMode:
+    def _prices_with_min_at(self, hour: int):
+        return {f"2024-06-15T{h:02d}:00:00": (0.05 if h == hour else 0.30) for h in range(24)}
+
+    def test_explicit_summer(self):
+        assert make_app(season_mode="summer")._active_season_mode() == "summer"
+
+    def test_explicit_winter(self):
+        assert make_app(season_mode="winter")._active_season_mode() == "winter"
+
+    def test_auto_daytime_min_infers_summer(self):
+        # Minimum price at 12:00 (inside season_day_start=8 … season_day_end=18) → summer
+        app = make_app(season_mode="auto")
+        app._get_prices_dict = MagicMock(return_value=self._prices_with_min_at(12))
+        assert app._active_season_mode() == "summer"
+
+    def test_auto_nighttime_min_infers_winter(self):
+        # Minimum price at 02:00 (outside daytime window) → winter
+        app = make_app(season_mode="auto")
+        app._get_prices_dict = MagicMock(return_value=self._prices_with_min_at(2))
+        assert app._active_season_mode() == "winter"
+
+    def test_entity_overrides_config_mode(self):
+        app = make_app(season_mode="auto", season_mode_entity="input_select.sessy_season_mode")
+        app.get_state = MagicMock(return_value="winter")
+        assert app._active_season_mode() == "winter"
+
+    def test_auto_falls_back_when_no_prices(self):
+        app = make_app(season_mode="auto", season_auto_fallback="winter")
+        app._get_prices_dict = MagicMock(return_value=None)
+        assert app._active_season_mode() == "winter"
+
+
+# ===========================================================================
+# Sensor readers
+# ===========================================================================
+
+class TestSensorReaders:
+    # _get_soc
+    def test_get_soc_valid(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value="75.5")
+        assert app._get_soc() == pytest.approx(75.5)
+
+    def test_get_soc_none_returns_none(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value=None)
+        assert app._get_soc() is None
+
+    def test_get_soc_unavailable_returns_none(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value="unavailable")
+        assert app._get_soc() is None
+
+    # _get_current_price
+    def test_get_price_from_attribute_dict(self):
+        # Attribute dict contains the current hour key → read from there
+        app = make_app()
+        app.get_state = MagicMock(return_value={"2024-06-15T14:00:00": 0.25})
+        assert app._get_current_price() == pytest.approx(0.25)
+
+    def test_get_price_fallback_to_sensor_state(self):
+        # No attribute dict → fall through to the sensor state value
+        app = make_app()
+        app.get_state = MagicMock(side_effect=[None, "0.30"])
+        assert app._get_current_price() == pytest.approx(0.30)
+
+    def test_get_price_unavailable_returns_none(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value=None)
+        assert app._get_current_price() is None
+
+    # _count_cheap_hours
+    def test_count_cheap_hours_consecutive(self):
+        # Hours 14 and 15 are cheap; 16 is not → count = 2
+        app = make_app()
+        prices = {
+            "2024-06-15T14:00:00": -0.20,
+            "2024-06-15T15:00:00": -0.15,
+            "2024-06-15T16:00:00": 0.10,
+        }
+        app._get_prices_dict = MagicMock(return_value=prices)
+        assert app._count_cheap_hours(-0.10) == 2
+
+    def test_count_cheap_hours_none_below_threshold_returns_one(self):
+        # No cheap hours → minimum of 1 so callers never divide by zero
+        app = make_app()
+        app._get_prices_dict = MagicMock(return_value={"2024-06-15T14:00:00": 0.20})
+        assert app._count_cheap_hours(-0.10) == 1
+
+    def test_count_cheap_hours_no_prices_returns_one(self):
+        app = make_app()
+        app._get_prices_dict = MagicMock(return_value=None)
+        assert app._count_cheap_hours(-0.10) == 1
+
+    # _max_price_in_window
+    def test_max_price_in_window_normal(self):
+        app = make_app()
+        prices = {
+            "2024-06-15T18:00:00": 0.35,
+            "2024-06-15T19:00:00": 0.45,
+            "2024-06-15T20:00:00": 0.40,
+        }
+        app._get_prices_dict = MagicMock(return_value=prices)
+        assert app._max_price_in_window(18, 21) == pytest.approx(0.45)
+
+    def test_max_price_no_prices_returns_none(self):
+        app = make_app()
+        app._get_prices_dict = MagicMock(return_value=None)
+        assert app._max_price_in_window(18, 23) is None
+
+    def test_max_price_empty_window_returns_none(self):
+        app = make_app()
+        app._get_prices_dict = MagicMock(return_value={})
+        assert app._max_price_in_window(18, 23) is None
+
+    # _daily_min_price_hour_and_value
+    def test_daily_min_price_finds_correct_hour(self):
+        app = make_app()
+        prices = {f"2024-06-15T{h:02d}:00:00": (0.05 if h == 12 else 0.30) for h in range(24)}
+        app._get_prices_dict = MagicMock(return_value=prices)
+        hour, value = app._daily_min_price_hour_and_value()
+        assert hour == 12
+        assert value == pytest.approx(0.05)
+
+    def test_daily_min_price_no_prices_returns_none_pair(self):
+        app = make_app()
+        app._get_prices_dict = MagicMock(return_value=None)
+        assert app._daily_min_price_hour_and_value() == (None, None)
+
+
+# ===========================================================================
+# Status publishing
+# ===========================================================================
+
+class TestPublishStatus:
+    def _call_publish(self, app):
+        app._publish_status(
+            active_season="summer",
+            min_price_hour=12,
+            min_price_value=0.05,
+            soc=75.0,
+            raw_price=0.20,
+            import_price=0.31,
+            soc_target=90.0,
+            soc_floor=20.0,
+            price_discharge=0.39,
+            price_charge=-0.10,
+            min_arbitrage_margin=0.05,
+            prepeak_start=16,
+            prepeak_end=18,
+            prepeak_window_h=2.0,
+        )
+
+    def test_writes_state_and_attributes(self):
+        app = make_app()
+        self._call_publish(app)
+        app.set_state.assert_called_once()
+        kwargs = app.set_state.call_args.kwargs
+        assert kwargs["state"] == "summer"
+        assert kwargs["attributes"]["soc"] == pytest.approx(75.0)
+        assert kwargs["attributes"]["raw_price"] == pytest.approx(0.20)
+
+    def test_skipped_when_status_sensor_unset(self):
+        app = make_app()
+        app.status_sensor = None
+        self._call_publish(app)
+        app.set_state.assert_not_called()
