@@ -1,0 +1,38 @@
+{
+  "title": "Home Battery",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Home Battery",
+        "description": "Map this logical battery onto your Sessy entities. Defaults match the standard SessyStrategy_HA install — press Submit to accept them.",
+        "data": {
+          "soc_source": "State-of-charge sensor",
+          "battery_power_source": "Battery power sensor",
+          "grid_power_source": "Grid power sensor",
+          "system_state_source": "System state sensor",
+          "sessy_strategy_source": "Sessy power-strategy select",
+          "status_source": "AppDaemon status sensor"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Home Battery is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Home Battery sources",
+        "description": "Remap the underlying Sessy entities.",
+        "data": {
+          "soc_source": "State-of-charge sensor",
+          "battery_power_source": "Battery power sensor",
+          "grid_power_source": "Grid power sensor",
+          "system_state_source": "System state sensor",
+          "sessy_strategy_source": "Sessy power-strategy select",
+          "status_source": "AppDaemon status sensor"
+        }
+      }
+    }
+  }
+}

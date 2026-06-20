@@ -340,12 +340,13 @@ sessy_strategy:
 
 All tunables (SOC targets, price thresholds, time windows) are optional and fall back to sensible defaults — see [Configuration reference](#6-configuration-reference) for the full list.
 
+**Optional — Home Battery integration:** copy `files/custom_components/home_battery/` to `/config/custom_components/home_battery/`, restart Home Assistant, then add the **Home Battery** integration under Settings → Devices & Services. This creates a real Home Battery device that owns the mode selector, setpoint/SOC numbers, and mirror sensors (see [section 8](#8-home-battery-integration-modes--controls)).
+
 **Optional — HA helpers:** enable `packages: !include_dir_named packages` in `configuration.yaml`, then copy into `/config/packages/`:
 
-- `home_battery.yaml` — the recommended control surface: `input_select.home_battery_mode` (master mode selector), manual setpoints, SOC target/floor/ceiling, and the logical home-battery sensors (see [section 8](#8-home-battery-package-modes--controls)).
 - `sessy_helpers.yaml` — `input_select.sessy_season_mode` (auto/summer/winter), the price-threshold sliders, and the legacy `input_boolean.sessy_strategy_enabled`.
 
-Reference these in `apps.yaml` (`mode_select:`, `season_mode_entity:`, and the `*_entity` keys) to control behavior from the HA UI without restarting AppDaemon.
+Reference these in `apps.yaml` (`season_mode_entity:` and the price `*_entity` keys) to tune behavior from the HA UI without restarting AppDaemon.
 
 ### Step 4 — Verify AppDaemon configuration
 
@@ -434,15 +435,15 @@ sessy_strategy:
   price_sensor: sensor.sessy_dnhh_energy_price
   status_sensor: sensor.sessy_strategy_status
 
-  # Master mode selector (see home_battery.yaml) — supersedes enable_switch:
-  mode_select: input_select.home_battery_mode
-  grid_setpoint_entity: input_number.home_battery_grid_setpoint
-  battery_setpoint_entity: input_number.home_battery_battery_setpoint
+  # Master mode selector (Home Battery integration) — supersedes enable_switch:
+  mode_select: select.home_battery_mode
+  grid_setpoint_entity: number.home_battery_grid_setpoint
+  battery_setpoint_entity: number.home_battery_battery_setpoint
   sessy_dynamic_option: roi      # Sessy power_strategy option for "Sessy dynamic"
   idle_option: idle              # Sessy power_strategy option for "Idle"
 
-  # Optional live SOC ceiling for cheap-charging (see home_battery.yaml):
-  cheap_soc_target_entity: input_number.home_battery_soc_ceiling
+  # Optional live SOC controls (Home Battery integration):
+  cheap_soc_target_entity: number.home_battery_soc_ceiling
 
   # Legacy master enable switch — only used when mode_select is unset:
   enable_switch: input_boolean.sessy_strategy_enabled
@@ -457,11 +458,11 @@ Changes to `apps.yaml` are picked up automatically by AppDaemon (it reloads the 
 
 The most frequently adjusted values can optionally be driven by helpers instead of static `apps.yaml` values, so you can change them from a dashboard (or your phone) with no file editing and no restart:
 
-| `apps.yaml` key | Helper | Source package |
+| `apps.yaml` key | Helper | Source |
 |---|---|---|
-| `soc_target_entity` | `input_number.home_battery_soc_target` | `home_battery.yaml` |
-| `soc_floor_entity` | `input_number.home_battery_soc_floor` | `home_battery.yaml` |
-| `cheap_soc_target_entity` | `input_number.home_battery_soc_ceiling` | `home_battery.yaml` |
+| `soc_target_entity` | `number.home_battery_soc_target` | Home Battery integration |
+| `soc_floor_entity` | `number.home_battery_soc_floor` | Home Battery integration |
+| `cheap_soc_target_entity` | `number.home_battery_soc_ceiling` | Home Battery integration |
 | `price_discharge_entity` | `input_number.sessy_price_discharge` | `sessy_helpers.yaml` |
 | `price_charge_entity` | `input_number.sessy_price_charge` | `sessy_helpers.yaml` |
 | `min_arbitrage_margin_entity` | `input_number.sessy_min_arbitrage_margin` | `sessy_helpers.yaml` |
@@ -525,12 +526,12 @@ The entity IDs below are the **defaults** (this author's installation). Override
 | `select.sessy_battery_alt9_power_strategy` | Active control strategy | `nom` (grid setpoint), `api` (battery setpoint) |
 | `number.sessy_pwkn_grid_target` | Grid power target W | −20000 to +20000 (negative = import) |
 | `number.sessy_battery_alt9_power_setpoint` | Battery power setpoint W | −2200 to +2200 (negative = charge, positive = discharge) |
-| `input_select.home_battery_mode` | Master mode selector (`mode_select`) | `Optimized`, `Grid setpoint`, `Battery setpoint`, `Sessy dynamic`, `Eco`, `Idle` |
-| `input_number.home_battery_grid_setpoint` | Manual grid target (`grid_setpoint_entity`) | W |
-| `input_number.home_battery_battery_setpoint` | Manual battery power (`battery_setpoint_entity`) | W (− = charge) |
-| `input_number.home_battery_soc_target` | Optional live SOC target (`soc_target_entity`) | 0–100 % |
-| `input_number.home_battery_soc_floor` | Optional live SOC floor (`soc_floor_entity`) | 0–100 % |
-| `input_number.home_battery_soc_ceiling` | Optional live SOC ceiling (`cheap_soc_target_entity`) | 0–100 % |
+| `select.home_battery_mode` | Master mode selector (`mode_select`) — Home Battery integration | `Optimized`, `Grid setpoint`, `Battery setpoint`, `Sessy dynamic`, `Eco`, `Idle` |
+| `number.home_battery_grid_setpoint` | Manual grid target (`grid_setpoint_entity`) — Home Battery integration | W |
+| `number.home_battery_battery_setpoint` | Manual battery power (`battery_setpoint_entity`) — Home Battery integration | W (− = charge) |
+| `number.home_battery_soc_target` | Optional live SOC target (`soc_target_entity`) — Home Battery integration | 0–100 % |
+| `number.home_battery_soc_floor` | Optional live SOC floor (`soc_floor_entity`) — Home Battery integration | 0–100 % |
+| `number.home_battery_soc_ceiling` | Optional live SOC ceiling (`cheap_soc_target_entity`) — Home Battery integration | 0–100 % |
 | `input_number.sessy_price_discharge` | Optional live discharge threshold (`price_discharge_entity`) | €/kWh |
 | `input_number.sessy_price_charge` | Optional live cheap-charge threshold (`price_charge_entity`) | €/kWh |
 | `input_number.sessy_min_arbitrage_margin` | Optional live arbitrage margin (`min_arbitrage_margin_entity`) | €/kWh |
@@ -539,25 +540,27 @@ The entity IDs below are the **defaults** (this author's installation). Override
 
 ---
 
-## 8. Home battery package (modes & controls)
+## 8. Home Battery integration (modes & controls)
 
-The optional `home_battery.yaml` package (place in `/config/packages/`) turns the
-Sessy plus this strategy into one logical "home battery" with an intuitive
-control surface. It is the recommended way to drive the system from the UI.
+The **Home Battery** custom integration (`custom_components/home_battery`) turns
+the Sessy plus this strategy into one logical "home battery" device with an
+intuitive control surface. It is the recommended way to drive the system from
+the UI — all controls and sensors appear under one device in
+Settings → Devices & Services.
 
 ### Why a master mode selector
 
 Three actors write the **same** physical entities (`power_strategy` select +
 the two number setpoints): the Sessy firmware, this AppDaemon app (which
 reasserts control every 5 minutes), and you. Manual control therefore only
-works if the app stands down. `input_select.home_battery_mode` is the single
+works if the app stands down. `select.home_battery_mode` is the single
 master input the app reads first (`mode_select:` in `apps.yaml`):
 
 | Mode | App behavior | Sessy `power_strategy` |
 |---|---|---|
 | **Optimized** | Runs the full priority chain ([§1](#1-how-the-strategy-works)) | app picks `nom`/`api` |
-| **Grid setpoint** | Applies `home_battery_grid_setpoint` (W) | forced to `nom` |
-| **Battery setpoint** | Applies `home_battery_battery_setpoint` (W, −=charge) | forced to `api` |
+| **Grid setpoint** | Applies `number.home_battery_grid_setpoint` (W) | forced to `nom` |
+| **Battery setpoint** | Applies `number.home_battery_battery_setpoint` (W, −=charge) | forced to `api` |
 | **Sessy dynamic** | Stands down; hands control to Sessy's own ROI schedule | `sessy_dynamic_option` (default `roi`) |
 | **Eco** | Stands down; lets Sessy run in eco mode | `eco_option` (default `eco`) |
 | **Idle** | Stands down; parks the battery | `idle_option` (default `idle`) |
@@ -570,18 +573,18 @@ in `apps.yaml` if they differ.
 
 ### Controls
 
-| Control | Drives |
+| Entity | Drives |
 |---|---|
-| `input_select.home_battery_mode` | master mode (above) |
-| `input_number.home_battery_grid_setpoint` | manual grid target (Grid setpoint mode) |
-| `input_number.home_battery_battery_setpoint` | manual battery power (Battery setpoint mode) |
-| `input_number.home_battery_soc_target` | pre-peak SOC target (`soc_target_entity`) |
-| `input_number.home_battery_soc_floor` | discharge floor (`soc_floor_entity`) |
-| `input_number.home_battery_soc_ceiling` | cheap-charge ceiling (`cheap_soc_target_entity`) |
+| `select.home_battery_mode` | master mode (above) |
+| `number.home_battery_grid_setpoint` | manual grid target (Grid setpoint mode) |
+| `number.home_battery_battery_setpoint` | manual battery power (Battery setpoint mode) |
+| `number.home_battery_soc_target` | pre-peak SOC target (`soc_target_entity`) |
+| `number.home_battery_soc_floor` | discharge floor (`soc_floor_entity`) |
+| `number.home_battery_soc_ceiling` | cheap-charge ceiling (`cheap_soc_target_entity`) |
 
-### Logical sensors
+### Sensors
 
-| Sensor | Description |
+| Entity | Description |
 |---|---|
 | `sensor.home_battery_soc` | SOC % |
 | `sensor.home_battery_charge_power` | battery net power W (+ = discharge) |
@@ -590,8 +593,8 @@ in `apps.yaml` if they differ.
 | `sensor.home_battery_active_strategy` | active mode; `sessy_strategy` attribute shows the live `power_strategy` |
 | `sensor.home_battery_active_substrategy` | active decision branch (`discharge`, `cheap_charge`, `prepeak_charge`, `post_peak_discharge`, `default`, `manual_grid`, `manual_battery`, `sessy_dynamic`, `idle`) |
 
-The decision branch is published to `sensor.sessy_strategy_status` as the
-`active_branch` attribute, so it is also available without the package.
+The decision branch is also published to `sensor.sessy_strategy_status` as the
+`active_branch` attribute, so it is available even without the integration.
 
 ---
 
