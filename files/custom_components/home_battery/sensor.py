@@ -21,7 +21,9 @@ from homeassistant.helpers.event import async_track_state_change_event
 
 from .const import (
     CONF_BATTERY_POWER_SOURCE,
+    CONF_BATTERY_SETPOINT_SOURCE,
     CONF_GRID_POWER_SOURCE,
+    CONF_GRID_SETPOINT_SOURCE,
     CONF_SESSY_STRATEGY_SOURCE,
     CONF_SOC_SOURCE,
     CONF_STATUS_SOURCE,
@@ -31,6 +33,19 @@ from .const import (
 from .entity import device_info
 
 _UNKNOWN = ("unknown", "unavailable", None)
+
+# Maps the AppDaemon active_branch key to a user-friendly label.
+# Unmapped keys (manual modes, stand-down modes) pass through as-is.
+_BRANCH_NAMES: dict[str, str] = {
+    "discharge":           "Price spike — discharging",
+    "cheap_charge":        "Cheap price — charging",
+    "cheap_charge_full":   "Cheap price — battery full",
+    "prepeak_charge":      "Pre-peak — charging",
+    "prepeak_full":        "Pre-peak — battery full",
+    "prepeak_skip":        "Pre-peak — price too high",
+    "post_peak_discharge": "Evening peak — discharging",
+    "default":             "Solar — storing surplus",
+}
 
 
 def _as_float(value) -> float | None:
@@ -79,7 +94,7 @@ async def async_setup_entry(
             HomeBatteryTextSensor(
                 entry,
                 key="system_state",
-                name="System state",
+                name="Sessy state",
                 sources=[cfg[CONF_SYSTEM_STATE_SOURCE]],
                 icon="mdi:state-machine",
                 value_fn=lambda hass: _state(hass, cfg[CONF_SYSTEM_STATE_SOURCE]),
@@ -92,12 +107,27 @@ async def async_setup_entry(
             ),
             HomeBatteryTextSensor(
                 entry,
+                key="sessy_strategy",
+                name="Sessy strategy",
+                sources=[cfg[CONF_SESSY_STRATEGY_SOURCE]],
+                icon="mdi:transmission-tower-import",
+                value_fn=lambda hass: _state(hass, cfg[CONF_SESSY_STRATEGY_SOURCE]),
+            ),
+            HomeBatteryActualSetpointSensor(
+                entry,
+                sessy_strategy_entity=cfg[CONF_SESSY_STRATEGY_SOURCE],
+                grid_setpoint_entity=cfg[CONF_GRID_SETPOINT_SOURCE],
+                battery_setpoint_entity=cfg[CONF_BATTERY_SETPOINT_SOURCE],
+            ),
+            HomeBatteryTextSensor(
+                entry,
                 key="active_substrategy",
-                name="Active sub-strategy",
+                name="Active rule",
                 sources=[cfg[CONF_STATUS_SOURCE]],
                 icon="mdi:source-branch",
-                value_fn=lambda hass: _attr(
-                    hass, cfg[CONF_STATUS_SOURCE], "active_branch"
+                value_fn=lambda hass: _BRANCH_NAMES.get(
+                    raw := _attr(hass, cfg[CONF_STATUS_SOURCE], "active_branch"),
+                    raw,
                 ),
             ),
         ]
@@ -127,6 +157,8 @@ class _BaseSensor(SensorEntity):
 
     def __init__(self, entry: ConfigEntry, key: str, name: str, sources: list[str]):
         self._sources = sources
+        # Pin entity_id to the stable key so friendly-name renames don't break references.
+        self.entity_id = f"sensor.home_battery_{key}"
         self._attr_name = name
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_device_info = device_info(entry)
@@ -198,7 +230,7 @@ class HomeBatteryActiveStrategySensor(_BaseSensor):
         super().__init__(
             entry,
             "active_strategy",
-            "Active strategy",
+            "Power strategy",
             [mode_entity, sessy_strategy_entity, status_entity],
         )
         self._mode_entity = mode_entity
@@ -212,6 +244,61 @@ class HomeBatteryActiveStrategySensor(_BaseSensor):
             "sessy_strategy": _state(self.hass, self._sessy_strategy_entity),
             "active_branch": _attr(self.hass, self._status_entity, "active_branch"),
         }
+
+
+class HomeBatteryActualSetpointSensor(_BaseSensor):
+    """The setpoint Sessy is actually targeting right now.
+
+    The requested setpoint is ``number.home_battery_setpoint``; this sensor
+    reports what Sessy actually applied. The active ``power_strategy`` decides
+    which physical setpoint is live: ``nom`` drives the grid target, ``api``
+    drives the battery power. The ``operates_on`` attribute records which one
+    (``grid`` / ``battery``), or ``None`` when Sessy runs its own strategy and
+    neither setpoint is being driven.
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_icon = "mdi:flash"
+
+    # Sessy power_strategy option → which setpoint it drives.
+    _OPERATES_ON = {"nom": "grid", "api": "battery"}
+
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        *,
+        sessy_strategy_entity: str,
+        grid_setpoint_entity: str,
+        battery_setpoint_entity: str,
+    ):
+        super().__init__(
+            entry,
+            "actual_setpoint",
+            "Actual setpoint",
+            [sessy_strategy_entity, grid_setpoint_entity, battery_setpoint_entity],
+        )
+        self._sessy_strategy_entity = sessy_strategy_entity
+        self._grid_setpoint_entity = grid_setpoint_entity
+        self._battery_setpoint_entity = battery_setpoint_entity
+
+    def _refresh(self) -> None:
+        strategy = _state(self.hass, self._sessy_strategy_entity)
+        operates_on = self._OPERATES_ON.get(strategy)
+        source = {
+            "grid": self._grid_setpoint_entity,
+            "battery": self._battery_setpoint_entity,
+        }.get(operates_on)
+
+        value = None
+        if source is not None:
+            state = self.hass.states.get(source)
+            value = _as_float(state.state) if state else None
+
+        self._attr_native_value = value
+        self._attr_available = value is not None
+        self._attr_extra_state_attributes = {"operates_on": operates_on}
 
 
 class HomeBatteryTextSensor(_BaseSensor):

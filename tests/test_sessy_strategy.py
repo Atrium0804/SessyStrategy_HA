@@ -285,9 +285,11 @@ class TestUpdateStrategyBranches:
         app = self._make_app_with_sensors(soc=95, price=0.20, now_hour=19)
         app._max_price_in_window = MagicMock(return_value=0.30)  # below price_discharge (0.39)
         app.update_strategy({})
-        app._set_battery_setpoint.assert_called_once()
-        assert app._set_battery_setpoint.call_args[0][0] > 0  # discharge → positive watts
-        app._set_grid_setpoint.assert_not_called()
+        # Sells the excess via a negative grid setpoint (negative = export) so the
+        # battery covers home load on top and never imports to top up.
+        app._set_grid_setpoint.assert_called_once()
+        assert app._set_grid_setpoint.call_args[0][0] < 0  # export → negative watts
+        app._set_battery_setpoint.assert_not_called()
 
     def test_priority35_skipped_when_spike_coming(self):
         # max remaining price > price_discharge → skip, fall through to default
@@ -349,8 +351,7 @@ class TestModeSelector:
     def _make(self, mode_state, **overrides):
         app = make_app(
             mode_select="input_select.home_battery_mode",
-            grid_setpoint_entity="input_number.home_battery_grid_setpoint",
-            battery_setpoint_entity="input_number.home_battery_battery_setpoint",
+            setpoint_entity="input_number.home_battery_setpoint",
             **overrides,
         )
         app._set_grid_setpoint = MagicMock()
@@ -367,10 +368,8 @@ class TestModeSelector:
         def _get_state(entity_id=None, *a, **kw):
             if entity_id == "input_select.home_battery_mode":
                 return mode_state
-            if entity_id == "input_number.home_battery_grid_setpoint":
+            if entity_id == "input_number.home_battery_setpoint":
                 return "-500"
-            if entity_id == "input_number.home_battery_battery_setpoint":
-                return "1200"
             return None
         app.get_state = MagicMock(side_effect=_get_state)
         return app
@@ -385,16 +384,16 @@ class TestModeSelector:
         # 14:00 / SOC 80 / 0.15 → default branch sets grid 0
         app._set_grid_setpoint.assert_called_once_with(0)
 
-    def test_grid_setpoint_mode_passes_user_value_through(self):
+    def test_grid_setpoint_mode_applies_setpoint_to_grid(self):
         app = self._make("Grid setpoint")
         app.update_strategy({})
         app._set_grid_setpoint.assert_called_once_with(-500.0)
         app._set_battery_setpoint.assert_not_called()
 
-    def test_battery_setpoint_mode_passes_user_value_through(self):
+    def test_battery_setpoint_mode_applies_setpoint_to_battery(self):
         app = self._make("Battery setpoint")
         app.update_strategy({})
-        app._set_battery_setpoint.assert_called_once_with(1200.0)
+        app._set_battery_setpoint.assert_called_once_with(-500.0)
         app._set_grid_setpoint.assert_not_called()
 
     def test_sessy_dynamic_stands_down(self):
@@ -457,11 +456,11 @@ class TestPublishBranch:
     def test_writes_branch_state_and_extra(self):
         app = make_app()
         app.set_state = MagicMock()
-        app._publish_branch("manual_grid", grid_setpoint=-500.0)
+        app._publish_branch("manual_grid", setpoint=-500.0)
         kwargs = app.set_state.call_args.kwargs
         assert kwargs["state"] == "manual_grid"
         assert kwargs["attributes"]["active_branch"] == "manual_grid"
-        assert kwargs["attributes"]["grid_setpoint"] == pytest.approx(-500.0)
+        assert kwargs["attributes"]["setpoint"] == pytest.approx(-500.0)
 
     def test_skipped_when_status_sensor_unset(self):
         app = make_app()

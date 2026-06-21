@@ -53,9 +53,9 @@ sessy_strategy:
   # Supersedes enable_switch when set. Options normalise to:
   # optimized | grid_setpoint | battery_setpoint | sessy_dynamic | eco | idle.
   mode_select: select.home_battery_mode
-  # Manual setpoints applied by the app in the matching modes.
-  grid_setpoint_entity: number.home_battery_grid_setpoint
-  battery_setpoint_entity: number.home_battery_battery_setpoint
+  # Single manual setpoint. The mode decides where it lands: grid_setpoint mode
+  # writes it to the grid target, battery_setpoint mode to the battery power.
+  setpoint_entity: number.home_battery_setpoint
   # Sessy power_strategy option strings used when handing control back.
   # Defaults match the ha-sessy integration — verify in Developer Tools and
   # override if your build uses different option strings.
@@ -73,14 +73,13 @@ sessy_strategy:
   # tune them from a dashboard without restarting AppDaemon. The app falls back
   # to the static values above if a helper is missing or unreadable. Remove any
   # line to keep that value static.
-  # SOC numbers come from the Home Battery integration; price sliders from sessy_helpers.yaml.
+  # SOC numbers and price thresholds all come from the Home Battery integration.
   soc_target_entity: number.home_battery_soc_target
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling
-  # Price-threshold sliders remain in sessy_helpers.yaml.
-  price_discharge_entity: input_number.sessy_price_discharge
-  price_charge_entity: input_number.sessy_price_charge
-  min_arbitrage_margin_entity: input_number.sessy_min_arbitrage_margin
+  price_discharge_entity: number.home_battery_price_discharge
+  price_charge_entity: number.home_battery_price_charge
+  min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
 
   # Optional live season mode selector (input_select with auto/summer/winter).
   # If set, this overrides season_mode from the UI.

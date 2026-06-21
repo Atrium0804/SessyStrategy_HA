@@ -31,5 +31,10 @@ ssh "${HA_USER}@${HA_HOST}" "mkdir -p ${HA_CONFIG}/custom_components/home_batter
 scp -r files/custom_components/home_battery/* "${HA_USER}@${HA_HOST}:${HA_CONFIG}/custom_components/home_battery/"
 
 Write-Host ""
-Write-Host "Done. Restart AppDaemon, and restart Home Assistant once to load the"
-Write-Host "Home Battery integration (then add it under Settings -> Devices & Services)."
+Write-Host "Restarting Home Assistant ..."
+ssh "${HA_USER}@${HA_HOST}" "cd /srv/homeassistant && sudo docker compose restart"
+
+Write-Host ""
+Write-Host "Done. Home Assistant is restarting. AppDaemon will come back up with it."
+Write-Host "If this is a first-time deploy, add the Home Battery integration under"
+Write-Host "Settings -> Devices & Services once HA is back online."
