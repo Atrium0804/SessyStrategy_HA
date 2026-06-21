@@ -44,7 +44,7 @@ _BRANCH_NAMES: dict[str, str] = {
     "prepeak_full":        "Pre-peak — battery full",
     "prepeak_skip":        "Pre-peak — price too high",
     "post_peak_discharge": "Evening peak — discharging",
-    "default":             "Solar — storing surplus",
+    "default":             "Idle — self consumption mode",
 }
 
 
@@ -75,8 +75,8 @@ async def async_setup_entry(
             ),
             HomeBatteryNumericSensor(
                 entry,
-                key="charge_power",
-                name="Charge power",
+                key="battery_power",
+                name="Battery power",
                 source=cfg[CONF_BATTERY_POWER_SOURCE],
                 device_class=SensorDeviceClass.POWER,
                 unit=UnitOfPower.WATT,
@@ -118,6 +118,44 @@ async def async_setup_entry(
                 sessy_strategy_entity=cfg[CONF_SESSY_STRATEGY_SOURCE],
                 grid_setpoint_entity=cfg[CONF_GRID_SETPOINT_SOURCE],
                 battery_setpoint_entity=cfg[CONF_BATTERY_SETPOINT_SOURCE],
+            ),
+            # Requested vs actual setpoint, split per branch so each charts as a
+            # clean line that only has data while its strategy drives Sessy.
+            HomeBatteryGatedSetpointSensor(
+                entry,
+                key="requested_grid_setpoint",
+                name="Requested grid setpoint",
+                icon="mdi:transmission-tower-export",
+                strategy_entity=cfg[CONF_SESSY_STRATEGY_SOURCE],
+                when_strategy="nom",
+                value_entity="number.home_battery_setpoint",
+            ),
+            HomeBatteryGatedSetpointSensor(
+                entry,
+                key="requested_battery_setpoint",
+                name="Requested battery setpoint",
+                icon="mdi:battery-charging",
+                strategy_entity=cfg[CONF_SESSY_STRATEGY_SOURCE],
+                when_strategy="api",
+                value_entity="number.home_battery_setpoint",
+            ),
+            HomeBatteryGatedSetpointSensor(
+                entry,
+                key="actual_grid_setpoint",
+                name="Actual grid setpoint",
+                icon="mdi:transmission-tower",
+                strategy_entity=cfg[CONF_SESSY_STRATEGY_SOURCE],
+                when_strategy="nom",
+                value_entity=cfg[CONF_GRID_SETPOINT_SOURCE],
+            ),
+            HomeBatteryGatedSetpointSensor(
+                entry,
+                key="actual_battery_setpoint",
+                name="Actual battery setpoint",
+                icon="mdi:flash",
+                strategy_entity=cfg[CONF_SESSY_STRATEGY_SOURCE],
+                when_strategy="api",
+                value_entity=cfg[CONF_BATTERY_SETPOINT_SOURCE],
             ),
             HomeBatteryTextSensor(
                 entry,
@@ -299,6 +337,45 @@ class HomeBatteryActualSetpointSensor(_BaseSensor):
         self._attr_native_value = value
         self._attr_available = value is not None
         self._attr_extra_state_attributes = {"operates_on": operates_on}
+
+
+class HomeBatteryGatedSetpointSensor(_BaseSensor):
+    """A power setpoint that only reports while its strategy is the live one.
+
+    ``nom`` drives the grid target, ``api`` the battery power. Gating each
+    requested/actual setpoint to its strategy keeps chart lines clean: a line
+    only carries data while its branch is active and goes unavailable otherwise,
+    so the pairs never overlap or drag a stale value across a strategy switch.
+    """
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        *,
+        key: str,
+        name: str,
+        icon: str,
+        strategy_entity: str,
+        when_strategy: str,
+        value_entity: str,
+    ):
+        super().__init__(entry, key, name, [strategy_entity, value_entity])
+        self._attr_icon = icon
+        self._strategy_entity = strategy_entity
+        self._when_strategy = when_strategy
+        self._value_entity = value_entity
+
+    def _refresh(self) -> None:
+        value = None
+        if _state(self.hass, self._strategy_entity) == self._when_strategy:
+            state = self.hass.states.get(self._value_entity)
+            value = _as_float(state.state) if state else None
+        self._attr_native_value = value
+        self._attr_available = value is not None
 
 
 class HomeBatteryTextSensor(_BaseSensor):
