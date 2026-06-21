@@ -42,7 +42,7 @@ The Sessy integration exposes **raw export prices** (what the grid pays you). Yo
 
 ### Mechanics shared by every branch
 
-- **Control mode** (full detail in [§2](#2-setpoint-types-explained)): charge and discharge branches drive the **battery setpoint** (`api` mode — exact battery power, grid balances); the default drives the **grid setpoint** (`nom` mode — meter target).
+- **Control mode** (full detail in [§2](#2-setpoint-types-explained)): the price-spike discharge and the charge branches drive the **battery setpoint** (`api` mode — exact battery power, grid balances); the default and the post-peak surplus sale drive the **grid setpoint** (`nom` mode — meter target).
 - **Proportional spread + caps.** Active power is the SOC gap spread over a time window, then capped at 40 % C-rate (2,000 W on a 5 kWh pack) and the 2,200 W hardware limit:
 
   ```
@@ -156,13 +156,13 @@ xychart-beta
 
 **Trigger.** Inside `prepeak_end`–`evening_peak_end` (18–23 h); SOC > `soc_target` (90 %); and no remaining hour today exceeds `price_discharge` (no spike left to save it for).
 
-**Battery steering.** Battery setpoint (`api`), positive = discharge, spread over the hours left in the evening window:
+**Grid steering.** Grid setpoint (`nom`), negative = export — we want to *sell* the surplus. The magnitude is spread over the hours left in the evening window:
 
 ```
-discharge (W) = (SOC − soc_target) / 100 × capacity_Wh / hours_until_peak_end   (capped)
+grid setpoint (W) = −(SOC − soc_target) / 100 × capacity_Wh / hours_until_peak_end   (capped)
 ```
 
-The blue line marks the discharge destination.
+Using the grid setpoint (not the battery setpoint) means the battery covers household load **on top of** the export target, so a high home load makes the battery work harder rather than importing from the grid. The blue line marks the discharge destination.
 
 ```mermaid
 %%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#EBB08A,#0072B2,#7BCAB4"}}}%%
@@ -212,7 +212,7 @@ The Sessy supports two control modes, switched via `select.sessy_battery_alt9_po
 
 Controls the power at the **grid connection**. The battery responds to keep the meter at the target value. PV generation is consumed by the house first; the battery covers any remaining gap or absorbs surplus.
 
-- Set via: `number.sessy_pwkn_grid_target` (W, negative = import, positive = export)
+- Set via: `number.sessy_pwkn_grid_target` (W, positive = import, negative = export)
 - Used for: default 0W operation
 - Effect of 0W: all PV is forced into the battery; export is blocked until battery is full
 
@@ -437,8 +437,7 @@ sessy_strategy:
 
   # Master mode selector (Home Battery integration) — supersedes enable_switch:
   mode_select: select.home_battery_mode
-  grid_setpoint_entity: number.home_battery_grid_setpoint
-  battery_setpoint_entity: number.home_battery_battery_setpoint
+  setpoint_entity: number.home_battery_setpoint   # mode decides grid vs battery
   sessy_dynamic_option: roi      # Sessy power_strategy option for "Sessy dynamic"
   idle_option: idle              # Sessy power_strategy option for "Idle"
 
@@ -463,9 +462,9 @@ The most frequently adjusted values can optionally be driven by helpers instead 
 | `soc_target_entity` | `number.home_battery_soc_target` | Home Battery integration |
 | `soc_floor_entity` | `number.home_battery_soc_floor` | Home Battery integration |
 | `cheap_soc_target_entity` | `number.home_battery_soc_ceiling` | Home Battery integration |
-| `price_discharge_entity` | `input_number.sessy_price_discharge` | `sessy_helpers.yaml` |
-| `price_charge_entity` | `input_number.sessy_price_charge` | `sessy_helpers.yaml` |
-| `min_arbitrage_margin_entity` | `input_number.sessy_min_arbitrage_margin` | `sessy_helpers.yaml` |
+| `price_discharge_entity` | `number.home_battery_price_discharge` | Home Battery integration |
+| `price_charge_entity` | `number.home_battery_price_charge` | Home Battery integration |
+| `min_arbitrage_margin_entity` | `number.home_battery_min_arbitrage_margin` | Home Battery integration |
 | `season_mode_entity` | `input_select.sessy_season_mode` | `sessy_helpers.yaml` |
 
 The app reads each helper every cycle and **falls back to the static value** above if the helper is missing or unreadable. Omit any `*_entity` line to keep that value `apps.yaml`-only. Because the helpers are real HA entities, they can also be driven by automations (e.g. raise `soc_floor` on cold days) and graphed in history. The structural settings (`capacity_wh`, entity IDs, time windows) remain `apps.yaml`-only by design.
@@ -524,17 +523,16 @@ The entity IDs below are the **defaults** (this author's installation). Override
 | Entity | Description | Values |
 |---|---|---|
 | `select.sessy_battery_alt9_power_strategy` | Active control strategy | `nom` (grid setpoint), `api` (battery setpoint) |
-| `number.sessy_pwkn_grid_target` | Grid power target W | −20000 to +20000 (negative = import) |
+| `number.sessy_pwkn_grid_target` | Grid power target W | positive = import, negative = export |
 | `number.sessy_battery_alt9_power_setpoint` | Battery power setpoint W | −2200 to +2200 (negative = charge, positive = discharge) |
 | `select.home_battery_mode` | Master mode selector (`mode_select`) — Home Battery integration | `Optimized`, `Grid setpoint`, `Battery setpoint`, `Sessy dynamic`, `Eco`, `Idle` |
-| `number.home_battery_grid_setpoint` | Manual grid target (`grid_setpoint_entity`) — Home Battery integration | W |
-| `number.home_battery_battery_setpoint` | Manual battery power (`battery_setpoint_entity`) — Home Battery integration | W (− = charge) |
+| `number.home_battery_setpoint` | Manual setpoint (`setpoint_entity`) — Home Battery integration; mode decides grid vs battery target | W; Battery mode: − = charge, + = discharge; Grid mode: + = import, − = export |
 | `number.home_battery_soc_target` | Optional live SOC target (`soc_target_entity`) — Home Battery integration | 0–100 % |
 | `number.home_battery_soc_floor` | Optional live SOC floor (`soc_floor_entity`) — Home Battery integration | 0–100 % |
 | `number.home_battery_soc_ceiling` | Optional live SOC ceiling (`cheap_soc_target_entity`) — Home Battery integration | 0–100 % |
-| `input_number.sessy_price_discharge` | Optional live discharge threshold (`price_discharge_entity`) | €/kWh |
-| `input_number.sessy_price_charge` | Optional live cheap-charge threshold (`price_charge_entity`) | €/kWh |
-| `input_number.sessy_min_arbitrage_margin` | Optional live arbitrage margin (`min_arbitrage_margin_entity`) | €/kWh |
+| `number.home_battery_price_discharge` | Optional live discharge threshold (`price_discharge_entity`) — Home Battery integration | €/kWh |
+| `number.home_battery_price_charge` | Optional live cheap-charge threshold (`price_charge_entity`) — Home Battery integration | €/kWh |
+| `number.home_battery_min_arbitrage_margin` | Optional live arbitrage margin (`min_arbitrage_margin_entity`) — Home Battery integration | €/kWh |
 | `input_boolean.sessy_strategy_enabled` | Legacy master switch (`enable_switch`, used only when `mode_select` unset) | `on`/`off` |
 | `input_select.sessy_season_mode` | Optional live season mode (`season_mode_entity`) | `auto`, `summer`, `winter` |
 
@@ -551,7 +549,7 @@ Settings → Devices & Services.
 ### Why a master mode selector
 
 Three actors write the **same** physical entities (`power_strategy` select +
-the two number setpoints): the Sessy firmware, this AppDaemon app (which
+the number setpoints): the Sessy firmware, this AppDaemon app (which
 reasserts control every 5 minutes), and you. Manual control therefore only
 works if the app stands down. `select.home_battery_mode` is the single
 master input the app reads first (`mode_select:` in `apps.yaml`):
@@ -559,8 +557,8 @@ master input the app reads first (`mode_select:` in `apps.yaml`):
 | Mode | App behavior | Sessy `power_strategy` |
 |---|---|---|
 | **Optimized** | Runs the full priority chain ([§1](#1-how-the-strategy-works)) | app picks `nom`/`api` |
-| **Grid setpoint** | Applies `number.home_battery_grid_setpoint` (W) | forced to `nom` |
-| **Battery setpoint** | Applies `number.home_battery_battery_setpoint` (W, −=charge) | forced to `api` |
+| **Grid setpoint** | Applies `number.home_battery_setpoint` (W, + = import, − = export) to the grid target | forced to `nom` |
+| **Battery setpoint** | Applies `number.home_battery_setpoint` (W, − = charge, + = discharge) to the battery | forced to `api` |
 | **Sessy dynamic** | Stands down; hands control to Sessy's own ROI schedule | `sessy_dynamic_option` (default `roi`) |
 | **Eco** | Stands down; lets Sessy run in eco mode | `eco_option` (default `eco`) |
 | **Idle** | Stands down; parks the battery | `idle_option` (default `idle`) |
@@ -576,11 +574,13 @@ in `apps.yaml` if they differ.
 | Entity | Drives |
 |---|---|
 | `select.home_battery_mode` | master mode (above) |
-| `number.home_battery_grid_setpoint` | manual grid target (Grid setpoint mode) |
-| `number.home_battery_battery_setpoint` | manual battery power (Battery setpoint mode) |
+| `number.home_battery_setpoint` | manual setpoint; mode decides grid (Grid setpoint) vs battery (Battery setpoint) |
 | `number.home_battery_soc_target` | pre-peak SOC target (`soc_target_entity`) |
 | `number.home_battery_soc_floor` | discharge floor (`soc_floor_entity`) |
 | `number.home_battery_soc_ceiling` | cheap-charge ceiling (`cheap_soc_target_entity`) |
+| `number.home_battery_price_discharge` | discharge price threshold (`price_discharge_entity`) |
+| `number.home_battery_price_charge` | cheap-charge price threshold (`price_charge_entity`) |
+| `number.home_battery_min_arbitrage_margin` | min arbitrage margin (`min_arbitrage_margin_entity`) |
 
 ### Sensors
 
@@ -589,9 +589,11 @@ in `apps.yaml` if they differ.
 | `sensor.home_battery_soc` | SOC % |
 | `sensor.home_battery_charge_power` | battery net power W (+ = discharge) |
 | `sensor.home_battery_grid_power` | grid net power W (− = export) |
-| `sensor.home_battery_system_state` | Sessy system state |
-| `sensor.home_battery_active_strategy` | active mode; `sessy_strategy` attribute shows the live `power_strategy` |
-| `sensor.home_battery_active_substrategy` | active decision branch (`discharge`, `cheap_charge`, `prepeak_charge`, `post_peak_discharge`, `default`, `manual_grid`, `manual_battery`, `sessy_dynamic`, `idle`) |
+| `sensor.home_battery_system_state` | Sessy state (running, full, empty…) |
+| `sensor.home_battery_active_strategy` | Power strategy — the mode selected (`Optimized`, `Grid setpoint`, etc.) |
+| `sensor.home_battery_sessy_strategy` | Sessy strategy — the underlying Sessy power_strategy (`nom`, `api`, `roi`, `eco`, `idle`) |
+| `sensor.home_battery_active_substrategy` | Active rule — the optimizer's current decision, translated to a friendly name (e.g. "Price spike — discharging", "Solar — storing surplus") |
+| `sensor.home_battery_actual_setpoint` | the setpoint W Sessy is actually targeting; `operates_on` attribute is `grid` (`nom`), `battery` (`api`), or `None` when Sessy runs its own strategy |
 
 The decision branch is also published to `sensor.sessy_strategy_status` as the
 `active_branch` attribute, so it is available even without the integration.
@@ -604,7 +606,7 @@ Install the [ApexCharts Card](https://github.com/RomRider/apexcharts-card) via H
 
 ### 9.1 — Energy price with strategy triggers
 
-Shows the full day's price curve with dynamic threshold lines driven by HA helpers (`input_number.sessy_price_discharge` and `input_number.sessy_price_charge`). The price y-axis uses soft bounds around the common raw-price band.
+Shows the full day's price curve with dynamic threshold lines driven by the Home Battery price numbers (`number.home_battery_price_discharge` and `number.home_battery_price_charge`). The price y-axis uses soft bounds around the common raw-price band.
 
 ```yaml
 type: custom:apexcharts-card
@@ -637,13 +639,13 @@ series:
         x: new Date(ts).getTime(),
         y: parseFloat(val)
       }));
-  - entity: input_number.sessy_price_discharge
+  - entity: number.home_battery_price_discharge
     name: Discharge trigger (dynamic)
     color: "#E24B4A"
     type: line
     stroke_width: 1.5
     stroke_dash: 5
-  - entity: input_number.sessy_price_charge
+  - entity: number.home_battery_price_charge
     name: Cheap charge trigger (dynamic)
     color: "#1D9E75"
     type: line
@@ -804,14 +806,14 @@ series:
         x: new Date(ts).getTime(),
         y: parseFloat(val)
       }));
-  - entity: input_number.sessy_price_discharge
+  - entity: number.home_battery_price_discharge
     name: Discharge trigger
     color: "#E24B4A"
     type: line
     stroke_width: 1.2
     stroke_dash: 5
     yaxis_id: price
-  - entity: input_number.sessy_price_charge
+  - entity: number.home_battery_price_charge
     name: Cheap charge trigger
     color: "#1D9E75"
     type: line

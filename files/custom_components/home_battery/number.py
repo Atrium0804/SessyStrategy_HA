@@ -34,25 +34,38 @@ class _Spec:
 
 # Controls exposed on the Home Battery device.
 _NUMBERS: tuple[_Spec, ...] = (
+    # Single manual setpoint. The mode select decides whether the AppDaemon app
+    # applies it to the grid target (Grid setpoint mode) or the battery power
+    # (Battery setpoint mode), so one control serves both.
     _Spec(
-        "grid_setpoint", "Grid setpoint", "mdi:transmission-tower",
+        "setpoint", "Setpoint", "mdi:flash",
         -10000, 10000, 50, UnitOfPower.WATT, 0, NumberMode.BOX,
     ),
     _Spec(
-        "battery_setpoint", "Battery setpoint", "mdi:battery-charging",
-        -2200, 2200, 50, UnitOfPower.WATT, 0, NumberMode.BOX,
+        "soc_target", "Pre-peak target", "mdi:battery-charging-90",
+        0, 100, 5, PERCENTAGE, 90, NumberMode.SLIDER,
     ),
     _Spec(
-        "soc_target", "SOC target", "mdi:battery-charging-90",
-        0, 100, 1, PERCENTAGE, 90, NumberMode.SLIDER,
+        "soc_floor", "Full discharge limit", "mdi:battery-20",
+        0, 100, 5, PERCENTAGE, 20, NumberMode.SLIDER,
     ),
     _Spec(
-        "soc_floor", "SOC floor", "mdi:battery-20",
-        0, 100, 1, PERCENTAGE, 20, NumberMode.SLIDER,
+        "soc_ceiling", "Full charge limit", "mdi:battery-charging-100",
+        0, 100, 5, PERCENTAGE, 100, NumberMode.SLIDER,
+    ),
+    # Price thresholds (€/kWh) the optimizer reads each cycle. Previously lived
+    # as input_number helpers in sessy_helpers.yaml; now owned by this device.
+    _Spec(
+        "price_discharge", "Full discharge above", "mdi:cash-plus",
+        0, 1, 0.01, "€/kWh", 0.39, NumberMode.BOX,
     ),
     _Spec(
-        "soc_ceiling", "SOC ceiling", "mdi:battery-charging-100",
-        0, 100, 1, PERCENTAGE, 100, NumberMode.SLIDER,
+        "price_charge", "Full charge below", "mdi:cash-minus",
+        -0.5, 0.2, 0.01, "€/kWh", -0.10, NumberMode.BOX,
+    ),
+    _Spec(
+        "min_arbitrage_margin", "Min arbitrage margin", "mdi:scale-balance",
+        0, 0.5, 0.01, "€/kWh", 0.05, NumberMode.BOX,
     ),
 )
 
@@ -72,6 +85,9 @@ class HomeBatteryNumber(NumberEntity, RestoreEntity):
 
     def __init__(self, entry: ConfigEntry, spec: _Spec):
         self._spec = spec
+        # Pin the entity_id to the stable key so the friendly name can change
+        # freely without altering the ID that apps.yaml and dashboards target.
+        self.entity_id = f"number.home_battery_{spec.key}"
         self._attr_name = spec.name
         self._attr_icon = spec.icon
         self._attr_native_min_value = spec.minimum

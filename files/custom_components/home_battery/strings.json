@@ -11,7 +11,9 @@
           "grid_power_source": "Grid power sensor",
           "system_state_source": "System state sensor",
           "sessy_strategy_source": "Sessy power-strategy select",
-          "status_source": "AppDaemon status sensor"
+          "status_source": "AppDaemon status sensor",
+          "grid_setpoint_source": "Sessy grid target number",
+          "battery_setpoint_source": "Sessy battery setpoint number"
         }
       }
     },
@@ -30,7 +32,9 @@
           "grid_power_source": "Grid power sensor",
           "system_state_source": "System state sensor",
           "sessy_strategy_source": "Sessy power-strategy select",
-          "status_source": "AppDaemon status sensor"
+          "status_source": "AppDaemon status sensor",
+          "grid_setpoint_source": "Sessy grid target number",
+          "battery_setpoint_source": "Sessy battery setpoint number"
         }
       }
     }

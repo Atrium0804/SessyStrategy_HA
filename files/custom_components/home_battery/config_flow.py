@@ -22,7 +22,9 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_BATTERY_POWER_SOURCE,
+    CONF_BATTERY_SETPOINT_SOURCE,
     CONF_GRID_POWER_SOURCE,
+    CONF_GRID_SETPOINT_SOURCE,
     CONF_SESSY_STRATEGY_SOURCE,
     CONF_SOC_SOURCE,
     CONF_STATUS_SOURCE,
@@ -34,6 +36,7 @@ from .const import (
 
 _SENSOR = EntitySelector(EntitySelectorConfig(domain="sensor"))
 _SELECT = EntitySelector(EntitySelectorConfig(domain="select"))
+_NUMBER = EntitySelector(EntitySelectorConfig(domain="number"))
 
 
 def _schema(values: dict[str, Any]) -> vol.Schema:
@@ -56,6 +59,13 @@ def _schema(values: dict[str, Any]) -> vol.Schema:
             vol.Required(
                 CONF_STATUS_SOURCE, default=values[CONF_STATUS_SOURCE]
             ): _SENSOR,
+            vol.Required(
+                CONF_GRID_SETPOINT_SOURCE, default=values[CONF_GRID_SETPOINT_SOURCE]
+            ): _NUMBER,
+            vol.Required(
+                CONF_BATTERY_SETPOINT_SOURCE,
+                default=values[CONF_BATTERY_SETPOINT_SOURCE],
+            ): _NUMBER,
         }
     )
 

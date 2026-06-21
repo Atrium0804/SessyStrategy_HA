@@ -72,8 +72,10 @@ class SessyStrategy(hass.Hass):
         #   sessy_dynamic   — stand down, hand control to Sessy's own schedule
         #   idle            — stand down, park the battery
         self.mode_select       = self.args.get("mode_select")
-        self.grid_setpoint_entity    = self.args.get("grid_setpoint_entity")
-        self.battery_setpoint_entity = self.args.get("battery_setpoint_entity")
+        # Single manual setpoint (W). The mode decides where it is applied:
+        # grid_setpoint writes it to the grid target, battery_setpoint to the
+        # battery power.
+        self.setpoint_entity   = self.args.get("setpoint_entity")
         # Sessy power_strategy option strings to select when handing control back.
         # Defaults match the ha-sessy integration; override if your build differs.
         self.sessy_dynamic_option = str(self.args.get("sessy_dynamic_option", "roi"))
@@ -123,17 +125,17 @@ class SessyStrategy(hass.Hass):
             return
 
         if mode == "grid_setpoint":
-            watts = self._tunable(0, self.grid_setpoint_entity)
+            watts = self._tunable(0, self.setpoint_entity)
             self.log(f"MANUAL grid setpoint {watts:.0f}W")
             self._set_grid_setpoint(watts)
-            self._publish_branch("manual_grid", grid_setpoint=watts)
+            self._publish_branch("manual_grid", setpoint=watts)
             return
 
         if mode == "battery_setpoint":
-            watts = self._tunable(0, self.battery_setpoint_entity)
+            watts = self._tunable(0, self.setpoint_entity)
             self.log(f"MANUAL battery setpoint {watts:.0f}W")
             self._set_battery_setpoint(watts)
-            self._publish_branch("manual_battery", battery_setpoint=watts)
+            self._publish_branch("manual_battery", setpoint=watts)
             return
 
         # ── mode == "optimized": price-optimisation priority chain ──────────
@@ -261,13 +263,16 @@ class SessyStrategy(hass.Hass):
             if max_remaining_price is None or max_remaining_price < price_discharge:
                 hours_remaining = self.evening_peak_end - now_hour
                 discharge_w = self._post_peak_discharge_setpoint(soc, soc_target, hours_remaining)
+                # Grid setpoint (negative = export) so the battery covers household
+                # load AND the export target. A high home load makes the battery
+                # work harder instead of pulling the shortfall from the grid.
                 self.log(
                     f"POST-PEAK DISCHARGE: SOC {soc:.0f}% > target {soc_target:.0f}% — "
-                    f"battery setpoint {discharge_w:.0f}W "
+                    f"grid export setpoint -{discharge_w:.0f}W "
                     f"(spread over {hours_remaining}h remaining peak window)"
                 )
                 self._publish_status("post_peak_discharge", **status_fields)
-                self._set_battery_setpoint(discharge_w)
+                self._set_grid_setpoint(-discharge_w)
                 return
 
         # ── Priority 4: default — grid setpoint 0W (solar absorption) ────────
@@ -353,7 +358,9 @@ class SessyStrategy(hass.Hass):
 
     def _post_peak_discharge_setpoint(self, soc: float, soc_target: float, hours_remaining: float) -> float:
         """
-        Watts to discharge excess SOC above target, spread over remaining peak hours.
+        Watts of excess SOC above target to sell, spread over remaining peak hours.
+        Applied as a negative grid setpoint (negative = export), so the battery
+        covers household load on top of the export and never imports to top up.
         """
         gap_wh   = (soc - soc_target) / 100.0 * self.capacity_wh
         spread_w = gap_wh / max(hours_remaining, 0.083)  # avoid div/0
@@ -363,7 +370,7 @@ class SessyStrategy(hass.Hass):
     # ── Actuator helpers ─────────────────────────────────────────────────────
 
     def _set_grid_setpoint(self, watts: float):
-        """Switch to NOM strategy and set grid target."""
+        """Switch to NOM strategy and set grid target (positive = import, negative = export)."""
         current_strategy = self.get_state(self.strategy_select)
         if current_strategy != "nom":
             self.call_service(

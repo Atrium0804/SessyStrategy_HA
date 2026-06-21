@@ -10,10 +10,10 @@
 #
 # NOTE: the Home Battery custom integration (custom_components/home_battery) is
 # the primary control surface. It owns the master mode selector
-# (select.home_battery_mode) and the SOC controls (number.home_battery_soc_*).
-# This file retains only the season selector and the price-threshold sliders,
-# plus the legacy enable switch (used by the app only when mode_select is not
-# configured).
+# (select.home_battery_mode), the SOC controls (number.home_battery_soc_*), and
+# the price thresholds (number.home_battery_price_* / _min_arbitrage_margin).
+# This file retains only the season selector plus the legacy enable switch
+# (used by the app only when mode_select is not configured).
 
 # Legacy master switch — superseded by input_select.home_battery_mode. The app
 # falls back to this only when apps.yaml has no mode_select. Keep it if you have
@@ -34,34 +34,5 @@ input_select:
       - winter
     initial: auto
 
-# Optional live-tuning sliders. Reference each from apps.yaml via the matching
-# *_entity key (e.g. soc_target_entity: input_number.sessy_soc_target) to adjust
-# the value from the HA UI without restarting AppDaemon. Omit any you don't want
-# to expose — the app falls back to the static apps.yaml default.
-input_number:
-  # SOC numbers live in the Home Battery integration (number.home_battery_soc_*).
-  # Price thresholds remain here.
-  sessy_price_discharge:
-    name: Sessy discharge price threshold
-    icon: mdi:cash-plus
-    min: 0
-    max: 1
-    step: 0.01
-    unit_of_measurement: "€/kWh"
-    initial: 0.39
-  sessy_price_charge:
-    name: Sessy cheap-charge price threshold
-    icon: mdi:cash-minus
-    min: -0.5
-    max: 0.2
-    step: 0.01
-    unit_of_measurement: "€/kWh"
-    initial: -0.10
-  sessy_min_arbitrage_margin:
-    name: Sessy min arbitrage margin
-    icon: mdi:scale-balance
-    min: 0
-    max: 0.5
-    step: 0.01
-    unit_of_measurement: "€/kWh"
-    initial: 0.05
+# SOC controls and price thresholds now live on the Home Battery device
+# (number.home_battery_*), so no input_number helpers are needed here.
