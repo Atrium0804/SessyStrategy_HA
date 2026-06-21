@@ -75,8 +75,8 @@ async def async_setup_entry(
             ),
             HomeBatteryNumericSensor(
                 entry,
-                key="charge_power",
-                name="Charge power",
+                key="battery_power",
+                name="Battery power",
                 source=cfg[CONF_BATTERY_POWER_SOURCE],
                 device_class=SensorDeviceClass.POWER,
                 unit=UnitOfPower.WATT,

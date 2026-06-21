@@ -587,7 +587,7 @@ in `apps.yaml` if they differ.
 | Entity | Description |
 |---|---|
 | `sensor.home_battery_soc` | SOC % |
-| `sensor.home_battery_charge_power` | battery net power W (+ = discharge) |
+| `sensor.home_battery_battery_power` | battery net power W (+ = discharge) |
 | `sensor.home_battery_grid_power` | grid net power W (− = export) |
 | `sensor.home_battery_system_state` | Sessy state (running, full, empty…) |
 | `sensor.home_battery_active_strategy` | Power strategy — the mode selected (`Optimized`, `Grid setpoint`, etc.) |
