@@ -230,13 +230,13 @@ class SessyStrategy(hass.Hass):
                 self._set_grid_setpoint(0)
                 return
 
-            # Break-even guard: only charge if the expected evening peak beats the
+            # Break-even guard: only charge if the best remaining price today beats the
             # current import price by at least min_arbitrage_margin.
-            expected_peak = self._max_price_in_window(self.evening_peak_start, self.evening_peak_end)
+            expected_peak = self._max_price_in_window(now_hour, 24)
             if expected_peak is not None and \
                     (expected_peak - import_price) < min_arbitrage_margin:
                 self.log(
-                    f"PRE-PEAK SKIP: expected peak {expected_peak:.3f} vs import now "
+                    f"PRE-PEAK SKIP: best remaining price {expected_peak:.3f} vs import now "
                     f"{import_price:.3f} (spread < margin {min_arbitrage_margin}) — "
                     f"holding grid setpoint 0W"
                 )
@@ -254,7 +254,7 @@ class SessyStrategy(hass.Hass):
             return
 
         # ── Priority 3.5: post-peak excess discharge ─────────────────────────
-        if prepeak_end <= now_hour < self.evening_peak_end and soc > soc_target:
+        if self.evening_peak_start <= now_hour < self.evening_peak_end and soc > soc_target:
             max_remaining_price = self._max_price_in_window(now_hour, 24)
             if max_remaining_price is None or max_remaining_price < price_discharge:
                 hours_remaining = self.evening_peak_end - now_hour

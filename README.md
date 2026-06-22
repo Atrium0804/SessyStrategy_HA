@@ -26,8 +26,8 @@ The app wakes every 5 minutes, reads the current state of charge (SOC) and the l
 ```
 Priority 1   — Price spike       → discharge toward SOC floor
 Priority 2   — Cheap / negative  → charge toward 100% SOC
-Priority 3   — Pre-peak window   → charge toward 90% SOC (only if the peak pays)
-Priority 3.5 — Post-peak surplus → bleed excess SOC back to target
+Priority 3   — Pre-peak window   → charge toward 70% SOC (16–18 h, only if the peak pays)
+Priority 3.5 — Post-peak surplus → bleed excess SOC back to target (20–22 h)
 Priority 4   — Default           → grid setpoint 0 W (absorb PV, block export)
 ```
 
@@ -118,13 +118,13 @@ xychart-beta
 
 **What it does.** Top the battery up to its evening target shortly before the peak — but *only* when that peak is expensive enough to be worth buying grid energy for.
 
-**Trigger.** All of: inside the pre-peak window `prepeak_start`–`prepeak_end` (16–18 h, winter 14–18 h); SOC < `soc_target` (90 %); and the break-even guard passes —
+**Trigger.** All of: inside the pre-peak window `prepeak_start`–`prepeak_end` (16–18 h, winter 14–18 h); SOC < `soc_target` (70 %); and the break-even guard passes —
 
 ```
 expected_evening_peak_raw − import_price_now ≥ min_arbitrage_margin (€0.05)
 ```
 
-where `expected_evening_peak_raw` is the highest raw price in the evening window (`evening_peak_start`–`evening_peak_end`, 18–23 h). If SOC is already at target, or the spread is too thin, it falls through to grid 0 W.
+where `expected_peak_raw` is the highest raw price from the current hour until end of day. If SOC is already at target, or the spread is too thin, it falls through to grid 0 W.
 
 **Battery steering.** Battery setpoint (`api`), negative = charge, spread over `prepeak_window_h` (2 h, winter 4 h):
 
@@ -154,7 +154,7 @@ xychart-beta
 
 **What it does.** If the peak passes and the battery is still above target with no further spike coming, bleed the surplus back down to target so you don't end the night holding energy you bought for a peak that's already over.
 
-**Trigger.** Inside `prepeak_end`–`evening_peak_end` (18–23 h); SOC > `soc_target` (90 %); and no remaining hour today exceeds `price_discharge` (no spike left to save it for).
+**Trigger.** Inside `evening_peak_start`–`evening_peak_end` (20–22 h); SOC > `soc_target` (70 %); and no remaining hour today exceeds `price_discharge` (no spike left to save it for).
 
 **Grid steering.** Grid setpoint (`nom`), negative = export — we want to *sell* the surplus. The magnitude is spread over the hours left in the evening window:
 
@@ -167,8 +167,8 @@ Using the grid setpoint (not the battery setpoint) means the battery covers hous
 ```mermaid
 %%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#EBB08A,#0072B2,#7BCAB4"}}}%%
 xychart-beta
-    title "Priority 3.5 — Post-peak excess discharge (18:00–23:00)"
-    x-axis ["18:00", "19:00", "20:00", "21:00", "22:00"]
+    title "Priority 3.5 — Post-peak excess discharge (20:00–22:00)"
+    x-axis ["20:00", "20:30", "21:00", "21:30", "22:00"]
     y-axis "SOC (%)" 0 --> 100
     line [96, 91, 90, 90, 90]
     line [20, 20, 20, 20, 20]
@@ -412,8 +412,8 @@ sessy_strategy:
   prepeak_end: 18            # End hour of pre-peak charge window (local)
   prepeak_window_h: 2.0      # Spread window for pre-peak charge (hours)
   discharge_window_h: 2.0    # Spread window for price-spike discharge (hours)
-  evening_peak_start: 18     # Start hour of evening peak (break-even check)
-  evening_peak_end: 23       # End hour of evening peak (break-even check)
+  evening_peak_start: 20     # Start hour of evening peak (break-even check + post-peak discharge)
+  evening_peak_end: 22       # End hour of evening peak (break-even check + post-peak discharge)
 
   # Season mode: auto | summer | winter
   season_mode: auto
