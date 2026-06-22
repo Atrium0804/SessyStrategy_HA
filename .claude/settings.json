@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python -c \"\nimport json, sys, re\nd = json.load(sys.stdin)\nf = d.get('tool_input', {}).get('file_path', '')\nif re.search(r'\\\\.(py|yaml)$', f):\n    print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': 'You just edited a .py or .yaml file. Check whether README.md or CLAUDE.md needs updating to reflect any logic, config, or default value changes.'}}))\n\"",
+            "statusMessage": "Checking docs sync..."
+          }
+        ]
+      }
+    ]
+  }
+}

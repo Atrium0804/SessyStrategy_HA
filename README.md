@@ -21,13 +21,13 @@ An AppDaemon-based charging strategy for the Sessy home battery that minimises s
 
 ## 1. How the strategy works
 
-The app wakes every 5 minutes, reads the current state of charge (SOC) and the live energy price, and runs a single **top-down priority chain**. The first branch whose condition matches wins, sets the battery for that cycle, and stops; everything below it is skipped. If nothing matches, the default branch runs. Nothing is stored between cycles — the decision is recomputed from scratch each run, so it behaves like a proportional controller that self-corrects as SOC and prices move.
+The app wakes every 5 minutes — and immediately whenever you change a live input (mode selector, manual setpoint, or any tuning helper), so changes apply without waiting for the next cycle — reads the current state of charge (SOC) and the live energy price, and runs a single **top-down priority chain**. The first branch whose condition matches wins, sets the battery for that cycle, and stops; everything below it is skipped. If nothing matches, the default branch runs. Nothing is stored between cycles — the decision is recomputed from scratch each run, so it behaves like a proportional controller that self-corrects as SOC and prices move.
 
 ```
 Priority 1   — Price spike       → discharge toward SOC floor
 Priority 2   — Cheap / negative  → charge toward 100% SOC
-Priority 3   — Pre-peak window   → charge toward 90% SOC (only if the peak pays)
-Priority 3.5 — Post-peak surplus → bleed excess SOC back to target
+Priority 3   — Pre-peak window   → charge toward 70% SOC (16–18 h, only if the peak pays)
+Priority 3.5 — Post-peak surplus → bleed excess SOC back to target (20–22 h)
 Priority 4   — Default           → grid setpoint 0 W (absorb PV, block export)
 ```
 
@@ -43,7 +43,7 @@ The Sessy integration exposes **raw export prices** (what the grid pays you). Yo
 ### Mechanics shared by every branch
 
 - **Control mode** (full detail in [§2](#2-setpoint-types-explained)): the price-spike discharge and the charge branches drive the **battery setpoint** (`api` mode — exact battery power, grid balances); the default and the post-peak surplus sale drive the **grid setpoint** (`nom` mode — meter target).
-- **Proportional spread + caps.** Active power is the SOC gap spread over a time window, then capped at 40 % C-rate (2,000 W on a 5 kWh pack) and the 2,200 W hardware limit:
+- **Proportional spread + clamp.** Active power is the SOC gap spread over a window, then clamped at the `max_power_w` hardware limit (2,200 W). The Sessy enforces its own technical limit below that, so there is no artificial C-rate cap — loss control comes from sizing the window, not from clamping power:
 
   ```
   charge    (W) = (SOC_target − SOC) / 100 × capacity_Wh / window_h
@@ -51,6 +51,8 @@ The Sessy integration exposes **raw export prices** (what the grid pays you). Yo
   ```
 
   Partial power is deliberate: inverter copper losses scale with the square of current, so half power is roughly 4× more efficient per watt, and a gentle charge leaves headroom for residual PV to fill the gap instead of the grid.
+
+- **Adaptive window.** The price-threshold branches (price-spike discharge, cheap charge) size `window_h` automatically: `window_safety_factor` (0.75) of the contiguous run of hours the price stays past the threshold, floored at `min_window_h` (2 h). Spreading over most — not all — of the favourable run keeps power (and losses) low while finishing with a margin before the window closes. The clock-bounded branches (pre-peak, post-peak) instead spread over the time left in their window.
 
 ---
 
@@ -63,10 +65,11 @@ The Sessy integration exposes **raw export prices** (what the grid pays you). Yo
 **Battery steering.** Battery setpoint (`api`), positive = discharge:
 
 ```
-discharge (W) = (SOC − soc_floor) / 100 × capacity_Wh / discharge_window_h   (capped)
+window_h      = max(0.75 × hours price stays > price_discharge, min_window_h)
+discharge (W) = (SOC − soc_floor) / 100 × capacity_Wh / window_h   (clamped at max_power_w)
 ```
 
-`discharge_window_h` (2 h) is only a **rate-sizing window**, not a duration commitment: it sets how hard to discharge *this* cycle so the battery drains gently rather than dumping at full power. The branch is re-evaluated every 5 minutes against the live price, so **discharge lasts exactly as long as the price stays above the threshold** — when the spike ends the branch stops firing and the chain falls through (usually to the 0 W default), leaving any remaining energy above the floor untouched. `soc_floor` (20 %, winter 30 %) is the lower bound that zeroes the setpoint while the branch is active, not a level the strategy commits to reaching. The orange line marks the discharge trigger.
+`window_h` is only a **rate-sizing window**, not a duration commitment: it sets how hard to discharge *this* cycle so the battery drains gently rather than dumping at full power. It is sized adaptively from how long the price is forecast to stay above the threshold (75 % of that run, floored at `min_window_h` = 2 h), so a brief spike discharges harder than a long expensive evening. The branch is re-evaluated every 5 minutes against the live price, so **discharge lasts exactly as long as the price stays above the threshold** — when the spike ends the branch stops firing and the chain falls through (usually to the 0 W default), leaving any remaining energy above the floor untouched. `soc_floor` (0 %, winter 30 %) is the lower bound that zeroes the setpoint while the branch is active, not a level the strategy commits to reaching. The orange line marks the discharge trigger.
 
 ```mermaid
 %%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#D55E00,#7BCAB4"}}}%%
@@ -92,10 +95,11 @@ xychart-beta
 **Battery steering.** Battery setpoint (`api`), negative = charge:
 
 ```
-charge (W) = (cheap_soc_target − SOC) / 100 × capacity_Wh / cheap_hours_remaining   (capped)
+window_h   = max(0.75 × hours price stays < price_charge, min_window_h)
+charge (W) = (cheap_soc_target − SOC) / 100 × capacity_Wh / window_h   (clamped at max_power_w)
 ```
 
-`cheap_hours_remaining` is the count of consecutive upcoming hours still below the threshold, so a single-hour dip charges hard to grab it while a long cheap block charges gently. The green line marks the charge trigger.
+`window_h` is sized from the count of consecutive upcoming hours still below the threshold (75 % of that run, floored at `min_window_h` = 2 h), so a single-hour dip charges hard to grab it while a long cheap block charges gently. The green line marks the charge trigger.
 
 ```mermaid
 %%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#EBB08A,#009E73"}}}%%
@@ -118,18 +122,18 @@ xychart-beta
 
 **What it does.** Top the battery up to its evening target shortly before the peak — but *only* when that peak is expensive enough to be worth buying grid energy for.
 
-**Trigger.** All of: inside the pre-peak window `prepeak_start`–`prepeak_end` (16–18 h, winter 14–18 h); SOC < `soc_target` (90 %); and the break-even guard passes —
+**Trigger.** All of: inside the pre-peak window `prepeak_start`–`prepeak_end` (16–18 h, winter 14–18 h); SOC < `soc_target` (70 %); and the break-even guard passes —
 
 ```
 expected_evening_peak_raw − import_price_now ≥ min_arbitrage_margin (€0.05)
 ```
 
-where `expected_evening_peak_raw` is the highest raw price in the evening window (`evening_peak_start`–`evening_peak_end`, 18–23 h). If SOC is already at target, or the spread is too thin, it falls through to grid 0 W.
+where `expected_peak_raw` is the highest raw price from the current hour until end of day. If SOC is already at target, or the spread is too thin, it falls through to grid 0 W.
 
 **Battery steering.** Battery setpoint (`api`), negative = charge, spread over `prepeak_window_h` (2 h, winter 4 h):
 
 ```
-charge (W) = (soc_target − SOC) / 100 × capacity_Wh / prepeak_window_h   (capped)
+charge (W) = (soc_target − SOC) / 100 × capacity_Wh / prepeak_window_h   (clamped at max_power_w)
 ```
 
 The blue line marks the SOC target.
@@ -154,12 +158,12 @@ xychart-beta
 
 **What it does.** If the peak passes and the battery is still above target with no further spike coming, bleed the surplus back down to target so you don't end the night holding energy you bought for a peak that's already over.
 
-**Trigger.** Inside `prepeak_end`–`evening_peak_end` (18–23 h); SOC > `soc_target` (90 %); and no remaining hour today exceeds `price_discharge` (no spike left to save it for).
+**Trigger.** Inside `evening_peak_start`–`evening_peak_end` (20–22 h); SOC > `soc_target` (70 %); and no remaining hour today exceeds `price_discharge` (no spike left to save it for).
 
 **Grid steering.** Grid setpoint (`nom`), negative = export — we want to *sell* the surplus. The magnitude is spread over the hours left in the evening window:
 
 ```
-grid setpoint (W) = −(SOC − soc_target) / 100 × capacity_Wh / hours_until_peak_end   (capped)
+grid setpoint (W) = −(SOC − soc_target) / 100 × capacity_Wh / hours_until_peak_end   (clamped at max_power_w)
 ```
 
 Using the grid setpoint (not the battery setpoint) means the battery covers household load **on top of** the export target, so a high home load makes the battery work harder rather than importing from the grid. The blue line marks the discharge destination.
@@ -167,8 +171,8 @@ Using the grid setpoint (not the battery setpoint) means the battery covers hous
 ```mermaid
 %%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#EBB08A,#0072B2,#7BCAB4"}}}%%
 xychart-beta
-    title "Priority 3.5 — Post-peak excess discharge (18:00–23:00)"
-    x-axis ["18:00", "19:00", "20:00", "21:00", "22:00"]
+    title "Priority 3.5 — Post-peak excess discharge (20:00–22:00)"
+    x-axis ["20:00", "20:30", "21:00", "21:30", "22:00"]
     y-axis "SOC (%)" 0 --> 100
     line [96, 91, 90, 90, 90]
     line [20, 20, 20, 20, 20]
@@ -399,21 +403,22 @@ sessy_strategy:
   class: SessyStrategy
 
   capacity_wh: 5000          # Battery capacity in Wh
-  max_power_w: 2200          # Inverter/battery max power in W
-  c_rate_cap: 0.40           # Max C-rate for spread setpoints (0.40 = 40%)
-  soc_target: 90             # % SOC to reach before the evening peak
-  soc_floor: 20              # % SOC floor — never discharge below this
+  max_power_w: 2200          # Inverter/battery max power in W — final setpoint clamp
+  soc_target: 70             # % SOC to reach before the evening peak
+  soc_floor: 0               # % SOC floor — never discharge below this
   cheap_soc_target: 100      # % SOC ceiling for cheap-price charging
   surcharge: 0.11            # Import surcharge €/kWh (raw export → import)
   price_discharge: 0.39      # Raw price above which to force discharge
   price_charge: -0.10        # Raw price below which to charge from grid
   min_arbitrage_margin: 0.05 # Min €/kWh spread to justify pre-peak charge
+  window_safety_factor: 0.75 # Fraction of the favourable price run to spread over
+  min_window_h: 2.0          # Minimum adaptive spread window (hours)
+  rerun_debounce_s: 2.0      # Delay before re-running after a live input changes
   prepeak_start: 16          # Start hour of pre-peak charge window (local)
   prepeak_end: 18            # End hour of pre-peak charge window (local)
   prepeak_window_h: 2.0      # Spread window for pre-peak charge (hours)
-  discharge_window_h: 2.0    # Spread window for price-spike discharge (hours)
-  evening_peak_start: 18     # Start hour of evening peak (break-even check)
-  evening_peak_end: 23       # End hour of evening peak (break-even check)
+  evening_peak_start: 20     # Start hour of evening peak (break-even check + post-peak discharge)
+  evening_peak_end: 22       # End hour of evening peak (break-even check + post-peak discharge)
 
   # Season mode: auto | summer | winter
   season_mode: auto
@@ -877,7 +882,7 @@ Check the AppDaemon log at 16:00 — it will show the SOC, target, and calculate
 
 **Pre-peak charge not reaching target by 18:00**
 
-If SOC starts too low (below ~50%) the 2-hour spread may be insufficient. The setpoint is capped at 40% C-rate (2,000 W for 5 kWh), which delivers at most 4 kWh in 2 hours — meaning you can recover at most 80% SOC from empty. If you regularly start the window below 50%, consider extending `PREPEAK_WINDOW_H` to 3 or 4 and setting `PREPEAK_START` to 14 or 15.
+If SOC starts too low (below ~50%) the 2-hour spread may be insufficient. The setpoint is clamped at `max_power_w` (2,200 W), which delivers at most 4.4 kWh in 2 hours — so from empty you can recover at most ~88% SOC on a 5 kWh pack within the window. If you regularly start the window below 50%, consider extending `PREPEAK_WINDOW_H` to 3 or 4 and setting `PREPEAK_START` to 14 or 15.
 
 **AppDaemon log says "Could not read SOC or price"**
 
