@@ -58,13 +58,9 @@ class SessyStrategy(hass.Hass):
         self.soc_sensor       = self.args.get("soc_sensor",       "sensor.sessy_battery_alt9_state_of_charge")
         self.price_sensor     = self.args.get("price_sensor",     "sensor.sessy_dnhh_energy_price")
         self.status_sensor    = self.args.get("status_sensor",    "sensor.sessy_strategy_status")
-        # Optional master enable switch (input_boolean). Legacy fallback used only
-        # when no mode_select is configured. If unset, the app always runs.
-        self.enable_switch    = self.args.get("enable_switch")
 
         # ── Operating-mode selector (input_select) ──────────────────────────
-        # The single master control the app obeys. When set, it supersedes
-        # enable_switch. Options are normalised to: optimized | grid_setpoint |
+        # The single master control the app obeys. Options are normalised to: optimized | grid_setpoint |
         # battery_setpoint | sessy_dynamic | idle (case- and space-insensitive).
         #   optimized       — run the full price-optimisation priority chain
         #   grid_setpoint   — pass user's grid target through (strategy → nom)
@@ -288,8 +284,7 @@ class SessyStrategy(hass.Hass):
     def _active_mode(self) -> str:
         """
         Resolve the operating mode from the input_select selector, normalising
-        labels like "Grid setpoint" to "grid_setpoint". When no selector is
-        configured, fall back to the legacy enable_switch ("disabled" when off).
+        labels like "Grid setpoint" to "grid_setpoint".
         """
         if self.mode_select:
             state = self.get_state(self.mode_select)
@@ -297,8 +292,6 @@ class SessyStrategy(hass.Hass):
                 key = state.strip().lower().replace(" ", "_")
                 if key in self._VALID_MODES:
                     return key
-        if self.enable_switch and self.get_state(self.enable_switch) == "off":
-            return "disabled"
         return "optimized"
 
     def _apply_standby(self, strategy_option: str, branch: str):
