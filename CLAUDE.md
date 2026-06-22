@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SessyStrategy HA is an **AppDaemon 4** application for Home Assistant that optimizes a Sessy home battery system. It runs every 5 minutes and executes a 4-priority decision chain based on dynamic energy prices and battery state-of-charge (SOC).
+SessyStrategy HA is an **AppDaemon 4** application for Home Assistant that optimizes a Sessy home battery system. It runs every 5 minutes (and immediately when a live input changes) and executes a 4-priority decision chain based on dynamic energy prices and battery state-of-charge (SOC).
 
 **Runtime:** AppDaemon 4 add-on inside Home Assistant — there is no local dev server or build step. The only runtime dependency is `appdaemon>=4.4` (see `requirements.txt`).
 
@@ -33,12 +33,12 @@ Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
 
 `SessyStrategy(hass.Hass)` in `files/sessy_strategy.py` is the entire application:
 
-- **`initialize()`** — reads `apps.yaml` config into `self.*` attributes, schedules `update_strategy()` to run every 5 minutes. No logic here.
+- **`initialize()`** — reads `apps.yaml` config into `self.*` attributes, schedules `update_strategy()` to run every 5 minutes, and registers `listen_state` on every live input so changes trigger a debounced immediate re-run. No logic here.
 - **`update_strategy(kwargs)`** — the sole decision entry point; runs each cycle as a linear if/elif priority chain.
 
 ### Decision priority chain (top wins, returns early)
 
-1. **Price spike** — raw price > `price_discharge` → discharge toward SOC floor over 2 hours
+1. **Price spike** — raw price > `price_discharge` → discharge toward SOC floor over an adaptive window (0.75 × the hours price stays above the threshold, floored at `min_window_h`)
 2. **Cheap/negative price** — raw price < `price_charge` → charge toward 100% SOC over remaining cheap window
 3. **Pre-peak charge** — in time window (16–18h) AND SOC < target AND evening peak beats current price by margin → charge toward SOC target
 3.5. **Post-peak discharge** — inside `evening_peak_start`–`evening_peak_end` (20–22h) AND SOC > target AND no price spike remaining → export excess via grid setpoint
@@ -48,9 +48,11 @@ Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
 
 | Category | Methods |
 |---|---|
-| Setpoint calculators | `_charge_setpoint()`, `_discharge_setpoint()`, `_cheap_charge_setpoint()` |
-| Sensor readers | `_get_soc()`, `_get_current_price()`, `_count_cheap_hours()`, `_max_price_in_window()`, `_daily_min_price_hour_and_value()` |
+| Setpoint calculators | `_charge_setpoint()`, `_discharge_setpoint()`, `_cheap_charge_setpoint()`, `_post_peak_discharge_setpoint()` |
+| Window sizing | `_contiguous_price_hours(threshold, above)`, `_spread_window_h(threshold, above)` |
+| Sensor readers | `_get_soc()`, `_get_current_price()`, `_max_price_in_window()`, `_daily_min_price_hour_and_value()` |
 | Actuators | `_set_grid_setpoint(watts)`, `_set_battery_setpoint(watts)` |
+| Live-input re-run | `_on_input_change()` (listen_state callback), `_rerun_now()` |
 | Seasonal logic | `_active_season_mode()`, `_infer_season_from_price_minimum()`, `_seasonal_value()` |
 | Status | `_publish_status()` — writes all current state to `sensor.sessy_strategy_status` |
 
@@ -58,9 +60,10 @@ Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
 
 All tunables live in `files/apps.yaml`. **No magic numbers in Python** — if a value might need tuning, it belongs in `apps.yaml`. Key groups:
 
-- Hardware: `capacity_wh`, `max_power_w`, `c_rate_cap`
+- Hardware: `capacity_wh`, `max_power_w` (final setpoint clamp — no artificial C-rate cap; the Sessy enforces its own limit)
 - SOC targets: `soc_target` (70%), `soc_floor` (0%), `cheap_soc_target` (100%)
 - Price thresholds: `price_discharge` (0.39), `price_charge` (-0.10), `min_arbitrage_margin` (0.05)
+- Spread window: `window_safety_factor` (0.75), `min_window_h` (2.0)
 - Time windows: `prepeak_start/end`, `evening_peak_start/end`, winter variants
 - Season auto-detect: `season_day_start/end` (8–18h)
 
@@ -87,5 +90,5 @@ Full detail in `CODING_PRINCIPLES.md`. Key rules:
 | Priority | Issue | Fix |
 |---|---|---|
 | 🔴 High | No test suite | Create `tests/test_sessy_strategy.py` with pytest + mocked `hass.Hass` |
-| 🟡 Medium | Hardcoded `max(50, ...)` in three setpoint methods | Extract `min_setpoint_w` to `apps.yaml` |
+| 🟡 Medium | Hardcoded `max(50, ...)` in four setpoint methods | Extract `min_setpoint_w` to `apps.yaml` |
 | 🟢 Low | Some direct `get_state()` calls not routed through helpers | Wrap in named helper methods |

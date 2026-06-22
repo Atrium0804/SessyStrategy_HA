@@ -4,8 +4,7 @@ sessy_strategy:
 
   # ── Battery / hardware ──────────────────────────────────────────────
   capacity_wh: 5000          # Battery capacity in Wh
-  max_power_w: 2200          # Inverter/battery max power in W
-  c_rate_cap: 0.40           # Max C-rate for spread setpoints (0.40 = 40%)
+  max_power_w: 2200          # Inverter/battery max power in W — final setpoint clamp
 
   # ── State-of-charge targets ─────────────────────────────────────────
   soc_target: 70             # % SOC to reach before the evening peak
@@ -18,11 +17,18 @@ sessy_strategy:
   price_charge: -0.10        # Raw price below which to charge from grid
   min_arbitrage_margin: 0.05 # Min €/kWh spread to justify pre-peak charge
 
+  # ── Adaptive spread window ──────────────────────────────────────────
+  # Price-spike discharge and cheap charge spread over this fraction of the
+  # contiguous run of hours the price stays past the threshold, floored at
+  # min_window_h. Wider spread = lower power = lower round-trip losses.
+  window_safety_factor: 0.75 # Fraction of the favourable price run to spread over
+  min_window_h: 2.0          # Minimum spread window (hours)
+  rerun_debounce_s: 2.0      # Delay before re-running after a live input changes
+
   # ── Time windows (local hours) ──────────────────────────────────────
   prepeak_start: 16
   prepeak_end: 18
   prepeak_window_h: 2.0
-  discharge_window_h: 2.0
   evening_peak_start: 20
   evening_peak_end: 22
 

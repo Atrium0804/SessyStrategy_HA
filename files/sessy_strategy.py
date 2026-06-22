@@ -24,7 +24,6 @@ class SessyStrategy(hass.Hass):
         # ── Tunables (overridable from apps.yaml) ───────────────────────────
         self.capacity_wh          = float(self.args.get("capacity_wh", 5000))
         self.max_power_w          = float(self.args.get("max_power_w", 2200))
-        self.c_rate_cap           = float(self.args.get("c_rate_cap", 0.40))
         self.soc_target           = float(self.args.get("soc_target", 90))
         self.soc_floor            = float(self.args.get("soc_floor", 20))
         self.cheap_soc_target     = float(self.args.get("cheap_soc_target", 100))
@@ -34,7 +33,14 @@ class SessyStrategy(hass.Hass):
         self.prepeak_start        = int(self.args.get("prepeak_start", 16))
         self.prepeak_end          = int(self.args.get("prepeak_end", 18))
         self.prepeak_window_h     = float(self.args.get("prepeak_window_h", 2.0))
-        self.discharge_window_h   = float(self.args.get("discharge_window_h", 2.0))
+        # Adaptive spread window: charge/discharge is spread over window_safety_factor
+        # of the contiguous run of hours the price stays past the threshold, floored
+        # at min_window_h. Wider spread = lower power = lower round-trip losses.
+        self.window_safety_factor = float(self.args.get("window_safety_factor", 0.75))
+        self.min_window_h         = float(self.args.get("min_window_h", 2.0))
+        # Seconds to wait after a live input changes before re-running, so a slider
+        # drag coalesces into a single run instead of one per intermediate value.
+        self.rerun_debounce_s     = float(self.args.get("rerun_debounce_s", 2.0))
         self.evening_peak_start   = int(self.args.get("evening_peak_start", 18))
         self.evening_peak_end     = int(self.args.get("evening_peak_end", 23))
         self.min_arbitrage_margin = float(self.args.get("min_arbitrage_margin", 0.05))
@@ -91,10 +97,29 @@ class SessyStrategy(hass.Hass):
         self.season_mode_entity          = self.args.get("season_mode_entity")
 
         self._last_active_season = None
+        self._rerun_timer = None
 
         self.log("Sessy strategy starting up")
         # Run immediately, then every 5 minutes
         self.run_every(self.update_strategy, "now", 5 * 60)
+
+        # Re-run immediately when the user changes any live input, so tweaks take
+        # effect without waiting for the next 5-minute cycle. None entries (unset
+        # optional entities) are skipped.
+        live_inputs = [
+            self.mode_select,
+            self.setpoint_entity,
+            self.soc_target_entity,
+            self.soc_floor_entity,
+            self.cheap_soc_target_entity,
+            self.price_discharge_entity,
+            self.price_charge_entity,
+            self.min_arbitrage_margin_entity,
+            self.season_mode_entity,
+        ]
+        for entity in live_inputs:
+            if entity:
+                self.listen_state(self._on_input_change, entity)
 
     # ── Main logic ────────────────────────────────────────────────────────────
 
@@ -188,11 +213,13 @@ class SessyStrategy(hass.Hass):
 
         # ── Priority 1: excessive price → discharge ─────────────────────
         if price > price_discharge:
-            discharge_w = self._discharge_setpoint(soc, soc_floor)
+            window_h    = self._spread_window_h(price_discharge, above=True)
+            discharge_w = self._discharge_setpoint(soc, soc_floor, window_h)
             self.log(
                 f"DISCHARGE override: import price {import_price:.3f} > "
                 f"{price_discharge + self.surcharge:.2f} — "
-                f"battery setpoint {discharge_w:.0f}W (SOC {soc:.0f}% → floor {soc_floor:.0f}%)"
+                f"battery setpoint {discharge_w:.0f}W (SOC {soc:.0f}% → floor {soc_floor:.0f}% "
+                f"over {window_h:.2f}h)"
             )
             self._publish_status("discharge", **status_fields)
             self._set_battery_setpoint(discharge_w)
@@ -208,12 +235,12 @@ class SessyStrategy(hass.Hass):
                 self._publish_status("cheap_charge_full", **status_fields)
                 self._set_grid_setpoint(0)
                 return
-            cheap_hours = self._count_cheap_hours(price_charge)
-            charge_w    = self._cheap_charge_setpoint(soc, cheap_soc_target, cheap_hours)
+            window_h = self._spread_window_h(price_charge, above=False)
+            charge_w = self._cheap_charge_setpoint(soc, cheap_soc_target, window_h)
             self.log(
                 f"CHEAP CHARGE: raw price {price:.5f} < {price_charge} — "
                 f"battery setpoint -{charge_w:.0f}W (SOC {soc:.0f}% → {cheap_soc_target:.0f}% "
-                f"over {cheap_hours}h cheap window)"
+                f"over {window_h:.2f}h cheap window)"
             )
             self._publish_status("cheap_charge", **status_fields)
             self._set_battery_setpoint(-charge_w)
@@ -257,7 +284,10 @@ class SessyStrategy(hass.Hass):
         if self.evening_peak_start <= now_hour < self.evening_peak_end and soc > soc_target:
             max_remaining_price = self._max_price_in_window(now_hour, 24)
             if max_remaining_price is None or max_remaining_price < price_discharge:
-                hours_remaining = self.evening_peak_end - now_hour
+                now_dt = self.datetime()
+                peak_end_minutes = self.evening_peak_end * 60
+                now_minutes = now_dt.hour * 60 + now_dt.minute
+                hours_remaining = (peak_end_minutes - now_minutes) / 60
                 discharge_w = self._post_peak_discharge_setpoint(soc, soc_target, hours_remaining)
                 # Grid setpoint (negative = export) so the battery covers household
                 # load AND the export target. A high home load makes the battery
@@ -265,7 +295,7 @@ class SessyStrategy(hass.Hass):
                 self.log(
                     f"POST-PEAK DISCHARGE: SOC {soc:.0f}% > target {soc_target:.0f}% — "
                     f"grid export setpoint -{discharge_w:.0f}W "
-                    f"(spread over {hours_remaining}h remaining peak window)"
+                    f"(spread over {hours_remaining:.2f}h remaining peak window)"
                 )
                 self._publish_status("post_peak_discharge", **status_fields)
                 self._set_grid_setpoint(-discharge_w)
@@ -310,55 +340,71 @@ class SessyStrategy(hass.Hass):
             self.log(f"Strategy → {strategy_option} ({branch})")
         self._publish_branch(branch, sessy_strategy=strategy_option)
 
+    # ── Live-input re-run ──────────────────────────────────────────────────────
+
+    def _on_input_change(self, entity, attribute, old, new, kwargs):
+        """
+        listen_state callback: schedule a strategy re-run after a live input
+        changes. Resets a shared debounce timer so a burst of changes (a slider
+        drag) collapses into a single run rerun_debounce_s after the last one.
+        """
+        if old == new:
+            return
+        if self._rerun_timer is not None:
+            self.cancel_timer(self._rerun_timer)
+        self.log(f"Input {entity} changed {old} → {new} — re-running in {self.rerun_debounce_s:.0f}s")
+        self._rerun_timer = self.run_in(self._rerun_now, self.rerun_debounce_s)
+
+    def _rerun_now(self, kwargs):
+        self._rerun_timer = None
+        self.update_strategy({})
+
     # ── Setpoint calculators ──────────────────────────────────────────────────
 
     def _charge_setpoint(self, soc: float, soc_target: float, prepeak_window_h: float) -> float:
         """
         Watts to charge. Spreads remaining gap over prepeak_window_h.
-        Capped at c_rate_cap × capacity and max_power_w.
+        Clamped at max_power_w; the Sessy enforces its own hardware limit below that.
         """
         gap_wh   = (soc_target - soc) / 100.0 * self.capacity_wh
         spread_w = gap_wh / prepeak_window_h
-        cap_w    = self.c_rate_cap * self.capacity_wh
-        return max(50, min(spread_w, cap_w, self.max_power_w))
+        return max(50, min(spread_w, self.max_power_w))
 
-    def _discharge_setpoint(self, soc: float, soc_floor: float) -> float:
+    def _discharge_setpoint(self, soc: float, soc_floor: float, window_h: float) -> float:
         """
-        Watts to discharge. Spreads available energy above floor over discharge_window_h.
-        Capped at c_rate_cap × capacity and max_power_w.
+        Watts to discharge. Spreads available energy above floor over window_h.
+        Clamped at max_power_w; the Sessy enforces its own hardware limit below that.
         """
         available_wh = (soc - soc_floor) / 100.0 * self.capacity_wh
         if available_wh <= 0:
             self.log(f"SOC {soc:.0f}% already at floor {soc_floor:.0f}% — holding 0W")
             return 0
-        spread_w = available_wh / self.discharge_window_h
-        cap_w    = self.c_rate_cap * self.capacity_wh
-        return max(50, min(spread_w, cap_w, self.max_power_w))
+        spread_w = available_wh / window_h
+        return max(50, min(spread_w, self.max_power_w))
 
-    def _cheap_charge_setpoint(self, soc: float, cheap_soc_target: float, cheap_hours: int) -> float:
+    def _cheap_charge_setpoint(self, soc: float, cheap_soc_target: float, window_h: float) -> float:
         """
         Watts to charge from the grid during a cheap-price window.
-        Spreads the gap to cheap_soc_target over the number of remaining cheap
-        hours, so a short dip charges hard and a long cheap block charges gently.
-        Capped at c_rate_cap × capacity and max_power_w.
+        Spreads the gap to cheap_soc_target over window_h, so a short dip charges
+        hard and a long cheap block charges gently.
+        Clamped at max_power_w; the Sessy enforces its own hardware limit below that.
         """
-        if soc >= cheap_soc_target or cheap_hours <= 0:
+        if soc >= cheap_soc_target:
             return 0
         gap_wh   = (cheap_soc_target - soc) / 100.0 * self.capacity_wh
-        spread_w = gap_wh / cheap_hours
-        cap_w    = self.c_rate_cap * self.capacity_wh
-        return max(50, min(spread_w, cap_w, self.max_power_w))
+        spread_w = gap_wh / window_h
+        return max(50, min(spread_w, self.max_power_w))
 
     def _post_peak_discharge_setpoint(self, soc: float, soc_target: float, hours_remaining: float) -> float:
         """
         Watts of excess SOC above target to sell, spread over remaining peak hours.
         Applied as a negative grid setpoint (negative = export), so the battery
         covers household load on top of the export and never imports to top up.
+        Clamped at max_power_w; the Sessy enforces its own hardware limit below that.
         """
         gap_wh   = (soc - soc_target) / 100.0 * self.capacity_wh
         spread_w = gap_wh / max(hours_remaining, 0.083)  # avoid div/0
-        cap_w    = self.c_rate_cap * self.capacity_wh
-        return max(50, min(spread_w, cap_w, self.max_power_w))
+        return max(50, min(spread_w, self.max_power_w))
 
     # ── Actuator helpers ─────────────────────────────────────────────────────
 
@@ -588,11 +634,11 @@ class SessyStrategy(hass.Hass):
         except (TypeError, ValueError):
             return None
 
-    def _count_cheap_hours(self, price_charge: float) -> int:
+    def _contiguous_price_hours(self, threshold: float, above: bool) -> int:
         """
-        Count consecutive upcoming hours (including the current one) whose raw
-        price is below price_charge. Used to spread cheap-window charging.
-        Returns at least 1.
+        Count consecutive upcoming hours (including the current one) whose raw price
+        stays past threshold — above it when above=True, below it when above=False.
+        The run stops at the first hour that crosses back. Returns at least 1.
         """
         prices = self._get_prices_dict()
         if not prices:
@@ -604,14 +650,25 @@ class SessyStrategy(hass.Hass):
             if key not in prices:
                 break
             try:
-                if float(prices[key]) < price_charge:
-                    count += 1
-                else:
-                    break
+                price = float(prices[key])
             except (TypeError, ValueError):
+                break
+            if (price > threshold) if above else (price < threshold):
+                count += 1
+            else:
                 break
             cursor += timedelta(hours=1)
         return max(count, 1)
+
+    def _spread_window_h(self, threshold: float, above: bool) -> float:
+        """
+        Adaptive spread window in hours: window_safety_factor of the contiguous run
+        of upcoming hours the price stays past threshold, floored at min_window_h.
+        Spreading over most (not all) of the favourable run finishes the charge or
+        discharge with a margin before the window closes.
+        """
+        run_h = self._contiguous_price_hours(threshold, above)
+        return max(run_h * self.window_safety_factor, self.min_window_h)
 
     def _max_price_in_window(self, start_hour: int, end_hour: int) -> float | None:
         """

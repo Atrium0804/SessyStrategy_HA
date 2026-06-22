@@ -37,7 +37,7 @@ These principles guide all development on this AppDaemon Home Assistant applicat
 def _calc_charge_setpoint(self, soc, soc_target, hours_remaining):
     gap_wh = (soc_target - soc) / 100 * self.capacity_wh
     raw = gap_wh / max(hours_remaining, 0.083)  # avoid div/0
-    return min(raw, self.c_rate_cap * self.capacity_wh, self.max_power_w)
+    return min(raw, self.max_power_w)
 
 # Bad: Unnecessary abstraction
 class SetpointCalculatorFactory:
@@ -219,10 +219,10 @@ if price > 0.39:
 **Extract pure helper functions so they can be tested without AppDaemon**
 ```python
 # Good: Pure function, easily unit-tested
-def _calc_spread_setpoint(gap_pct, capacity_wh, window_hours, c_rate_cap, max_power_w):
+def _calc_spread_setpoint(gap_pct, capacity_wh, window_hours, max_power_w):
     gap_wh = gap_pct / 100 * capacity_wh
     raw = gap_wh / max(window_hours, 0.083)
-    return min(raw, c_rate_cap * capacity_wh, max_power_w)
+    return min(raw, max_power_w)
 
 # Bad: Logic buried in method that requires a live HA connection to test
 def update_strategy(self, kwargs):
