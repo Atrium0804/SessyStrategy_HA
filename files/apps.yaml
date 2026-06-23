@@ -18,10 +18,9 @@ sessy_strategy:
   min_arbitrage_margin: 0.05 # Min €/kWh spread to justify pre-peak charge
 
   # ── Adaptive spread window ──────────────────────────────────────────
-  # Price-spike discharge and cheap charge spread over this fraction of the
-  # contiguous run of hours the price stays past the threshold, floored at
-  # min_window_h. Wider spread = lower power = lower round-trip losses.
-  window_safety_factor: 0.75 # Fraction of the favourable price run to spread over
+  # Price-spike discharge and cheap charge spread over the contiguous run of
+  # hours the price stays past the threshold, floored at min_window_h.
+  # Wider spread = lower power = lower round-trip losses.
   min_window_h: 2.0          # Minimum spread window (hours)
   rerun_debounce_s: 2.0      # Delay before re-running after a live input changes
 
