@@ -42,8 +42,8 @@ The Sessy integration exposes **raw export prices** (what the grid pays you). Yo
 
 ### Mechanics shared by every branch
 
-- **Control mode** (full detail in [§2](#2-setpoint-types-explained)): the price-spike discharge and the charge branches drive the **battery setpoint** (`api` mode — exact battery power, grid balances); the default and the post-peak surplus sale drive the **grid setpoint** (`nom` mode — meter target).
-- **Proportional spread + clamp.** Active power is the SOC gap spread over a window, then clamped at the `max_power_w` hardware limit (2,200 W). The Sessy enforces its own technical limit below that, so there is no artificial C-rate cap — loss control comes from sizing the window, not from clamping power:
+- **Control mode** (full detail in [§2](#2-setpoint-types-explained)): the price-spike discharge and the charge branches drive the **battery setpoint** (`api` mode — exact battery power, grid balances); the default and the post-peak surplus sale drive the **grid setpoint** (`nom` mode — meter target, battery balances).
+- **Proportional spread + clamp.** Active power is the SOC gap spread over a window, then clamped at the `max_power_w` hardware limit (2,200 W). 
 
   ```
   charge    (W) = (SOC_target − SOC) / 100 × capacity_Wh / window_h
@@ -52,24 +52,24 @@ The Sessy integration exposes **raw export prices** (what the grid pays you). Yo
 
   Partial power is deliberate: inverter copper losses scale with the square of current, so half power is roughly 4× more efficient per watt, and a gentle charge leaves headroom for residual PV to fill the gap instead of the grid.
 
-- **Adaptive window.** The price-threshold branches (price-spike discharge, cheap charge) size `window_h` automatically: `window_safety_factor` (0.75) of the contiguous run of hours the price stays past the threshold, floored at `min_window_h` (2 h). Spreading over most — not all — of the favourable run keeps power (and losses) low while finishing with a margin before the window closes. The clock-bounded branches (pre-peak, post-peak) instead spread over the time left in their window.
+- **Adaptive window.** The price-threshold branches (price-spike discharge, cheap charge) size `window_h` automatically: the contiguous run of hours the price stays past the threshold, floored at `min_window_h` (2 h). Spreading over the whole favourable run keeps power (and losses) low. The clock-bounded branches (pre-peak, post-peak) instead spread over the time left in their window.
 
 ---
 
 ### Priority 1 — Price-spike discharge
 
-**What it does.** During an extreme price hour, the battery feeds the house and offsets grid import, so you ride out the spike on stored energy instead of buying at the peak.
+**What it does.** During an extreme-price hour the battery discharges at a set rate: it covers the house load and **exports the surplus to the grid, selling your stored energy (plus any solar) at the high spike price** — while also avoiding any import at that price.
 
 **Trigger.** Raw price > `price_discharge` (€0.39 → €0.50 import).
 
 **Battery steering.** Battery setpoint (`api`), positive = discharge:
 
 ```
-window_h      = max(0.75 × hours price stays > price_discharge, min_window_h)
+window_h      = max(hours price stays > price_discharge, min_window_h)
 discharge (W) = (SOC − soc_floor) / 100 × capacity_Wh / window_h   (clamped at max_power_w)
 ```
 
-`window_h` is only a **rate-sizing window**, not a duration commitment: it sets how hard to discharge *this* cycle so the battery drains gently rather than dumping at full power. It is sized adaptively from how long the price is forecast to stay above the threshold (75 % of that run, floored at `min_window_h` = 2 h), so a brief spike discharges harder than a long expensive evening. The branch is re-evaluated every 5 minutes against the live price, so **discharge lasts exactly as long as the price stays above the threshold** — when the spike ends the branch stops firing and the chain falls through (usually to the 0 W default), leaving any remaining energy above the floor untouched. `soc_floor` (0 %, winter 30 %) is the lower bound that zeroes the setpoint while the branch is active, not a level the strategy commits to reaching. The orange line marks the discharge trigger.
+`window_h` is only a **rate-sizing window**, not a duration commitment: it sets how hard to discharge *this* cycle so the battery drains gently rather than dumping at full power. It is sized adaptively from how long the price is forecast to stay above the threshold (the full run, floored at `min_window_h` = 2 h), so a brief spike discharges harder than a long expensive evening. The branch is re-evaluated every 5 minutes against the live price, so **discharge lasts exactly as long as the price stays above the threshold** — when the spike ends the branch stops firing and the chain falls through (usually to the 0 W default), leaving any remaining energy above the floor untouched. `soc_floor` (0 %, winter 30 %) is the lower bound that zeroes the setpoint while the branch is active, not a level the strategy commits to reaching. The orange line marks the discharge trigger.
 
 ```mermaid
 %%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#D55E00,#7BCAB4"}}}%%
@@ -95,11 +95,11 @@ xychart-beta
 **Battery steering.** Battery setpoint (`api`), negative = charge:
 
 ```
-window_h   = max(0.75 × hours price stays < price_charge, min_window_h)
+window_h   = max(hours price stays < price_charge, min_window_h)
 charge (W) = (cheap_soc_target − SOC) / 100 × capacity_Wh / window_h   (clamped at max_power_w)
 ```
 
-`window_h` is sized from the count of consecutive upcoming hours still below the threshold (75 % of that run, floored at `min_window_h` = 2 h), so a single-hour dip charges hard to grab it while a long cheap block charges gently. The green line marks the charge trigger.
+`window_h` is sized from the count of consecutive upcoming hours still below the threshold (the full run, floored at `min_window_h` = 2 h), so a single-hour dip charges hard to grab it while a long cheap block charges gently. The green line marks the charge trigger.
 
 ```mermaid
 %%{init: {"xyChart": {"plotColorPalette": "#CC79A7,#EBB08A,#009E73"}}}%%
@@ -411,7 +411,6 @@ sessy_strategy:
   price_discharge: 0.39      # Raw price above which to force discharge
   price_charge: -0.10        # Raw price below which to charge from grid
   min_arbitrage_margin: 0.05 # Min €/kWh spread to justify pre-peak charge
-  window_safety_factor: 0.75 # Fraction of the favourable price run to spread over
   min_window_h: 2.0          # Minimum adaptive spread window (hours)
   rerun_debounce_s: 2.0      # Delay before re-running after a live input changes
   prepeak_start: 16          # Start hour of pre-peak charge window (local)

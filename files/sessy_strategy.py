@@ -33,10 +33,9 @@ class SessyStrategy(hass.Hass):
         self.prepeak_start        = int(self.args.get("prepeak_start", 16))
         self.prepeak_end          = int(self.args.get("prepeak_end", 18))
         self.prepeak_window_h     = float(self.args.get("prepeak_window_h", 2.0))
-        # Adaptive spread window: charge/discharge is spread over window_safety_factor
-        # of the contiguous run of hours the price stays past the threshold, floored
-        # at min_window_h. Wider spread = lower power = lower round-trip losses.
-        self.window_safety_factor = float(self.args.get("window_safety_factor", 0.75))
+        # Adaptive spread window: charge/discharge is spread over the contiguous run
+        # of hours the price stays past the threshold, floored at min_window_h.
+        # Wider spread = lower power = lower round-trip losses.
         self.min_window_h         = float(self.args.get("min_window_h", 2.0))
         # Seconds to wait after a live input changes before re-running, so a slider
         # drag coalesces into a single run instead of one per intermediate value.
@@ -662,13 +661,11 @@ class SessyStrategy(hass.Hass):
 
     def _spread_window_h(self, threshold: float, above: bool) -> float:
         """
-        Adaptive spread window in hours: window_safety_factor of the contiguous run
-        of upcoming hours the price stays past threshold, floored at min_window_h.
-        Spreading over most (not all) of the favourable run finishes the charge or
-        discharge with a margin before the window closes.
+        Adaptive spread window in hours: the contiguous run of upcoming hours the
+        price stays past threshold, floored at min_window_h.
         """
         run_h = self._contiguous_price_hours(threshold, above)
-        return max(run_h * self.window_safety_factor, self.min_window_h)
+        return max(run_h, self.min_window_h)
 
     def _max_price_in_window(self, start_hour: int, end_hour: int) -> float | None:
         """
