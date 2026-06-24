@@ -40,7 +40,7 @@ sessy_strategy:
   season_auto_fallback: winter
 
   # Optional winter-specific overrides. If omitted, base values are used.
-  soc_floor_winter: 30
+  soc_floor_winter: 0
   prepeak_start_winter: 14
   prepeak_end_winter: 18
   prepeak_window_h_winter: 4.0
