@@ -279,7 +279,7 @@ class SessyStrategy(hass.Hass):
             self._set_battery_setpoint(-charge_w)   # negative = charge
             return
 
-        # ── Priority 3.5: post-peak excess discharge ─────────────────────────
+        # ── Priority 4: evening peak excess discharge ────────────────────────
         if self.evening_peak_start <= now_hour < self.evening_peak_end and soc > soc_target:
             max_remaining_price = self._max_price_in_window(now_hour, 24)
             if max_remaining_price is None or max_remaining_price < price_discharge:
@@ -287,20 +287,20 @@ class SessyStrategy(hass.Hass):
                 peak_end_minutes = self.evening_peak_end * 60
                 now_minutes = now_dt.hour * 60 + now_dt.minute
                 hours_remaining = (peak_end_minutes - now_minutes) / 60
-                discharge_w = self._post_peak_discharge_setpoint(soc, soc_target, hours_remaining)
+                discharge_w = self._evening_peak_excess_setpoint(soc, soc_target, hours_remaining)
                 # Grid setpoint (negative = export) so the battery covers household
                 # load AND the export target. A high home load makes the battery
                 # work harder instead of pulling the shortfall from the grid.
                 self.log(
-                    f"POST-PEAK DISCHARGE: SOC {soc:.0f}% > target {soc_target:.0f}% — "
+                    f"EVENING PEAK EXCESS: SOC {soc:.0f}% > target {soc_target:.0f}% — "
                     f"grid export setpoint -{discharge_w:.0f}W "
                     f"(spread over {hours_remaining:.2f}h remaining peak window)"
                 )
-                self._publish_status("post_peak_discharge", **status_fields)
+                self._publish_status("evening_peak_excess", **status_fields)
                 self._set_grid_setpoint(-discharge_w)
                 return
 
-        # ── Priority 4: default — grid setpoint 0W (solar absorption) ────────
+        # ── Priority 5: default — grid setpoint 0W (solar absorption) ────────
         self.log("DEFAULT: grid setpoint 0W — absorb solar, block export")
         self._publish_status("default", **status_fields)
         self._set_grid_setpoint(0)
@@ -394,7 +394,7 @@ class SessyStrategy(hass.Hass):
         spread_w = gap_wh / window_h
         return max(50, min(spread_w, self.max_power_w))
 
-    def _post_peak_discharge_setpoint(self, soc: float, soc_target: float, hours_remaining: float) -> float:
+    def _evening_peak_excess_setpoint(self, soc: float, soc_target: float, hours_remaining: float) -> float:
         """
         Watts of excess SOC above target to sell, spread over remaining peak hours.
         Applied as a negative grid setpoint (negative = export), so the battery

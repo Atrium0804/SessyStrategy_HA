@@ -43,7 +43,7 @@ _BRANCH_NAMES: dict[str, str] = {
     "prepeak_charge":      "Pre-peak — charging",
     "prepeak_full":        "Pre-peak — battery full",
     "prepeak_skip":        "Pre-peak — price too high",
-    "post_peak_discharge": "Evening peak — discharging",
+    "evening_peak_excess": "Evening peak — discharging",
     "default":             "Idle — self consumption mode",
 }
 

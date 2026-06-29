@@ -39,11 +39,11 @@ _NUMBERS: tuple[_Spec, ...] = (
     # (Battery setpoint mode), so one control serves both.
     _Spec(
         "setpoint", "Setpoint", "mdi:flash",
-        -10000, 10000, 50, UnitOfPower.WATT, 0, NumberMode.BOX,
+        -2200, 1700, 100, UnitOfPower.WATT, 0, NumberMode.SLIDER,
     ),
     _Spec(
         "soc_target", "Evening target", "mdi:battery-charging-90",
-        0, 100, 5, PERCENTAGE, 90, NumberMode.SLIDER,
+        0, 100, 5, PERCENTAGE, 60, NumberMode.SLIDER,
     ),
     _Spec(
         "soc_floor", "Full discharge limit", "mdi:battery-20",
@@ -57,7 +57,7 @@ _NUMBERS: tuple[_Spec, ...] = (
     # as input_number helpers in sessy_helpers.yaml; now owned by this device.
     _Spec(
         "price_discharge", "Full discharge above", "mdi:cash-plus",
-        0, 1, 0.01, "€/kWh", 0.39, NumberMode.BOX,
+        0, 1, 0.01, "€/kWh", 0.45, NumberMode.BOX,
     ),
     _Spec(
         "price_charge", "Full charge below", "mdi:cash-minus",
