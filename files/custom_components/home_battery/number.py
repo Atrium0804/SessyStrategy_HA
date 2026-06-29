@@ -42,7 +42,7 @@ _NUMBERS: tuple[_Spec, ...] = (
         -10000, 10000, 50, UnitOfPower.WATT, 0, NumberMode.BOX,
     ),
     _Spec(
-        "soc_target", "Pre-peak target", "mdi:battery-charging-90",
+        "soc_target", "Evening target", "mdi:battery-charging-90",
         0, 100, 5, PERCENTAGE, 90, NumberMode.SLIDER,
     ),
     _Spec(
