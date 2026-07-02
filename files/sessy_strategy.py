@@ -256,14 +256,15 @@ class SessyStrategy(hass.Hass):
                 self._set_grid_setpoint(0)
                 return
 
-            # Break-even guard: only charge if the best remaining price today beats the
-            # current import price by at least min_arbitrage_margin.
+            # Break-even guard: only charge if the best remaining raw price today beats the
+            # current raw price by at least min_arbitrage_margin. Both sides are compared
+            # as raw prices so the import surcharge cancels out instead of shrinking the margin.
             expected_peak = self._max_price_in_window(now_hour, 24)
             if expected_peak is not None and \
-                    (expected_peak - import_price) < min_arbitrage_margin:
+                    (expected_peak - price) < min_arbitrage_margin:
                 self.log(
-                    f"PRE-PEAK SKIP: best remaining price {expected_peak:.3f} vs import now "
-                    f"{import_price:.3f} (spread < margin {min_arbitrage_margin}) — "
+                    f"PRE-PEAK SKIP: best remaining price {expected_peak:.3f} vs current "
+                    f"{price:.3f} (spread < margin {min_arbitrage_margin}) — "
                     f"holding grid setpoint 0W"
                 )
                 self._publish_status("prepeak_skip", **status_fields)
