@@ -45,6 +45,11 @@ _BRANCH_NAMES: dict[str, str] = {
     "prepeak_skip":        "Pre-peak — price too high",
     "evening_peak_excess": "Evening peak — discharging",
     "default":             "Idle — self consumption mode",
+    "manual_grid":         "Manual — grid setpoint",
+    "manual_battery":      "Manual — battery setpoint",
+    "idle":                "Idle — Sessy standby",
+    "sessy_dynamic":       "Sessy's own dynamic schedule",
+    "eco":                 "Eco mode",
 }
 
 
