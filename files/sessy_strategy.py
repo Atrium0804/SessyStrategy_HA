@@ -99,8 +99,11 @@ class SessyStrategy(hass.Hass):
         self._rerun_timer = None
 
         self.log("Sessy strategy starting up")
-        # Run immediately, then every 5 minutes
-        self.run_every(self.update_strategy, "now", 5 * 60)
+        # Delay initial run by 30 seconds to allow Home Assistant to fully initialize
+        # This helps avoid race conditions where entities might not be ready immediately
+        self.run_in(self.update_strategy, 30)
+        # Then run every 5 minutes
+        self.run_every(self.update_strategy, self.datetime() + timedelta(seconds=30), 5 * 60)
 
         # Re-run immediately when the user changes any live input, so tweaks take
         # effect without waiting for the next 5-minute cycle. None entries (unset
@@ -123,6 +126,11 @@ class SessyStrategy(hass.Hass):
     # ── Main logic ────────────────────────────────────────────────────────────
 
     def update_strategy(self, kwargs):
+        # Check if critical entities are available
+        if not self._entity_exists(self.soc_sensor) or not self._entity_exists(self.price_sensor):
+            self.log("Critical entities (SOC or price sensor) not available — skipping this cycle", level="WARNING")
+            return
+
         # ── Mode dispatch: the selector is the single master input ──────────
         # Manual and stand-down modes return early; only "optimized" runs the
         # price-optimisation priority chain below.
@@ -330,15 +338,24 @@ class SessyStrategy(hass.Hass):
         schedule or idle) without writing any setpoint. Only switches the select
         if it is not already on the requested option.
         """
-        current = self.get_state(self.strategy_select)
-        if current != strategy_option:
-            self.call_service(
-                "select/select_option",
-                entity_id=self.strategy_select,
-                option=strategy_option,
-            )
-            self.log(f"Strategy → {strategy_option} ({branch})")
-        self._publish_branch(branch, sessy_strategy=strategy_option)
+        if not self._entity_exists(self.strategy_select):
+            self.log("Strategy select entity not available", level="WARNING")
+            self._publish_branch(branch, sessy_strategy=strategy_option)
+            return
+        
+        try:
+            current = self.get_state(self.strategy_select)
+            if current != strategy_option:
+                self.call_service(
+                    "select/select_option",
+                    entity_id=self.strategy_select,
+                    option=strategy_option,
+                )
+                self.log(f"Strategy → {strategy_option} ({branch})")
+            self._publish_branch(branch, sessy_strategy=strategy_option)
+        except Exception as e:
+            self.log(f"Failed to apply standby strategy: {e}", level="WARNING")
+            self._publish_branch(branch, sessy_strategy=strategy_option)
 
     # ── Live-input re-run ──────────────────────────────────────────────────────
 
@@ -369,7 +386,7 @@ class SessyStrategy(hass.Hass):
         """
         gap_wh   = (soc_target - soc) / 100.0 * self.capacity_wh
         spread_w = gap_wh / prepeak_window_h
-        power_w = gap_wh / spread_w * 1.5
+        power_w = spread_w * 1.5  # Charge 50% faster than the even spread
         power_w = min(power_w, self.max_power_w)  # cap at the Sessy's max power
         min_power_w = self.max_power_w * 0.66    # minimum power to avoid wasting surplus PV energy when SOC is near target
         return max(min_power_w, power_w)
@@ -414,38 +431,52 @@ class SessyStrategy(hass.Hass):
 
     def _set_grid_setpoint(self, watts: float):
         """Switch to NOM strategy and set grid target (positive = import, negative = export)."""
-        current_strategy = self.get_state(self.strategy_select)
-        if current_strategy != "nom":
+        if not self._entity_exists(self.strategy_select) or not self._entity_exists(self.grid_target):
+            self.log("Grid setpoint entities not available", level="WARNING")
+            return
+        
+        try:
+            current_strategy = self.get_state(self.strategy_select)
+            if current_strategy != "nom":
+                self.call_service(
+                    "select/select_option",
+                    entity_id=self.strategy_select,
+                    option="nom"
+                )
+                self.log("Strategy → nom (grid setpoint)")
             self.call_service(
-                "select/select_option",
-                entity_id=self.strategy_select,
-                option="nom"
+                "number/set_value",
+                entity_id=self.grid_target,
+                value=int(round(watts))
             )
-            self.log("Strategy → nom (grid setpoint)")
-        self.call_service(
-            "number/set_value",
-            entity_id=self.grid_target,
-            value=int(round(watts))
-        )
+        except Exception as e:
+            self.log(f"Failed to set grid setpoint: {e}", level="WARNING")
 
     def _set_battery_setpoint(self, watts: float):
         """
         Switch to API strategy and set battery power setpoint.
         Positive = discharge, negative = charge.
         """
-        current_strategy = self.get_state(self.strategy_select)
-        if current_strategy != "api":
+        if not self._entity_exists(self.strategy_select) or not self._entity_exists(self.battery_setpoint):
+            self.log("Battery setpoint entities not available", level="WARNING")
+            return
+        
+        try:
+            current_strategy = self.get_state(self.strategy_select)
+            if current_strategy != "api":
+                self.call_service(
+                    "select/select_option",
+                    entity_id=self.strategy_select,
+                    option="api"
+                )
+                self.log("Strategy → api (battery setpoint)")
             self.call_service(
-                "select/select_option",
-                entity_id=self.strategy_select,
-                option="api"
+                "number/set_value",
+                entity_id=self.battery_setpoint,
+                value=int(round(watts))
             )
-            self.log("Strategy → api (battery setpoint)")
-        self.call_service(
-            "number/set_value",
-            entity_id=self.battery_setpoint,
-            value=int(round(watts))
-        )
+        except Exception as e:
+            self.log(f"Failed to set battery setpoint: {e}", level="WARNING")
 
     # ── Sensor readers ────────────────────────────────────────────────────────
 
@@ -536,6 +567,19 @@ class SessyStrategy(hass.Hass):
 
         return min_hour, min_price
 
+    def _entity_exists(self, entity_id: str) -> bool:
+        """
+        Check if an entity exists and is available in Home Assistant.
+        Returns False if the entity doesn't exist or its state cannot be read.
+        """
+        if not entity_id:
+            return False
+        try:
+            state = self.get_state(entity_id)
+            return state is not None
+        except Exception:
+            return False
+
     def _publish_status(
             self,
             active_branch: str,
@@ -555,7 +599,7 @@ class SessyStrategy(hass.Hass):
             prepeak_end: int,
             prepeak_window_h: float,
     ):
-        if not self.status_sensor:
+        if not self.status_sensor or not self._entity_exists(self.status_sensor):
             return
 
         mode_source = self.season_mode
@@ -567,31 +611,34 @@ class SessyStrategy(hass.Hass):
         if mode_source not in ("auto", "summer", "winter"):
             mode_source = "auto"
 
-        self.set_state(
-            self.status_sensor,
-            state=active_season,
-            attributes={
-                "active_branch": active_branch,
-                "season_mode_source": mode_source,
-                "season_day_start": self.season_day_start,
-                "season_day_end": self.season_day_end,
-                "season_auto_fallback": self.season_auto_fallback,
-                "daily_min_price_hour": min_price_hour,
-                "daily_min_price": min_price_value,
-                "soc": round(soc, 2),
-                "raw_price": round(raw_price, 5),
-                "import_price": round(import_price, 5),
-                "soc_target": soc_target,
-                "soc_floor": soc_floor,
-                "cheap_soc_target": cheap_soc_target,
-                "price_discharge": price_discharge,
-                "price_charge": price_charge,
-                "min_arbitrage_margin": min_arbitrage_margin,
-                "prepeak_start": prepeak_start,
-                "prepeak_end": prepeak_end,
-                "prepeak_window_h": prepeak_window_h,
-            },
-        )
+        try:
+            self.set_state(
+                self.status_sensor,
+                state=active_season,
+                attributes={
+                    "active_branch": active_branch,
+                    "season_mode_source": mode_source,
+                    "season_day_start": self.season_day_start,
+                    "season_day_end": self.season_day_end,
+                    "season_auto_fallback": self.season_auto_fallback,
+                    "daily_min_price_hour": min_price_hour,
+                    "daily_min_price": min_price_value,
+                    "soc": round(soc, 2),
+                    "raw_price": round(raw_price, 5),
+                    "import_price": round(import_price, 5),
+                    "soc_target": soc_target,
+                    "soc_floor": soc_floor,
+                    "cheap_soc_target": cheap_soc_target,
+                    "price_discharge": price_discharge,
+                    "price_charge": price_charge,
+                    "min_arbitrage_margin": min_arbitrage_margin,
+                    "prepeak_start": prepeak_start,
+                    "prepeak_end": prepeak_end,
+                    "prepeak_window_h": prepeak_window_h,
+                },
+            )
+        except Exception as e:
+            self.log(f"Failed to publish status: {e}", level="WARNING")
 
     def _publish_branch(self, active_branch: str, **extra):
         """
@@ -599,13 +646,16 @@ class SessyStrategy(hass.Hass):
         full optimisation context (season, thresholds) does not apply. Sets the
         status state to the active branch and records any extra fields.
         """
-        if not self.status_sensor:
+        if not self.status_sensor or not self._entity_exists(self.status_sensor):
             return
-        self.set_state(
-            self.status_sensor,
-            state=active_branch,
-            attributes={"active_branch": active_branch, **extra},
-        )
+        try:
+            self.set_state(
+                self.status_sensor,
+                state=active_branch,
+                attributes={"active_branch": active_branch, **extra},
+            )
+        except Exception as e:
+            self.log(f"Failed to publish branch status: {e}", level="WARNING")
 
     def _get_soc(self) -> float | None:
         state = self.get_state(self.soc_sensor)
