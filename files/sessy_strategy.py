@@ -363,12 +363,16 @@ class SessyStrategy(hass.Hass):
 
     def _charge_setpoint(self, soc: float, soc_target: float, prepeak_window_h: float) -> float:
         """
-        Watts to charge. Spreads remaining gap over prepeak_window_h.
-        Clamped at max_power_w; the Sessy enforces its own hardware limit below that.
+        Watts to charge: spread charging over the prepeak_window_h hours
+        but do not charge below the min_power_w threshold. This prevents slow charging when soc is near-target and
+        wasting surplus pv-energy
         """
         gap_wh   = (soc_target - soc) / 100.0 * self.capacity_wh
         spread_w = gap_wh / prepeak_window_h
-        return max(50, min(spread_w, self.max_power_w))
+        power_w = gap_wh / spread_w * 1.5
+        power_w = min(power_w, self.max_power_w)  # cap at the Sessy's max power
+        min_power_w = self.max_power_w * 0.66    # minimum power to avoid wasting surplus PV energy when SOC is near target
+        return max(min_power_w, power_w)
 
     def _discharge_setpoint(self, soc: float, soc_floor: float, window_h: float) -> float:
         """

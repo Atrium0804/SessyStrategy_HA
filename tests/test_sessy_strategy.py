@@ -108,16 +108,16 @@ class TestChargeSetpoint:
     def test_basic_gap(self):
         app = make_app()
         # gap = (90-50)/100 * 5000 = 2000 Wh; over 2h → 1000 W
-        # cap = 0.40 * 5000 = 2000 W; max_power = 2200 → min is 1000
+        # max_power_w * 0.66 = 2200 * 0.66 = 1452 W → min is 1000
         result = app._charge_setpoint(soc=50, soc_target=90, prepeak_window_h=2.0)
         assert result == pytest.approx(1000.0)
 
-    def test_capped_by_c_rate(self):
+    def test_capped_by_max_power_66_percent(self):
         app = make_app()
         # gap = (90-10)/100 * 5000 = 4000 Wh; over 1h → 4000 W
-        # c_rate_cap = 0.40 * 5000 = 2000 W → capped at 2000
+        # max_power_w * 0.66 = 2200 * 0.66 = 1452 W → capped at 1452
         result = app._charge_setpoint(soc=10, soc_target=90, prepeak_window_h=1.0)
-        assert result == pytest.approx(2000.0)
+        assert result == pytest.approx(1452.0)
 
     def test_minimum_50w(self):
         app = make_app()
