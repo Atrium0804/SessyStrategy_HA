@@ -40,6 +40,12 @@ class _FakeHass:
     def run_every(self, *a, **kw):
         pass
 
+    def run_in(self, *a, **kw):
+        pass
+
+    def listen_state(self, *a, **kw):
+        pass
+
 
 _hass_module        = types.ModuleType("appdaemon")
 _plugins_module     = types.ModuleType("appdaemon.plugins")
@@ -96,6 +102,8 @@ def make_app(**overrides):
     app.set_state = MagicMock()
     app.datetime = MagicMock(return_value=datetime(2024, 6, 15, 14, 0, 0))
     app.run_every = MagicMock()
+    app.run_in = MagicMock()
+    app.listen_state = MagicMock()
     app.initialize()
     return app
 
@@ -108,61 +116,68 @@ class TestChargeSetpoint:
     def test_basic_gap(self):
         app = make_app()
         # gap = (90-50)/100 * 5000 = 2000 Wh; over 2h → 1000 W
-        # cap = 0.40 * 5000 = 2000 W; max_power = 2200 → min is 1000
+        # spread_w = 2000/2 = 1000 W, power_w = 1000 * 1.5 = 1500 W
+        # capped by max_power_w (2200), min_power_w = 2200 * 0.66 = 1452 W
+        # result = max(1452, 1500) = 1500 W
         result = app._charge_setpoint(soc=50, soc_target=90, prepeak_window_h=2.0)
-        assert result == pytest.approx(1000.0)
+        assert result == pytest.approx(1500.0)
 
-    def test_capped_by_c_rate(self):
+    def test_capped_by_max_power_66_percent(self):
         app = make_app()
         # gap = (90-10)/100 * 5000 = 4000 Wh; over 1h → 4000 W
-        # c_rate_cap = 0.40 * 5000 = 2000 W → capped at 2000
+        # spread_w = 4000/1 = 4000 W, power_w = 4000 * 1.5 = 6000 W
+        # capped by max_power_w (2200), min_power_w = 2200 * 0.66 = 1452 W
+        # result = max(1452, 2200) = 2200 W
         result = app._charge_setpoint(soc=10, soc_target=90, prepeak_window_h=1.0)
-        assert result == pytest.approx(2000.0)
+        assert result == pytest.approx(2200.0)
 
     def test_minimum_50w(self):
         app = make_app()
-        # Tiny gap: (90-89)/100 * 5000 = 50 Wh / 2h → 25 W; floor at 50
+        # Tiny gap: (90-89)/100 * 5000 = 50 Wh / 2h → 25 W
+        # spread_w = 50/2 = 25 W, power_w = 25 * 1.5 = 37.5 W
+        # capped by max_power_w (2200), min_power_w = 2200 * 0.66 = 1452 W
+        # result = max(1452, 37.5) = 1452 W (minimum power threshold)
         result = app._charge_setpoint(soc=89, soc_target=90, prepeak_window_h=2.0)
-        assert result == pytest.approx(50.0)
+        assert result == pytest.approx(1452.0)
 
 
 class TestDischargeSetpoint:
     def test_basic(self):
         app = make_app()
         # available = (80-20)/100 * 5000 = 3000 Wh / 2h → 1500 W
-        result = app._discharge_setpoint(soc=80, soc_floor=20)
+        result = app._discharge_setpoint(soc=80, soc_floor=20, window_h=2.0)
         assert result == pytest.approx(1500.0)
 
     def test_at_floor_returns_zero(self):
         app = make_app()
-        result = app._discharge_setpoint(soc=20, soc_floor=20)
+        result = app._discharge_setpoint(soc=20, soc_floor=20, window_h=2.0)
         assert result == 0
 
     def test_below_floor_returns_zero(self):
         app = make_app()
-        result = app._discharge_setpoint(soc=15, soc_floor=20)
+        result = app._discharge_setpoint(soc=15, soc_floor=20, window_h=2.0)
         assert result == 0
 
     def test_capped_by_max_power(self):
         app = make_app(max_power_w=500)
-        result = app._discharge_setpoint(soc=80, soc_floor=20)
+        result = app._discharge_setpoint(soc=80, soc_floor=20, window_h=2.0)
         assert result == pytest.approx(500.0)
 
 
 class TestPostPeakDischargeSetpoint:
     def test_basic(self):
         # gap = (95-90)/100 * 5000 = 250 Wh / 4h → 62.5 W (above 50W floor)
-        result = make_app()._post_peak_discharge_setpoint(soc=95, soc_target=90, hours_remaining=4)
+        result = make_app()._evening_peak_excess_setpoint(soc=95, soc_target=90, hours_remaining=4)
         assert result == pytest.approx(62.5)
 
     def test_capped_by_c_rate(self):
-        # gap = (100-20)/100 * 5000 = 4000 Wh / 1h → 4000 W; cap = 2000 W
-        result = make_app()._post_peak_discharge_setpoint(soc=100, soc_target=20, hours_remaining=1)
-        assert result == pytest.approx(2000.0)
+        # gap = (100-20)/100 * 5000 = 4000 Wh / 1h → 4000 W; cap = max_power_w = 2200 W
+        result = make_app()._evening_peak_excess_setpoint(soc=100, soc_target=20, hours_remaining=1)
+        assert result == pytest.approx(2200.0)
 
     def test_minimum_50w(self):
         # tiny gap: (91-90)/100 * 5000 = 50 Wh / 4h → 12.5 W → floor at 50
-        result = make_app()._post_peak_discharge_setpoint(soc=91, soc_target=90, hours_remaining=4)
+        result = make_app()._evening_peak_excess_setpoint(soc=91, soc_target=90, hours_remaining=4)
         assert result == pytest.approx(50.0)
 
 
@@ -170,23 +185,23 @@ class TestCheapChargeSetpoint:
     def test_spreads_over_cheap_hours(self):
         app = make_app()
         # gap = (100-60)/100 * 5000 = 2000 Wh / 4h → 500 W
-        result = app._cheap_charge_setpoint(soc=60, cheap_soc_target=100, cheap_hours=4)
+        result = app._cheap_charge_setpoint(soc=60, cheap_soc_target=100, window_h=4)
         assert result == pytest.approx(500.0)
 
     def test_already_at_ceiling_returns_zero(self):
         app = make_app()
-        result = app._cheap_charge_setpoint(soc=100, cheap_soc_target=100, cheap_hours=3)
+        result = app._cheap_charge_setpoint(soc=100, cheap_soc_target=100, window_h=3)
         assert result == 0
 
     def test_zero_cheap_hours_returns_zero(self):
         app = make_app()
-        result = app._cheap_charge_setpoint(soc=50, cheap_soc_target=100, cheap_hours=0)
+        result = app._cheap_charge_setpoint(soc=50, cheap_soc_target=100, window_h=0)
         assert result == 0
 
     def test_respects_lower_ceiling(self):
         app = make_app()
         # ceiling 80 → gap = (80-60)/100 * 5000 = 1000 Wh / 2h → 500 W
-        result = app._cheap_charge_setpoint(soc=60, cheap_soc_target=80, cheap_hours=2)
+        result = app._cheap_charge_setpoint(soc=60, cheap_soc_target=80, window_h=2)
         assert result == pytest.approx(500.0)
 
 
@@ -220,6 +235,15 @@ class TestUpdateStrategyBranches:
 
     def _make_app_with_sensors(self, soc, price, now_hour=14):
         app = make_app()
+        # Mock entity existence checks
+        app.get_state = MagicMock(side_effect=lambda entity_id, **kwargs: {
+            app.soc_sensor: str(soc) if soc is not None else None,
+            app.price_sensor: str(price) if price is not None else None,
+            app.strategy_select: "nom",
+            app.grid_target: "0",
+            app.battery_setpoint: "0",
+        }.get(entity_id, None))
+        
         app._get_soc = MagicMock(return_value=soc)
         app._get_current_price = MagicMock(return_value=price)
         app.datetime = MagicMock(return_value=datetime(2024, 6, 15, now_hour, 0, 0))
@@ -229,6 +253,7 @@ class TestUpdateStrategyBranches:
         app._publish_status = MagicMock()
         app._set_battery_setpoint = MagicMock()
         app._set_grid_setpoint = MagicMock()
+        app._apply_standby = MagicMock()
         return app
 
     def test_priority1_high_price_triggers_discharge(self):
@@ -260,8 +285,8 @@ class TestUpdateStrategyBranches:
         assert app._set_battery_setpoint.call_args[0][0] < 0
 
     def test_priority3_prepeak_skipped_when_spread_too_small(self):
-        app = self._make_app_with_sensors(soc=60, price=0.10, now_hour=17)
-        # import_price = 0.10 + 0.11 = 0.21; expected_peak = 0.22 → spread 0.01 < margin 0.05
+        app = self._make_app_with_sensors(soc=60, price=0.20, now_hour=17)
+        # price = 0.20; expected_peak = 0.22 → spread 0.02 < margin 0.05
         app._max_price_in_window = MagicMock(return_value=0.22)
         app.update_strategy({})
         app._set_grid_setpoint.assert_called_once_with(0)
@@ -565,7 +590,7 @@ class TestSensorReaders:
         app.get_state = MagicMock(return_value=None)
         assert app._get_current_price() is None
 
-    # _count_cheap_hours
+    # _contiguous_price_hours (renamed from _count_cheap_hours)
     def test_count_cheap_hours_consecutive(self):
         # Hours 14 and 15 are cheap; 16 is not → count = 2
         app = make_app()
@@ -575,18 +600,18 @@ class TestSensorReaders:
             "2024-06-15T16:00:00": 0.10,
         }
         app._get_prices_dict = MagicMock(return_value=prices)
-        assert app._count_cheap_hours(-0.10) == 2
+        assert app._contiguous_price_hours(-0.10, above=False) == 2
 
     def test_count_cheap_hours_none_below_threshold_returns_one(self):
         # No cheap hours → minimum of 1 so callers never divide by zero
         app = make_app()
         app._get_prices_dict = MagicMock(return_value={"2024-06-15T14:00:00": 0.20})
-        assert app._count_cheap_hours(-0.10) == 1
+        assert app._contiguous_price_hours(-0.10, above=False) == 1
 
     def test_count_cheap_hours_no_prices_returns_one(self):
         app = make_app()
         app._get_prices_dict = MagicMock(return_value=None)
-        assert app._count_cheap_hours(-0.10) == 1
+        assert app._contiguous_price_hours(-0.10, above=False) == 1
 
     # _max_price_in_window
     def test_max_price_in_window_normal(self):

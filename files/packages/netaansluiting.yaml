@@ -1,0 +1,390 @@
+# ============================================================
+# Netaansluiting package
+#
+# Wraps the DSMR smart meter and Frankenergy dynamic tariff into
+# logical sensors and derives net/consumption power.
+#
+# Physical devices:
+#   sensor.sessy_pwkn_p1_consuming_power                 - Sessy P1: grid import power (W)
+#   sensor.sessy_pwkn_p1_producing_power                 - Sessy P1: grid export power (W)
+#   sensor.frankenergy_current_electricity_market_price  - dynamic market tariff (€/kWh)
+#   sensor.pv_panelen_totaal_vermogen                    - total PV production (from solarsystem package)
+#
+# Logical sensors exposed to the UI:
+#   sensor.netaansluiting_import_vermogen       - grid import power (W)
+#   sensor.netaansluiting_export_vermogen       - grid export power (W)
+#   sensor.netaansluiting_productie_vermogen    - PV production power (W)
+#   sensor.netaansluiting_netvermogen           - net grid power (export − import, W)
+#   sensor.netaansluiting_verbruik_vermogen     - home consumption (PV − net, W)
+#   sensor.netaansluiting_status_netbelasting   - grid load status label
+#   sensor.netaansluiting_markttarief           - market spot price for the current clock hour (€/kWh)
+#   sensor.netaansluiting_inkooptarief          - calculated purchase price (€/kWh)
+#   sensor.netaansluiting_verkooptarief         - calculated sale price (€/kWh)
+#
+# Integration sensors (kWh accumulators):
+#   sensor.netaansluiting_verbruik_energie
+#   sensor.netaansluiting_import_energie
+#   sensor.netaansluiting_export_energie
+#   sensor.netaansluiting_productie_energie
+#
+# Hourly utility meters:
+#   sensor.netaansluiting_verbruik_energie_uur
+#   sensor.netaansluiting_import_energie_uur
+#   sensor.netaansluiting_export_energie_uur
+#   sensor.netaansluiting_productie_energie_uur
+#
+# Grid load status values:
+#   piekuren           - peak hours (06:00-09:00 and 16:30-21:00)
+#   veel overproductie - market tariff < 0 (excess solar, sell now)
+#   normaal            - regular consumption hours
+#
+# Tariff note:
+#   netaansluiting_markttarief is trigger-based and flips exactly on the clock
+#   hour, reading the authoritative per-hour value from the frankenergy `prices`
+#   attribute. This keeps each hour a clean constant so the long-term statistics
+#   satisfy min == max == mean == the real hourly tariff, which is required for
+#   correct cost = energy_uur × prijs calculations. inkooptarief/verkooptarief
+#   are plain derivatives that follow markttarief automatically.
+# ============================================================
+
+template:
+  # ── Power sensors + status (plain template, react to source state changes) ──
+  - sensor:
+      - name: "Netaansluiting Import Vermogen"
+        unique_id: netaansluiting_import_vermogen
+        icon: mdi:transmission-tower-export
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ states('sensor.sessy_pwkn_p1_consuming_power') | float(0) }}"
+        availability: "{{ is_number(states('sensor.sessy_pwkn_p1_consuming_power')) }}"
+
+      # Grid export power mirrored from the Sessy sensor.
+      - name: "Netaansluiting Export Vermogen"
+        unique_id: netaansluiting_export_vermogen
+        icon: mdi:transmission-tower-import
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ states('sensor.sessy_pwkn_p1_producing_power') | float(0) }}"
+        availability: "{{ is_number(states('sensor.sessy_pwkn_p1_producing_power')) }}"
+
+      # PV production power mirrored from the Sessy PV-phase measuring sensor.
+      - name: "Netaansluiting Productie Vermogen"
+        unique_id: netaansluiting_productie_vermogen
+        icon: mdi:solar-power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ states('sensor.sessy_battery_alt9_pv_power') | float(0) }}"
+        availability: "{{ is_number(states('sensor.sessy_battery_alt9_pv_power')) }}"
+
+      # Net grid power: positive = exporting to grid, negative = importing from grid.
+      - name: "Netaansluiting Netvermogen"
+        unique_id: netaansluiting_netvermogen
+        icon: mdi:transmission-tower
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {{
+            (states('sensor.sessy_pwkn_p1_power') | float(0))
+          }}
+        availability: >
+          {{
+            is_number(states('sensor.sessy_pwkn_p1_power'))
+          }}
+
+      # Home consumption: PV production + net battery power  -  net grid power.
+      # Positive = consuming power, negative = impossible in normal operation.
+      - name: "Netaansluiting Verbruik Vermogen"
+        unique_id: netaansluiting_verbruik_vermogen
+        icon: mdi:home-lightning-bolt
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: >
+          {{
+              (states('sensor.pv_panelen_totaal_vermogen') | float(0))
+            + (states('sensor.netaansluiting_netvermogen') | float(0))
+            + (states('sensor.sessy_battery_alt9_power')   | float(0))
+          }}
+        availability: >
+          {{
+            is_number(states('sensor.netaansluiting_netvermogen'))
+            and
+            is_number(states('sensor.pv_panelen_totaal_vermogen'))
+            and
+            is_number(states('sensor.sessy_battery_alt9_power'))
+          }}
+
+      # Home battery charging power (power flowing into battery).
+      - name: "Netaansluiting Batterij Laad Vermogen"
+        unique_id: netaansluiting_batterij_laad_vermogen
+        icon: mdi:battery-charging
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ states('sensor.sessy_battery_alt9_charge_power') | float(0) }}"
+        availability: "{{ is_number(states('sensor.sessy_battery_alt9_charge_power')) }}"
+
+      # Home battery discharging power (power flowing out of battery).
+      - name: "Netaansluiting Batterij Ontlaad Vermogen"
+        unique_id: netaansluiting_batterij_ontlaad_vermogen
+        icon: mdi:battery-charging-outline
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ states('sensor.sessy_battery_alt9_discharge_power') | float(0) }}"
+        availability: "{{ is_number(states('sensor.sessy_battery_alt9_discharge_power')) }}"
+
+      # Home battery net power (negative = charging, positive = discharging).
+      - name: "Netaansluiting Batterij Netvermogen"
+        unique_id: netaansluiting_batterij_netvermogen
+        icon: mdi:battery
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ states('sensor.sessy_battery_alt9_power') | float(0) }}"
+        availability: "{{ is_number(states('sensor.sessy_battery_alt9_power')) }}"
+
+      # Grid load status label used for UI colouring and automation decisions.
+      # Peak hours are hardcoded: 06:00-09:00 and 17:30-21:00.
+      - name: "Netaansluiting Status Netbelasting"
+        unique_id: netaansluiting_status_netbelasting
+        icon: >
+          {% set s = this.state %}
+          {% if s == 'piekuren' %}
+            mdi:flash-alert
+          {% elif s == 'veel overproductie' %}
+            mdi:flash-off
+          {% elif s == 'overproductie' %}
+            mdi:flash-triangle
+          {% else %}
+            mdi:flash
+          {% endif %}
+        attributes:
+          color: >
+            {% set s = this.state %}
+            {% if s == 'veel overproductie' %}
+              primary
+            {% elif s == 'overproductie' %}
+              primary
+            {% elif s == 'piekuren' %}
+              deep-purple
+            {% elif s == 'normaal' %}
+              primary
+            {% else %}
+              pink
+            {% endif %}
+          badge: >
+            {% set s = this.state %}
+            {% if s == 'veel overproductie' %}
+              mdi:chevron-double-up
+            {% elif s == 'overproductie' %}
+            {% elif s == 'piekuren' %}
+              mdi:alert
+            {% elif s == 'normaal' %}
+            {% else %}
+            {% endif %}
+          input: >
+            {{
+              {
+                'markttarief': states('sensor.netaansluiting_markttarief') | float(none),
+                'uur': now().hour,
+                'minuut': now().minute
+              }
+            }}
+        state: >
+          {% set markt = states('sensor.netaansluiting_markttarief') | float(none) %}
+          {% set h = now().hour %}
+          {% set m = now().minute %}
+          {% if (h >= 6 and (h < 9))
+             or (h == 17 and m >= 30)
+             or (h >= 18 and h < 21) %}
+            piekuren
+          {% elif markt is not none and markt < 0 %}
+            veel overproductie
+          {% else %}
+            normaal
+          {% endif %}
+        availability: >
+          {{
+            is_number(states('sensor.netaansluiting_markttarief'))
+          }}
+
+      ###########################
+      ## Tariff derivatives
+      ###########################
+      # Plain template sensors that follow netaansluiting_markttarief. Kept out of
+      # the trigger block on purpose: there they would read markttarief's previous
+      # state on the hourly trigger and lag a full hour. As plain sensors they
+      # re-render on every markttarief state change, milliseconds later.
+
+      # Purchase price calculation (market price + fees + taxes).
+      - name: "Stroomprijs inkoop"
+        unique_id: netaansluiting_inkooptarief
+        icon: mdi:currency-eur
+        unit_of_measurement: "€/kWh"
+        state_class: measurement
+        state: >
+          {% set markttarief = states('sensor.netaansluiting_markttarief') | float(0) %}
+          {% set inkoopvergoeding = 0.01992 %}
+          {% set energiebelasting = 0.09161 %}
+          {% set btw = 1.21 %}
+          {{ ((markttarief + inkoopvergoeding + energiebelasting) * btw) | round(5) }}
+        availability: "{{ is_number(states('sensor.netaansluiting_markttarief')) }}"
+        attributes:
+          markttarief: "{{ states('sensor.netaansluiting_markttarief') | float(0) }}"
+          inkoopvergoeding_excl_btw: 0.01992
+          energiebelasting_excl_btw: 0.09161
+          btw_factor: 1.21
+
+      # Sale price calculation (market price - fees).
+      - name: "Stroomprijs verkoop"
+        unique_id: netaansluiting_verkooptarief
+        icon: mdi:currency-eur
+        unit_of_measurement: "€/kWh"
+        state_class: measurement
+        state: >
+          {% set markttarief = states('sensor.netaansluiting_markttarief') | float(0) %}
+          {% set verkoopvergoeding = 0.02413 %}
+          {{ (markttarief - verkoopvergoeding) | round(5) }}
+        availability: "{{ is_number(states('sensor.netaansluiting_markttarief')) }}"
+        attributes:
+          markttarief: "{{ states('sensor.netaansluiting_markttarief') | float(0) }}"
+          verkoopvergoeding_excl_btw: 0.02413
+
+  # ── Market tariff: trigger-based so it flips exactly on the clock hour ───────
+  # Reads the authoritative per-hour value from the frankenergy `prices` array.
+  # Result: each clock hour is a clean constant → statistics min == max == mean.
+  - trigger:
+      - platform: time_pattern        # klap exact op het hele uur om
+        minutes: 0
+        seconds: 0
+      - platform: state               # en zodra een nieuwe prijslijst binnenkomt
+        entity_id: sensor.frankenergy_current_electricity_market_price
+        attribute: prices
+      - platform: homeassistant       # en bij HA-herstart
+        event: start
+    sensor:
+      - name: "Netaansluiting Markttarief"
+        unique_id: netaansluiting_markttarief
+        icon: mdi:currency-eur
+        unit_of_measurement: "€/kWh"
+        state_class: measurement
+        state: >
+          {% set prices = state_attr('sensor.frankenergy_current_electricity_market_price', 'prices') %}
+          {% set nu = now() %}
+          {% set ns = namespace(prijs=none) %}
+          {% for p in prices or [] %}
+            {% if as_datetime(p['from']) <= nu < as_datetime(p['till']) %}
+              {% set ns.prijs = p['price'] %}
+            {% endif %}
+          {% endfor %}
+          {{ (ns.prijs if ns.prijs is not none
+              else states('sensor.frankenergy_current_electricity_market_price')) | float(0) }}
+        availability: >
+          {{ state_attr('sensor.frankenergy_current_electricity_market_price', 'prices') is not none }}
+        attributes:
+          prices: "{{ state_attr('sensor.frankenergy_current_electricity_market_price', 'prices') }}"
+
+# kWh accumulators derived via the integration platform (Riemann left-sum).
+sensor:
+  - platform: integration
+    source: sensor.netaansluiting_verbruik_vermogen
+    name: Netaansluiting Verbruik Energie
+    unique_id: netaansluiting_verbruik_energie
+    unit_prefix: k
+    round: 3
+    method: left
+  - platform: integration
+    source: sensor.netaansluiting_import_vermogen
+    name: Netaansluiting Import Energie
+    unique_id: netaansluiting_import_energie
+    unit_prefix: k
+    round: 3
+    method: left
+    # Note: Sessy also provides tariff_1/2_consumed_energy and tariff_1/2_produced_energy
+    # if you want to use those instead of deriving via integration.
+  - platform: integration
+    source: sensor.netaansluiting_export_vermogen
+    name: Netaansluiting Export Energie
+    unique_id: netaansluiting_export_energie
+    unit_prefix: k
+    round: 3
+    method: left
+    # Note: Sessy provides direct tariff counters via:
+    # sensor.sessy_pwkn_tariff_1_produced_energy, sensor.sessy_pwkn_tariff_2_produced_energy
+  - platform: integration
+    source: sensor.pv_panelen_totaal_vermogen
+    name: Netaansluiting Productie Energie
+    unique_id: netaansluiting_productie_energie
+    unit_prefix: k
+    round: 3
+    method: left
+  - platform: integration
+    source: sensor.netaansluiting_batterij_laad_vermogen
+    name: Netaansluiting Batterij Laad Energie
+    unique_id: netaansluiting_batterij_laad_energie
+    unit_prefix: k
+    round: 3
+    method: left
+  - platform: integration
+    source: sensor.netaansluiting_batterij_ontlaad_vermogen
+    name: Netaansluiting Batterij Ontlaad Energie
+    unique_id: netaansluiting_batterij_ontlaad_energie
+    unit_prefix: k
+    round: 3
+    method: left
+  # - platform: integration
+  #   source: sensor.netaansluiting_batterij_netvermogen
+  #   name: Netaansluiting Batterij Net Energie
+  #   unique_id: netaansluiting_batterij_net_energie
+  #   unit_prefix: k
+  #   round: 3
+  #   method: left
+
+# Hourly utility meters derived from the cumulative energy sensors.
+utility_meter:
+  netaansluiting_verbruik_energie_uur:
+    source: sensor.netaansluiting_verbruik_energie
+    cycle: hourly
+  netaansluiting_import_energie_uur:
+    source: sensor.netaansluiting_import_energie
+    cycle: hourly
+  netaansluiting_export_energie_uur:
+    source: sensor.netaansluiting_export_energie
+    cycle: hourly
+  netaansluiting_productie_energie_uur:
+    source: sensor.netaansluiting_productie_energie
+    cycle: hourly
+  netaansluiting_batterij_laad_energie_uur:
+    source: sensor.netaansluiting_batterij_laad_energie
+    cycle: hourly
+  netaansluiting_batterij_ontlaad_energie_uur:
+    source: sensor.netaansluiting_batterij_ontlaad_energie
+    cycle: hourly
+  # netaansluiting_batterij_net_energie_uur:
+  #   source: sensor.netaansluiting_batterij_net_energie
+  #   cycle: hourly
+
+# Icon customization for integration-platform sensors (which don't support icon: in their config).
+homeassistant:
+  customize:
+    sensor.netaansluiting_verbruik_energie:
+      icon: mdi:home-lightning-bolt
+    sensor.netaansluiting_import_energie:
+      icon: mdi:transmission-tower-export
+    sensor.netaansluiting_export_energie:
+      icon: mdi:transmission-tower-import
+    sensor.netaansluiting_productie_energie:
+      icon: mdi:solar-power
+    sensor.netaansluiting_batterij_laad_energie:
+      icon: mdi:battery-charging
+    sensor.netaansluiting_batterij_ontlaad_energie:
+      icon: mdi:battery-charging-outline
+    sensor.netaansluiting_inkooptarief:
+      icon: mdi:currency-eur
+    sensor.netaansluiting_verkooptarief:
+      icon: mdi:currency-eur

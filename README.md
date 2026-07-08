@@ -150,7 +150,7 @@ xychart-beta
     line [100, 100, 100, 100, 100]
 ```
 
-**Rationale.** On dull days solar cannot fill the battery, so a small grid top-up is the only way to have stored energy ready for the evening. The break-even guard is the restraint that matters: buying at €0.46 to discharge at €0.47 just churns the battery for nothing. **Lean:** one max-lookup over the day's prices avoids that trap without a full arbitrage optimiser.
+**Rationale.** On dull days solar cannot fill the battery, so a small grid top-up is the only way to have stored energy ready for the evening when prices are higher.. The break-even guard is the restraint that matters: buying at €0.46 to discharge at €0.47 just churns the battery for nothing. **Lean:** one max-lookup over the day's prices avoids that trap without a full arbitrage optimiser.
 
 ---
 

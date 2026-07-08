@@ -41,14 +41,14 @@ Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
 1. **Price spike** — raw price > `price_discharge` → discharge toward SOC floor over an adaptive window (the hours price stays above the threshold, floored at `min_window_h`)
 2. **Cheap/negative price** — raw price < `price_charge` → charge toward 100% SOC over remaining cheap window
 3. **Pre-peak charge** — in time window (16–18h) AND SOC < target AND evening peak beats current price by margin → charge toward SOC target
-3.5. **Post-peak discharge** — inside `evening_peak_start`–`evening_peak_end` (20–22h) AND SOC > target AND no price spike remaining → export excess via grid setpoint
-4. **Default** — grid setpoint = 0W (absorb solar, block export)
+4. **Evening peak excess** — inside `evening_peak_start`–`evening_peak_end` (20–22h) AND SOC > target AND no price spike remaining → export excess via grid setpoint
+5. **Default** — grid setpoint = 0W (absorb solar, block export)
 
 ### Helper method categories
 
 | Category | Methods |
 |---|---|
-| Setpoint calculators | `_charge_setpoint()`, `_discharge_setpoint()`, `_cheap_charge_setpoint()`, `_post_peak_discharge_setpoint()` |
+| Setpoint calculators | `_charge_setpoint()`, `_discharge_setpoint()`, `_cheap_charge_setpoint()`, `_evening_peak_excess_setpoint()` |
 | Window sizing | `_contiguous_price_hours(threshold, above)`, `_spread_window_h(threshold, above)` |
 | Sensor readers | `_get_soc()`, `_get_current_price()`, `_max_price_in_window()`, `_daily_min_price_hour_and_value()` |
 | Actuators | `_set_grid_setpoint(watts)`, `_set_battery_setpoint(watts)` |
