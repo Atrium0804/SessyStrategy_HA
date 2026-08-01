@@ -1,0 +1,205 @@
+# MkDocs Configuration for SessyStrategy HA Documentation
+# This configuration file enables static site generation using MkDocs
+# Run with: mkdocs serve (development) or mkdocs build (production)
+
+site_name: SessyStrategy HA Documentation
+site_description: Complete documentation for SessyStrategy HA - Smart battery charging strategy for Home Assistant + Sessy
+site_author: SessyStrategy Team
+site_url: https://github.com/your-repo/sessy-strategy-ha
+
+# Repository information
+repo_name: SessyStrategy HA
+repo_url: https://github.com/your-repo/sessy-strategy-ha
+edit_uri: edit/main/docs/
+
+# Documentation directory
+# Note: If you change this, move mkdocs.yml into the docs directory
+docs_dir: docs
+
+# Theme configuration (Material theme recommended)
+theme:
+  name: material
+  language: en
+  logo: assets/logo.png  # Optional: add your logo
+  favicon: assets/favicon.ico  # Optional: add your favicon
+  palette:
+    # Light mode (default)
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+  features:
+    - navigation.top
+    - navigation.sections
+    - navigation.indexes
+    - toc.integrate
+    - content.code.copy
+    - content.code.annotate
+
+# Navigation structure
+nav:
+  - Home: index.md
+  
+  # Tutorials Section
+  - Tutorials:
+    - tutorials/getting-started.md
+    - tutorials/first-day-operation.md
+    - tutorials/dashboard-setup.md
+  
+  # How-to Guides Section
+  - How-to Guides:
+    - how-to/configure-seasonal-mode.md
+    - how-to/tune-price-thresholds.md
+    - how-to/override-manual-mode.md
+    - how-to/add-live-tuning-helpers.md
+    - how-to/debug-strategy-decisions.md
+    - how-to/migrate-from-older-version.md
+  
+  # Explanations Section
+  - Explanations:
+    - explanation/strategy-priority-chain.md
+    - explanation/price-basis-raw-vs-import.md
+    - explanation/adaptive-spread-windows.md
+    - explanation/setpoint-types-explained.md
+    - explanation/seasonal-operation.md
+    - explanation/arbitrage-margin.md
+  
+  # Reference Section
+  - Reference:
+    - Configuration:
+      - reference/configuration/apps-yaml.md
+    - Entities:
+      - reference/entity-reference.md
+      - reference/live-tuning-entities.md
+      - reference/status-sensor-attributes.md
+    - Services:
+      - reference/service-calls.md
+    - Architecture:
+      - reference/architecture.md
+    - Algorithms:
+      - reference/algorithms.md
+
+# Extensions (for advanced Markdown features)
+markdown_extensions:
+  # Standard extensions
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      baselevel: 2
+      separator: "-"
+  
+  # PyMdown Extensions (enhance Markdown)
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+      auto_inline: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+      separator: '[\s\-]+'
+  - git-revision-date-localized:
+      enabled: true
+      fallback_to_build_date: true
+      type: datetime
+      timezone: Europe/Amsterdam
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+        remove_comments: true
+  - macros:
+      include_yaml:
+        - _sidebar.yml
+
+# Extra configuration
+extra:
+  # Social links
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-repo/sessy-strategy-ha
+    - icon: fontawesome/brands/git
+      link: https://github.com/your-repo
+  
+  # Version information (for version selector)
+  version:
+    provider: mike
+    default: latest
+
+# Copyright and footer
+copyright: |
+  &copy; 2026 SessyStrategy Team<br>
+  Documentation built with <a href="https://www.mkdocs.org/" target="_blank">MkDocs</a> &nbsp;
+  <a href="https://diataxis.fr/" target="_blank">Diátaxis Framework</a>
+
+# Google Analytics (optional - uncomment to enable)
+#google_analytics:
+#  - "UA-XXXXXXXX-X"
+#  - auto
+
+# Custom CSS/JS (optional)
+extra_css:
+  - css/custom.css
+
+extra_javascript:
+  - js/custom.js
+
+# Page tree configuration
+use_directory_urls: true
+strict: true
+
+# Dev server configuration
+dev_addr: 0.0.0.0:8000
+watch:
+  - docs
+  - mkdocs.yml
