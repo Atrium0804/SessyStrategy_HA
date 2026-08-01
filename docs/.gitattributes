@@ -1,0 +1,33 @@
+# Git Attributes for Documentation
+# Ensures consistent line endings and file handling across platforms
+
+# Markdown files - force LF line endings
+*.md text=auto eol=lf
+
+# YAML files - force LF line endings
+*.yaml text=auto eol=lf
+*.yml text=auto eol=lf
+
+# Sidebars and configuration
+_sidebar.yml text=auto eol=lf
+
+# Ignore files
+.gitignore text=auto eol=lf
+
+# Template files
+_templates/*.md text=auto eol=lf
+
+# Ensure consistent line endings for all text files
+*.txt text=auto eol=lf
+*.json text=auto eol=lf
+
+# Preserve executable permissions for scripts (if any)
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
+# Documentation specific attributes
+# Merge strategy for documentation files
+*.md merge=union
+
+# Diff strategy for markdown files
+*.md diff=unified

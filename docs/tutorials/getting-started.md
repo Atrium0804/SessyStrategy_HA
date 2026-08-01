@@ -41,10 +41,8 @@ Before starting this tutorial, ensure you have:
 
 ## 📚 Related Documentation
 
-- [Configuration Reference](../reference/configuration/apps-yaml.md) — Complete list of all tunable parameters
-- [Entity Reference](../reference/entity-reference.md) — All required and optional entities
-- [Tune Price Thresholds](../how-to/tune-price-thresholds.md) — Adjust charge/discharge prices for your situation
-- [Debug Strategy Decisions](../how-to/debug-strategy-decisions.md) — Troubleshooting guide
+- [First Day Operation](first-day-operation.md) — What to expect on your first day
+- [Dashboard Setup](dashboard-setup.md) — Create visual monitoring for your strategy
 
 ---
 

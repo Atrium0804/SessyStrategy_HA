@@ -40,10 +40,7 @@ Before starting this tutorial, ensure you have:
 ## 📚 Related Documentation
 
 - [Getting Started](getting-started.md) — Installation and setup guide
-- [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — How decisions are made
-- [Price Basis: Raw vs Import](../explanation/price-basis-raw-vs-import.md) — Understanding price calculations
-- [Debug Strategy Decisions](../how-to/debug-strategy-decisions.md) — Troubleshooting guide
-- [Setpoint Types Explained](../explanation/setpoint-types-explained.md) — Battery vs grid setpoints
+- [Dashboard Setup](dashboard-setup.md) — Create visual monitoring for your strategy
 
 ---
 

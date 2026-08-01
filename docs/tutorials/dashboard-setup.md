@@ -43,8 +43,6 @@ Before starting this tutorial, ensure you have:
 
 - [Getting Started](getting-started.md) — Installation and setup guide
 - [First Day Operation](first-day-operation.md) — Understand strategy behavior
-- [Status Sensor Attributes](../reference/status-sensor-attributes.md) — Complete list of status attributes
-- [Entity Reference](../reference/entity-reference.md) — All entities used by SessyStrategy
 
 ---
 
