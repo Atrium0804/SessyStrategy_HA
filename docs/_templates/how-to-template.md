@@ -19,7 +19,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Relevant explanation document](link)
 - [Relevant reference document](link)
@@ -27,7 +27,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 Understanding the Problem
+## Understanding the Problem
 
 ### What You're Experiencing
 
@@ -46,7 +46,10 @@ Common scenarios:
 
 ---
 
-## ✅ Solution Steps
+## Solution Steps
+
+[!note]
+Follow these steps in order. Each step builds on the previous one.
 
 ### Step 1: [First Step]
 
@@ -72,7 +75,7 @@ example_key: example_value
 
 ---
 
-## 🔍 Verification
+## Verification
 
 To confirm your solution is working:
 
@@ -89,7 +92,10 @@ To confirm your solution is working:
 
 ---
 
-## ⚠️ Common Issues
+## Common Issues
+
+[!caution]
+If you encounter issues, verify each step was completed correctly before troubleshooting.
 
 ### Issue 1: [Problem Title]
 
@@ -111,7 +117,10 @@ To confirm your solution is working:
 
 ---
 
-## 🎯 Alternative Approaches
+## Alternative Approaches
+
+[!note]
+Alternative approaches may be more suitable for your specific setup.
 
 ### Approach 1: [Method Name]
 
@@ -135,16 +144,16 @@ To confirm your solution is working:
 
 ---
 
-## 📝 Best Practices
+## Best Practices
 
-- ✅ **Do:** [Recommended practice 1]
-- ✅ **Do:** [Recommended practice 2]
-- ❌ **Don't:** [Practice to avoid 1]
-- ❌ **Don't:** [Practice to avoid 2]
+- [x] **Do:** [Recommended practice 1]
+- [x] **Do:** [Recommended practice 2]
+- [ ] **Don't:** [Practice to avoid 1]
+- [ ] **Don't:** [Practice to avoid 2]
 
 ---
 
-## 🔗 See Also
+## See Also
 
 - [Related how-to guide](link)
 - [Underlying explanation](link)
@@ -152,7 +161,7 @@ To confirm your solution is working:
 
 ---
 
-## 📊 Quick Checklist
+## Quick Checklist
 
 - [ ] Problem symptoms confirmed
 - [ ] Solution step 1 completed

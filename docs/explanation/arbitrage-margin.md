@@ -211,7 +211,7 @@ This means:
 ### Visual Representation
 
 ```mermaid
-%%{init: {"xyChart": {"plotColorPalette": "#009E73,#D55E00"}}}%%
+%%{init: {'theme': 'neutral'}}%%
 xychart-beta
     title "Arbitrage Decision Space"
     x-axis "Current Raw Price (€/kWh)" 0 --> 0.60
@@ -226,11 +226,11 @@ xychart-beta
     text "min_arbitrage_margin = 0.05" at [0.3, 0.35]
     
     %% Regions
-    fill [0.0, 0.0, 0.55, 0.05] with #009E73
-    text "SKIP" at [0.2, 0.02] fill #FFFFFF
+    fill [0.0, 0.0, 0.55, 0.05]
+    text "SKIP" at [0.2, 0.02]
     
-    fill [0.0, 0.05, 0.6, 0.6] with #D55E00
-    text "CHARGE" at [0.4, 0.4] fill #FFFFFF
+    fill [0.0, 0.05, 0.6, 0.6]
+    text "CHARGE" at [0.4, 0.4]
 ```
 
 **Interpretation:**

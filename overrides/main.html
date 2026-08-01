@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{#
+  Chromium browsers deny localStorage access on file:// origins (opened from disk).
+  Material's bundle.js calls localStorage without a try/catch, so it throws silently
+  and the dark/light toggle click handler never gets wired up. Patch localStorage with
+  an in-memory stub before the bundle runs (see ADR-TPD030 disk-based distribution).
+#}
+{% block extrahead %}
+  {{ super() }}
+  <script>
+    (function () {
+      try {
+        window.localStorage.setItem("__ns_probe__", "1");
+        window.localStorage.removeItem("__ns_probe__");
+      } catch (err) {
+        var store = {};
+        window.localStorage = {
+          getItem: function (key) {
+            return Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null;
+          },
+          setItem: function (key, value) {
+            store[key] = String(value);
+          },
+          removeItem: function (key) {
+            delete store[key];
+          },
+          clear: function () {
+            store = {};
+          }
+        };
+      }
+    })();
+  </script>
+{% endblock %}

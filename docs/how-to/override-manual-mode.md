@@ -21,7 +21,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Setpoint Types Explained](../explanation/setpoint-types-explained.md)
 - [Strategy Priority Chain Explained](../explanation/strategy-priority-chain.md)
@@ -30,7 +30,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 Understanding Manual Modes
+## Understanding Manual Modes
 
 ### The Operating Mode Hierarchy
 
@@ -56,7 +56,7 @@ The strategy reads from your configured `setpoint_entity` and writes to the appr
 
 ---
 
-## ✅ Solution Steps
+## Solution Steps
 
 ### Step 1: Choose Your Manual Mode Method
 
@@ -297,7 +297,7 @@ Set up a Home Assistant dashboard to make manual mode switching easy.
 
 ---
 
-## 🔍 Verification
+## Verification
 
 To confirm your manual mode setup is working:
 
@@ -330,7 +330,7 @@ To confirm your manual mode setup is working:
 
 ---
 
-## ⚠️ Common Issues
+## Common Issues
 
 ### Issue 1: Manual Mode Not Working
 
@@ -400,7 +400,7 @@ To confirm your manual mode setup is working:
 
 ---
 
-## 🎯 Alternative Approaches
+## Alternative Approaches
 
 ### Approach 1: Multiple Mode Selectors
 
@@ -517,13 +517,13 @@ sequence:
 
 ---
 
-## 📝 Best Practices
+## Best Practices
 
-- ✅ **Do:** Start with the hybrid approach (mode selector + setpoint entity)
-- ✅ **Do:** Use the same max/min values for your setpoint entity as your battery's capabilities
-- ✅ **Do:** Test manual modes during low-usage periods first
-- ✅ **Do:** Monitor battery behavior closely when in manual mode
-- ✅ **Do:** Return to `optimized` mode when manual control is no longer needed
+- [x] **Do:** Start with the hybrid approach (mode selector + setpoint entity)
+- [x] **Do:** Use the same max/min values for your setpoint entity as your battery's capabilities
+- [x] **Do:** Test manual modes during low-usage periods first
+- [x] **Do:** Monitor battery behavior closely when in manual mode
+- [x] **Do:** Return to `optimized` mode when manual control is no longer needed
 - ❌ **Don't:** Leave manual modes active for extended periods without monitoring
 - ❌ **Don't:** Set setpoints outside your battery's rated capacity
 - ❌ **Don't:** Switch modes rapidly — allow time for the strategy to process
@@ -531,7 +531,7 @@ sequence:
 
 ---
 
-## 🔗 See Also
+## See Also
 
 - [Setpoint Types Explained](../explanation/setpoint-types-explained.md)
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
@@ -540,7 +540,7 @@ sequence:
 
 ---
 
-## 📊 Quick Checklist
+## Quick Checklist
 
 - [ ] Set up mode_select input_select entity with all required modes
 - [ ] Configured mode_select entity ID in apps.yaml

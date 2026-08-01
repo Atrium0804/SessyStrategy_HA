@@ -1,0 +1,101 @@
+# MkDocs Navigation Configuration
+# This file defines the navigation structure for static site generation
+# Compatible with MkDocs and similar static site generators
+
+# Main navigation
+nav:
+  - Home: index.md
+  
+  # Tutorials Section
+  - Tutorials:
+    - tutorials/getting-started.md
+    - tutorials/first-day-operation.md
+    - tutorials/dashboard-setup.md
+  
+  # How-to Guides Section
+  - How-to Guides:
+    - how-to/configure-seasonal-mode.md
+    - how-to/tune-price-thresholds.md
+    - how-to/override-manual-mode.md
+    - how-to/add-live-tuning-helpers.md
+    - how-to/debug-strategy-decisions.md
+    - how-to/migrate-from-older-version.md
+  
+  # Explanations Section
+  - Explanations:
+    - explanation/strategy-priority-chain.md
+    - explanation/price-basis-raw-vs-import.md
+    - explanation/adaptive-spread-windows.md
+    - explanation/setpoint-types-explained.md
+    - explanation/seasonal-operation.md
+    - explanation/arbitrage-margin.md
+  
+  # Reference Section
+  - Reference:
+    - Configuration:
+      - reference/configuration/apps-yaml.md
+    - Entities:
+      - reference/entity-reference.md
+      - reference/live-tuning-entities.md
+      - reference/status-sensor-attributes.md
+    - Services:
+      - reference/service-calls.md
+    - Architecture:
+      - reference/architecture.md
+    - Algorithms:
+      - reference/algorithms.md
+
+# Site metadata (for MkDocs)
+site_name: SessyStrategy HA Documentation
+site_description: Complete documentation for SessyStrategy HA
+site_author: SessyStrategy Team
+site_url: https://github.com/your-repo
+
+# Theme configuration (example for MkDocs)
+theme:
+  name: material
+  palette:
+    primary: indigo
+    accent: indigo
+  font:
+    text: Roboto
+    code: Roboto Mono
+
+# Extensions (for MkDocs)
+extensions:
+  - pymdownx.arithmatex
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.emoji
+  - pymdownx.escapeall
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - pymdownx.tasklist
+  - pymdownx.tilde
+
+# Plugins
+plugins:
+  - search
+  - git-revision-date-localized
+  - minify:
+      minify_html: true
+
+# Extra configuration for static site
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/your-repo
+  
+# Copyright
+extra_css: |-
+  .md-footer {
+    padding: 2em 0;
+    text-align: center;
+    color: #666;
+    font-size: 0.9em;
+  }

@@ -17,6 +17,7 @@ The priority chain is designed to capture the most valuable opportunities first 
 ## Priority Flow Diagram
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     A[Start: Read SOC, Price, Time] --> B{P1: Price > price_discharge?}
     B -->|Yes| C[Discharge toward SOC floor]

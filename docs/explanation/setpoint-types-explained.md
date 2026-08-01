@@ -45,15 +45,15 @@ The strategy uses battery setpoint (`api` mode) in the following priority branch
 ### Control Characteristics
 
 **Pros:**
-- ✅ **Precise battery control**: Directly sets battery power to exact desired value
-- ✅ **Predictable behavior**: Battery behaves exactly as commanded
-- ✅ **Optimal for energy storage**: Ideal when the goal is to store/release specific amounts of energy
-- ✅ **Efficient power flow**: Can be tuned for maximum inverter efficiency
+- [x] **Precise battery control**: Directly sets battery power to exact desired value
+- [x] **Predictable behavior**: Battery behaves exactly as commanded
+- [x] **Optimal for energy storage**: Ideal when the goal is to store/release specific amounts of energy
+- [x] **Efficient power flow**: Can be tuned for maximum inverter efficiency
 
 **Cons:**
-- ❌ **Grid balance is automatic**: The grid will import or export whatever is needed to balance house load + battery power
-- ❌ **Less direct grid control**: Cannot directly control grid import/export
-- ❌ **May cause unexpected grid behavior**: If house load is high, battery discharge might not be enough, causing grid import
+- [ ] **Grid balance is automatic**: The grid will import or export whatever is needed to balance house load + battery power
+- [ ] **Less direct grid control**: Cannot directly control grid import/export
+- [ ] **May cause unexpected grid behavior**: If house load is high, battery discharge might not be enough, causing grid import
 
 ### Mathematical Control
 
@@ -134,15 +134,15 @@ Additionally, grid setpoint is used in **manual mode** when `grid_setpoint` mode
 ### Control Characteristics
 
 **Pros:**
-- ✅ **Direct grid control**: Precisely controls import/export at the meter
-- ✅ **Battery handles the rest**: Battery automatically adjusts to achieve the grid target
-- ✅ **Simple mental model**: Think in terms of "what do I want at the meter"
-- ✅ **Good for export control**: Can precisely limit or block grid export
+- [x] **Direct grid control**: Precisely controls import/export at the meter
+- [x] **Battery handles the rest**: Battery automatically adjusts to achieve the grid target
+- [x] **Simple mental model**: Think in terms of "what do I want at the meter"
+- [x] **Good for export control**: Can precisely limit or block grid export
 
 **Cons:**
-- ❌ **Less precise battery control**: Battery power is determined by grid target, not directly controlled
-- ❌ **Battery may work harder**: To achieve grid target, battery might charge/discharge more than expected
-- ❌ **House load affects battery**: High house load means battery works harder to maintain grid target
+- [ ] **Less precise battery control**: Battery power is determined by grid target, not directly controlled
+- [ ] **Battery may work harder**: To achieve grid target, battery might charge/discharge more than expected
+- [ ] **House load affects battery**: High house load means battery works harder to maintain grid target
 
 ### Mathematical Control
 
@@ -295,6 +295,7 @@ The strategy supports manual override modes via the `mode_select` entity:
 ## Diagram: Control Flow
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TD
     A[Strategy Decision] --> B{Priority 1-3?}
     B -->|Yes| C[Set api mode]
@@ -317,7 +318,7 @@ flowchart TD
 ## Mermaid Diagram: Conceptual Comparison
 
 ```mermaid
-%%{init: {"xyChart": {"plotColorPalette": "#D55E00,#0072B2"}}}%%
+%%{init: {'theme': 'neutral'}}%%
 xychart-beta
     title "Battery vs Grid Setpoint Response"
     x-axis ["Low Load", "Medium Load", "High Load"]

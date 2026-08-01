@@ -21,7 +21,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Live Tuning Entities Reference](../reference/live-tuning-entities.md)
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
@@ -30,7 +30,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 Understanding Live Tuning
+## Understanding Live Tuning
 
 ### What Live Tuning Does
 
@@ -75,7 +75,7 @@ Else → Use static value from apps.yaml
 
 ---
 
-## ✅ Solution Steps
+## Solution Steps
 
 ### Step 1: Plan Your Live Tuning Setup
 
@@ -257,7 +257,7 @@ Set up a dedicated dashboard for tuning your strategy.
   cards:
     # Price Thresholds Section
     - type: markdown
-      content: "### 💰 Price Thresholds"
+      content: "### Price Thresholds"
     
     - type: horizontal-stack
       cards:
@@ -278,7 +278,7 @@ Set up a dedicated dashboard for tuning your strategy.
     
     # SOC Targets Section
     - type: markdown
-      content: "### 🔋 SOC Targets"
+      content: "### SOC Targets"
     
     - type: horizontal-stack
       cards:
@@ -299,7 +299,7 @@ Set up a dedicated dashboard for tuning your strategy.
     
     # Season Mode Section
     - type: markdown
-      content: "### 🌞 Season Mode"
+      content: "### Season Mode"
     
     - type: entity
       entity: input_select.sessy_season_mode
@@ -308,7 +308,7 @@ Set up a dedicated dashboard for tuning your strategy.
     
     # Current Status Section
     - type: markdown
-      content: "### 📊 Current Status"
+      content: "### Current Status"
     
     - type: entity
       entity: sensor.sessy_strategy_status
@@ -338,7 +338,7 @@ Set up a dedicated dashboard for tuning your strategy.
 
 ---
 
-## 🔍 Verification
+## Verification
 
 To confirm your live tuning setup is working:
 
@@ -373,7 +373,7 @@ To confirm your live tuning setup is working:
 
 ---
 
-## ⚠️ Common Issues
+## Common Issues
 
 ### Issue 1: Live Entities Not Working
 
@@ -466,7 +466,7 @@ To confirm your live tuning setup is working:
 
 ---
 
-## 🎯 Advanced Usage
+## Advanced Usage
 
 ### Automated Tuning Based on Conditions
 
@@ -586,23 +586,23 @@ action:
 
 ---
 
-## 📝 Best Practices
+## Best Practices
 
-- ✅ **Do:** Start with the essential parameters (price thresholds, SOC targets)
-- ✅ **Do:** Use descriptive names for your entities
-- ✅ **Do:** Set initial values to match your static configuration
-- ✅ **Do:** Use appropriate min/max/step values for each parameter
-- ✅ **Do:** Test live changes during low-usage periods first
-- ✅ **Do:** Monitor strategy behavior after changes
-- ✅ **Do:** Use automations to adjust parameters based on conditions
-- ❌ **Don't:** Create entities for parameters you never change
-- ❌ **Don't:** Set debounce delay too low (can cause excessive re-runs)
-- ❌ **Don't:** Remove entity configurations from apps.yaml after setting up live entities
-- ❌ **Don't:** Expect live entity changes to persist across restarts
+- [x] **Do:** Start with the essential parameters (price thresholds, SOC targets)
+- [x] **Do:** Use descriptive names for your entities
+- [x] **Do:** Set initial values to match your static configuration
+- [x] **Do:** Use appropriate min/max/step values for each parameter
+- [x] **Do:** Test live changes during low-usage periods first
+- [x] **Do:** Monitor strategy behavior after changes
+- [x] **Do:** Use automations to adjust parameters based on conditions
+- [ ] **Don't:** Create entities for parameters you never change
+- [ ] **Don't:** Set debounce delay too low (can cause excessive re-runs)
+- [ ] **Don't:** Remove entity configurations from apps.yaml after setting up live entities
+- [ ] **Don't:** Expect live entity changes to persist across restarts
 
 ---
 
-## 🔗 See Also
+## See Also
 
 - [Live Tuning Entities Reference](../reference/live-tuning-entities.md)
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
@@ -612,7 +612,7 @@ action:
 
 ---
 
-## 📊 Quick Checklist
+## Quick Checklist
 
 - [ ] Identified which parameters to make live-tunable
 - [ ] Created input_number entities for each parameter

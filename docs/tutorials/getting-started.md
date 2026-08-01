@@ -21,7 +21,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 What You Will Learn
+## What You Will Learn
 
 - Install and configure AppDaemon for SessyStrategy
 - Set up the SessyStrategy application in your Home Assistant environment
@@ -29,17 +29,17 @@ last_updated: 2026-08-01
 - Verify the strategy is running correctly
 - Monitor your first strategy decisions
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before starting this tutorial, ensure you have:
 
-- ✅ **Home Assistant** installed and running (tested on 2024.6+)
-- ✅ **Sessy integration** installed and configured with your battery
-- ✅ **Dynamic energy price sensor** (e.g., from ha-dsmr, Nordic Energy, or other price integration)
-- ✅ Basic familiarity with YAML configuration files
-- ✅ SSH/Samba access or File Editor add-on for Home Assistant
+- [x] **Home Assistant** installed and running (tested on 2024.6+)
+- [x] **Sessy integration** installed and configured with your battery
+- [x] **Dynamic energy price sensor** (e.g., from ha-dsmr, Nordic Energy, or other price integration)
+- [x] Basic familiarity with YAML configuration files
+- [x] SSH/Samba access or File Editor add-on for Home Assistant
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [First Day Operation](first-day-operation.md) — What to expect on your first day
 - [Dashboard Setup](dashboard-setup.md) — Create visual monitoring for your strategy
@@ -546,22 +546,23 @@ Monitor SessyStrategy during its first few cycles to ensure it's working correct
 
 ---
 
-## ✅ Verification
+## Verification
 
 To confirm everything is working correctly:
 
-1. ✅ AppDaemon is running and shows no errors in the log
-2. ✅ SessyStrategy logs show successful startup and regular updates
-3. ✅ `sensor.sessy_strategy_status` exists and shows current state
-4. ✅ Strategy select entity switches between "nom" and "api"
-5. ✅ Setpoint entities show appropriate values
-6. ✅ SOC and price sensors show current data
-7. ✅ Strategy responds to price changes and SOC levels
+1. [x] AppDaemon is running and shows no errors in the log
+2. [x] SessyStrategy logs show successful startup and regular updates
+3. [x] `sensor.sessy_strategy_status` exists and shows current state
+4. [x] Strategy select entity switches between "nom" and "api"
+5. [x] Setpoint entities show appropriate values
+6. [x] SOC and price sensors show current data
+7. [x] Strategy responds to price changes and SOC levels
 
 ---
 
-## 🎉 Success!
+## Success
 
+[!note]
 You have successfully installed and configured SessyStrategy HA! Your battery is now making intelligent decisions based on real-time energy prices.
 
 ### Next Steps
@@ -582,7 +583,7 @@ Now that you're up and running, consider:
 
 ---
 
-## 📝 Feedback
+## Feedback
 
 Found an issue or have suggestions for this tutorial? [Open an issue](https://github.com/your-repo/issues) or contribute improvements via pull request.
 

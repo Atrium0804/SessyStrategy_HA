@@ -21,7 +21,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Price Basis: Raw vs Import Explained](../explanation/price-basis-raw-vs-import.md)
 - [Strategy Priority Chain Explained](../explanation/strategy-priority-chain.md)
@@ -30,7 +30,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 Understanding Price Thresholds
+## Understanding Price Thresholds
 
 ### What Price Thresholds Control
 
@@ -68,7 +68,7 @@ surcharge: 0.11           # Import surcharge
 
 ---
 
-## ✅ Solution Steps
+## Solution Steps
 
 ### Step 1: Know Your Surcharge
 
@@ -236,7 +236,7 @@ sessy_strategy:
 
 ---
 
-## 🔍 Verification
+## Verification
 
 To confirm your price thresholds are working correctly:
 
@@ -275,7 +275,7 @@ To confirm your price thresholds are working correctly:
 
 ---
 
-## ⚠️ Common Issues
+## Common Issues
 
 ### Issue 1: Battery Not Discharging During Peak Prices
 
@@ -364,7 +364,7 @@ To confirm your price thresholds are working correctly:
 
 ---
 
-## 🎯 Tuning Strategies by User Type
+## Tuning Strategies by User Type
 
 ### Strategy for Most Users (Netherlands, Default)
 
@@ -429,13 +429,13 @@ sessy_strategy:
 
 ---
 
-## 📝 Best Practices
+## Best Practices
 
-- ✅ **Do:** Start with default values and monitor for a few days
-- ✅ **Do:** Use live entities for easier experimentation
-- ✅ **Do:** Consider your actual surcharge, not just estimates
-- ✅ **Do:** Leave a safety margin (€0.05-0.10) between thresholds and typical prices
-- ✅ **Do:** Check the status sensor regularly to verify thresholds are applied
+- [x] **Do:** Start with default values and monitor for a few days
+- [x] **Do:** Use live entities for easier experimentation
+- [x] **Do:** Consider your actual surcharge, not just estimates
+- [x] **Do:** Leave a safety margin (€0.05-0.10) between thresholds and typical prices
+- [x] **Do:** Check the status sensor regularly to verify thresholds are applied
 - ❌ **Don't:** Set thresholds too close together (causes frequent switching)
 - ❌ **Don't:** Set `price_charge` above zero unless you understand the implications
 - ❌ **Don't:** Set `price_discharge` below zero (battery will never discharge)
@@ -443,7 +443,7 @@ sessy_strategy:
 
 ---
 
-## 🔗 See Also
+## See Also
 
 - [Price Basis: Raw vs Import Explained](../explanation/price-basis-raw-vs-import.md)
 - [Arbitrage Margin Explained](../explanation/arbitrage-margin.md)
@@ -453,7 +453,7 @@ sessy_strategy:
 
 ---
 
-## 📊 Quick Checklist
+## Quick Checklist
 
 - [ ] Determined my actual surcharge value
 - [ ] Calculated my break-even discharge threshold

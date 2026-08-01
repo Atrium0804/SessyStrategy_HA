@@ -1,0 +1,84 @@
+/*
+ * NS corporate styling for MkDocs Material.
+ * Source of truth for values: docs/reference/brand-tokens.md
+ * (NS Huisstijl Richtlijnen v4.4). Do not hardcode these colors in page content.
+ */
+
+/* ---------------------------------------------------------------------------
+ * Typography
+ * NS Sans is installed on corporate laptops; the stack falls back gracefully
+ * elsewhere. Frutiger is intentionally omitted (not available on laptops).
+ * ------------------------------------------------------------------------- */
+:root {
+  --md-text-font-family: "NS Sans", "Segoe UI", system-ui, Arial, sans-serif;
+  --md-code-font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular",
+    Consolas, "Liberation Mono", monospace;
+}
+
+/* Headings: NS Sans bold with slightly tightened tracking, per the guide. */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* ---------------------------------------------------------------------------
+ * Light scheme (default)
+ * Dark blue is primary; light blue (accessibility variant) drives links.
+ * Yellow appears only as a non-text brand accent (header underline).
+ * ------------------------------------------------------------------------- */
+[data-md-color-scheme="default"] {
+  --ns-yellow: #ffc917;
+  --ns-blue: #003082;
+  --ns-lightblue: #0079d3;
+  --ns-lightblue-a11y: #0063d3;
+  --ns-gray: #383e42;
+
+  --md-primary-fg-color: var(--ns-blue);
+  --md-primary-fg-color--light: #1a4a9c;
+  --md-primary-fg-color--dark: #002261;
+  --md-primary-bg-color: #ffffff;
+
+  --md-accent-fg-color: var(--ns-lightblue-a11y);
+
+  --md-default-bg-color: #ffffff;
+  --md-typeset-color: var(--ns-gray);
+  --md-typeset-a-color: var(--ns-lightblue-a11y);
+}
+
+/* ---------------------------------------------------------------------------
+ * Dark scheme (slate)
+ * Header stays deep NS blue for calm reading; links use a lightened blue for
+ * contrast. Yellow remains the brand accent (header underline).
+ * ------------------------------------------------------------------------- */
+[data-md-color-scheme="slate"] {
+  --ns-yellow: #ffc917;
+  --ns-blue: #003082;
+
+  --md-primary-fg-color: #0a2a63;
+  --md-primary-fg-color--light: #1a4a9c;
+  --md-primary-fg-color--dark: #041d47;
+  --md-primary-bg-color: #e6e8eb;
+
+  --md-accent-fg-color: #4d8ee0;
+
+  --md-default-bg-color: #12161c;
+  --md-default-fg-color: #e6e8eb;
+  --md-typeset-color: #e6e8eb;
+  --md-typeset-a-color: #4d8ee0;
+}
+
+/* ---------------------------------------------------------------------------
+ * NS brand accent: thin yellow rule under the header, in both schemes.
+ * Keeps the recognizable yellow+blue identity without distracting from text.
+ * ------------------------------------------------------------------------- */
+.md-header {
+  border-bottom: 3px solid var(--ns-yellow);
+}
+
+/* Keep content measure comfortable for reading. */
+.md-typeset {
+  line-height: 1.65;
+}

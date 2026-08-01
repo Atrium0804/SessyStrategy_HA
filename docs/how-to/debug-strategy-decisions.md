@@ -21,7 +21,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Strategy Priority Chain Explained](../explanation/strategy-priority-chain.md)
 - [Status Sensor Attributes Reference](../reference/status-sensor-attributes.md)
@@ -31,7 +31,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 Understanding Strategy Decision Making
+## Understanding Strategy Decision Making
 
 ### The Priority Chain Evaluation
 
@@ -79,7 +79,7 @@ mode_select → [optimized | grid_setpoint | battery_setpoint | sessy_dynamic | 
 
 ---
 
-## ✅ Step-by-Step Debugging Process
+## Step-by-Step Debugging Process
 
 ### Step 1: Quick Check — Status Sensor
 
@@ -300,7 +300,7 @@ If `energy_prices` is missing or incomplete:
 
 ---
 
-## 🔍 Common Issues and Fixes
+## Common Issues and Fixes
 
 ### Issue 1: "It's not charging during cheap hours"
 
@@ -503,7 +503,7 @@ appdaemon logs
 
 ---
 
-## 🎯 Advanced Debugging Techniques
+## Advanced Debugging Techniques
 
 ### Technique 1: Manual Priority Chain Simulation
 
@@ -647,15 +647,15 @@ if prices:
 
 ---
 
-## 📝 Best Practices
+## Best Practices
 
-- ✅ **Do:** Start with the status sensor — it has most of the information you need
-- ✅ **Do:** Check logs for the exact conditions that were evaluated
-- ✅ **Do:** Work through the priority chain systematically
-- ✅ **Do:** Verify all required entities exist and have valid data
-- ✅ **Do:** Check price sensor has complete `energy_prices` data
-- ✅ **Do:** Test one change at a time to isolate issues
-- ✅ **Do:** Monitor for at least one full day after making changes
+- [x] **Do:** Start with the status sensor — it has most of the information you need
+- [x] **Do:** Check logs for the exact conditions that were evaluated
+- [x] **Do:** Work through the priority chain systematically
+- [x] **Do:** Verify all required entities exist and have valid data
+- [x] **Do:** Check price sensor has complete `energy_prices` data
+- [x] **Do:** Test one change at a time to isolate issues
+- [x] **Do:** Monitor for at least one full day after making changes
 - ❌ **Don't:** Assume the strategy should be doing something without checking the conditions
 - ❌ **Don't:** Change multiple parameters simultaneously — it makes debugging harder
 - ❌ **Don't:** Forget to check if you're in manual mode or a different season
@@ -663,7 +663,7 @@ if prices:
 
 ---
 
-## 🔗 See Also
+## See Also
 
 - [Strategy Priority Chain Explained](../explanation/strategy-priority-chain.md)
 - [Status Sensor Attributes Reference](../reference/status-sensor-attributes.md)
@@ -673,7 +673,7 @@ if prices:
 
 ---
 
-## 📊 Quick Checklist
+## Quick Checklist
 
 - [ ] Checked status sensor state and attributes
 - [ ] Identified the active_branch from status sensor
@@ -688,7 +688,7 @@ if prices:
 
 ---
 
-## 🚨 Emergency Debugging Script
+## Emergency Debugging Script
 
 If you're completely stuck, run this emergency debugging sequence:
 

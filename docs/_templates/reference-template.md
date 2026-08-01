@@ -17,7 +17,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📋 Overview
+## Overview
 
 ### Purpose
 
@@ -25,8 +25,8 @@ last_updated: 2026-08-01
 
 ### Scope
 
-- ✅ [What is included]
-- ❌ [What is NOT included]
+- [x] [What is included]
+- [ ] [What is NOT included]
 
 ### Intended Audience
 
@@ -35,7 +35,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [How-to guide applying this](link)
 - [Explanation of the concepts](link)
@@ -43,7 +43,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📊 [Main Content Section]
+## [Main Content Section]
 
 ### [Subsection 1]
 
@@ -87,7 +87,7 @@ example:
 
 ---
 
-## 🔍 Detailed Specifications
+## Detailed Specifications
 
 ### [Specification Section 1]
 
@@ -110,23 +110,26 @@ example:
 
 ---
 
-## 📝 Usage Notes
+## Usage Notes
+
+[!note]
+Following best practices ensures optimal performance and reliability.
 
 ### Best Practices
 
-- ✅ **Do:** [Recommended practice 1]
-- ✅ **Do:** [Recommended practice 2]
-- ❌ **Don't:** [Practice to avoid 1]
-- ❌ **Don't:** [Practice to avoid 2]
+- [x] **Do:** [Recommended practice 1]
+- [x] **Do:** [Recommended practice 2]
+- [ ] **Don't:** [Practice to avoid 1]
+- [ ] **Don't:** [Practice to avoid 2]
 
 ### Common Pitfalls
 
-- ⚠️ **Pitfall 1:** [Description and how to avoid]
-- ⚠️ **Pitfall 2:** [Description and how to avoid]
+- [ ] **Pitfall 1:** [Description and how to avoid]
+- [ ] **Pitfall 2:** [Description and how to avoid]
 
 ---
 
-## 🔄 Version Compatibility
+## Version Compatibility
 
 | Version | Introduced | Changed | Deprecated | Removed |
 |---------|------------|---------|------------|---------|
@@ -134,7 +137,7 @@ example:
 
 ---
 
-## 📎 Appendices
+## Appendices
 
 ### Appendix A: [Title]
 
@@ -146,7 +149,7 @@ example:
 
 ---
 
-## 🔗 See Also
+## See Also
 
 - [Related reference document](link)
 - [Parent configuration](link)
@@ -155,7 +158,7 @@ example:
 
 ---
 
-## 📊 Quick Reference Card
+## Quick Reference Card
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -171,7 +174,7 @@ example:
 
 ---
 
-## 📝 Changelog
+## Changelog
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|

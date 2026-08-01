@@ -21,7 +21,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
 - [Entity Reference](../reference/entity-reference.md)
@@ -30,7 +30,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 Version History and Breaking Changes
+## Version History and Breaking Changes
 
 ### Version Identification
 
@@ -51,16 +51,19 @@ last_updated: 2026-08-01
 #### From v2.1 to v3.x (Current)
 
 **Major changes:**
-- ✅ **New**: Seasonal mode support (`auto`, `summer`, `winter`)
-- ✅ **New**: Live tuning entities for all major parameters
-- ✅ **New**: Adaptive spread windows for charge/discharge
-- ✅ **New**: Priority 4 — Evening peak excess discharge
-- ✅ **New**: Pre-peak arbitrage margin check
-- ⚠️ **Changed**: Price threshold logic now uses raw prices exclusively
-- ⚠️ **Changed**: SOC target for pre-peak is separate from cheap charge
-- ⚠️ **Changed**: `min_window_h` parameter added for adaptive spreading
-- ⚠️ **Changed**: `rerun_debounce_s` parameter added for live input handling
-- ⚠️ **Changed**: Entity naming convention standardized
+- [x] **New**: Seasonal mode support (`auto`, `summer`, `winter`)
+- [x] **New**: Live tuning entities for all major parameters
+- [x] **New**: Adaptive spread windows for charge/discharge
+- [x] **New**: Priority 4 — Evening peak excess discharge
+- [x] **New**: Pre-peak arbitrage margin check
+
+[!warning]
+The following changes require attention:
+- **Changed**: Price threshold logic now uses raw prices exclusively
+- **Changed**: SOC target for pre-peak is separate from cheap charge
+- **Changed**: `min_window_h` parameter added for adaptive spreading
+- **Changed**: `rerun_debounce_s` parameter added for live input handling
+- **Changed**: Entity naming convention standardized
 
 **Configuration changes required:**
 
@@ -151,7 +154,7 @@ sessy_strategy:
 
 ---
 
-## ✅ Migration Steps
+## Migration Steps
 
 ### Step 1: Backup Your Current Configuration
 
@@ -457,7 +460,7 @@ sessy_strategy:
 
 ---
 
-## ⚠️ Common Migration Issues
+## Common Migration Issues
 
 ### Issue 1: Strategy Doesn't Start
 
@@ -610,7 +613,7 @@ sessy_strategy:
 
 ---
 
-## 🎯 Rollback Procedure
+## Rollback Procedure
 
 If you encounter issues that you cannot resolve, you can roll back to your previous version.
 
@@ -649,14 +652,14 @@ If you encounter issues that you cannot resolve, you can roll back to your previ
 
 ---
 
-## 📝 Best Practices for Migration
+## Best Practices for Migration
 
-- ✅ **Do:** Backup everything before starting
-- ✅ **Do:** Test during low-usage periods first
-- ✅ **Do:** Validate configuration with YAML linter
-- ✅ **Do:** Start with default values and adjust gradually
-- ✅ **Do:** Monitor closely for the first few days
-- ✅ **Do:** Keep old configuration until new version is validated
+- [x] **Do:** Backup everything before starting
+- [x] **Do:** Test during low-usage periods first
+- [x] **Do:** Validate configuration with YAML linter
+- [x] **Do:** Start with default values and adjust gradually
+- [x] **Do:** Monitor closely for the first few days
+- [x] **Do:** Keep old configuration until new version is validated
 - ❌ **Don't:** Migrate during critical energy periods (peak hours)
 - ❌ **Don't:** Delete old files until new version is working
 - ❌ **Don't:** Change multiple parameters at once
@@ -664,7 +667,7 @@ If you encounter issues that you cannot resolve, you can roll back to your previ
 
 ---
 
-## 🔗 See Also
+## See Also
 
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
 - [Entity Reference](../reference/entity-reference.md)
@@ -674,7 +677,7 @@ If you encounter issues that you cannot resolve, you can roll back to your previ
 
 ---
 
-## 📊 Migration Checklist
+## Migration Checklist
 
 ### Before Migration
 - [ ] Backed up current apps.yaml
@@ -710,7 +713,7 @@ If you encounter issues that you cannot resolve, you can roll back to your previ
 
 ---
 
-## 📞 Getting Help with Migration
+## Getting Help with Migration
 
 If you encounter issues during migration:
 

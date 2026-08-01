@@ -17,7 +17,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 Concept Overview
+## Concept Overview
 
 ### What This Is
 
@@ -36,7 +36,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Reference document](link) - Technical details
 - [How-to guide](link) - Practical application
@@ -44,7 +44,10 @@ last_updated: 2026-08-01
 
 ---
 
-## 🔍 Deep Dive
+## Deep Dive
+
+[!note]
+This section provides technical depth for those who want to understand the underlying mechanisms.
 
 ### [Section 1: Core Concept]
 
@@ -84,12 +87,16 @@ Result: [output]
 
 ---
 
-## 🎨 Visual Representation
+## Visual Representation
+
+[!note]
+Diagrams use Mermaid with neutral theme for clarity and professional appearance.
 
 ### Diagram
 
 ```mermaid
-[Mermaid diagram type] TD/LR/Flowchart/etc.
+%%{init: {'theme': 'neutral'}}%%
+flowchart TD
     A[Label 1] --> B[Label 2]
     B --> C[Label 3]
     C --> D[Label 4]
@@ -121,7 +128,7 @@ Action:   Charge   Hold     Discharge Hold     Charge
 
 ---
 
-## 💡 Practical Implications
+## Practical Implications
 
 ### When This Applies
 
@@ -136,17 +143,20 @@ Action:   Charge   Hold     Discharge Hold     Charge
 
 ---
 
-## ⚖️ Trade-offs and Considerations
+## Trade-offs and Considerations
+
+[!caution]
+Understand these trade-offs before making configuration changes.
 
 ### Advantages
 
-- ✅ [Benefit 1 with explanation]
-- ✅ [Benefit 2 with explanation]
+- [x] [Benefit 1 with explanation]
+- [x] [Benefit 2 with explanation]
 
 ### Limitations
 
-- ⚠️ [Limitation 1 with explanation]
-- ⚠️ [Limitation 2 with explanation]
+- [ ] [Limitation 1 with explanation]
+- [ ] [Limitation 2 with explanation]
 
 ### Configuration Impact
 
@@ -157,7 +167,7 @@ Action:   Charge   Hold     Discharge Hold     Charge
 
 ---
 
-## 📊 Real-World Examples
+## Real-World Examples
 
 ### Example 1: [Title]
 
@@ -175,7 +185,7 @@ Action:   Charge   Hold     Discharge Hold     Charge
 
 ---
 
-## 🔗 References
+## References
 
 - [External reference 1](link) - [Description]
 - [External reference 2](link) - [Description]
@@ -183,7 +193,7 @@ Action:   Charge   Hold     Discharge Hold     Charge
 
 ---
 
-## 📝 Summary
+## Summary
 
 | Aspect | Key Point |
 |--------|-----------|
@@ -194,7 +204,7 @@ Action:   Charge   Hold     Discharge Hold     Charge
 
 ---
 
-## 🎯 Quick Quiz (Self-Assessment)
+## Quick Quiz (Self-Assessment)
 
 1. **Question:** [Simple comprehension question]?
    - A) [Option 1]

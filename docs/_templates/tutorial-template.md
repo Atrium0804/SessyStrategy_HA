@@ -19,21 +19,24 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 What You Will Learn
+## What You Will Learn
 
 - [Learning objective 1]
 - [Learning objective 2]
 - [Learning objective 3]
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before starting this tutorial, ensure you have:
 
-- ✅ [Prerequisite 1](link-to-prerequisite-doc)
-- ✅ [Prerequisite 2](link-to-prerequisite-doc)
-- ✅ [Prerequisite 3](link-to-prerequisite-doc)
+- [ ] [Prerequisite 1](link-to-prerequisite-doc)
+- [ ] [Prerequisite 2](link-to-prerequisite-doc)
+- [ ] [Prerequisite 3](link-to-prerequisite-doc)
 
-## 📚 Related Documentation
+[!warning]
+All prerequisites must be completed before starting this tutorial.
+
+## Related Documentation
 
 - [Related how-to guide](link)
 - [Related explanation](link)
@@ -80,7 +83,7 @@ Before starting this tutorial, ensure you have:
 
 ---
 
-## ✅ Verification
+## Verification
 
 To confirm everything is working correctly:
 
@@ -90,9 +93,10 @@ To confirm everything is working correctly:
 
 ---
 
-## 🎉 Success!
+## Success
 
-You have successfully completed this tutorial. 
+[!note]
+You have successfully completed this tutorial.
 
 ### Next Steps
 
@@ -102,7 +106,7 @@ You have successfully completed this tutorial.
 
 ---
 
-## 📝 Feedback
+## Feedback
 
 Found an issue or have suggestions for this tutorial? [Open an issue](link-to-issues).
 

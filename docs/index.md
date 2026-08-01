@@ -6,7 +6,7 @@ created: 2026-08-01
 last_updated: 2026-08-01
 ---
 
-# 📚 SessyStrategy HA Documentation
+# SessyStrategy HA Documentation
 
 **Smart battery charging strategy for Home Assistant + Sessy**
 
@@ -14,7 +14,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 Welcome
+## Welcome
 
 SessyStrategy HA is an intelligent battery management strategy that optimizes your energy usage by making smart decisions about when to charge and discharge your battery based on real-time energy prices, solar production, and your usage patterns.
 
@@ -22,10 +22,10 @@ This documentation is organized using the **Diátaxis methodology**, which categ
 
 ---
 
-## 🗺️ Documentation Navigation
+## Documentation Navigation
 
-### 📚 Tutorials *(Learning-oriented)*
-*Follow along step-by-step to learn how to use SessyStrategy HA*
+### Tutorials *(Learning-oriented)*
+Follow along step-by-step to learn how to use SessyStrategy HA.
 
 | Tutorial | Description | Time | Difficulty |
 |----------|-------------|------|------------|
@@ -33,12 +33,12 @@ This documentation is organized using the **Diátaxis methodology**, which categ
 | [First Day Operation](tutorials/first-day-operation.md) | What to expect on day one | 15 min | Beginner |
 | [Dashboard Setup](tutorials/dashboard-setup.md) | Create visual dashboards | 20-30 min | Intermediate |
 
-**🎯 Start here if you're new to SessyStrategy HA**
+Use these when you're new to SessyStrategy HA.
 
 ---
 
-### 🛠️ How-to Guides *(Problem-oriented)*
-*Solve specific problems with practical, actionable solutions*
+### How-to Guides *(Problem-oriented)*
+Solve specific problems with practical, actionable solutions.
 
 | Guide | Problem Solved | Time |
 |-------|----------------|------|
@@ -49,12 +49,12 @@ This documentation is organized using the **Diátaxis methodology**, which categ
 | [Add Live Tuning Helpers](how-to/add-live-tuning-helpers.md) | Adjust settings without restarting | 15 min |
 | [Migrate from Older Version](how-to/migrate-from-older-version.md) | Upgrade from previous versions | 10-15 min |
 
-**🔧 Use these when you have a specific problem to solve**
+Use these when you have a specific problem to solve.
 
 ---
 
-### 💡 Explanations *(Understanding-oriented)*
-*Learn the concepts and theory behind how SessyStrategy HA works*
+### Explanations *(Understanding-oriented)*
+Learn the concepts and theory behind how SessyStrategy HA works.
 
 | Explanation | Concept | Level |
 |-------------|---------|-------|
@@ -65,12 +65,12 @@ This documentation is organized using the **Diátaxis methodology**, which categ
 | [Seasonal Operation](explanation/seasonal-operation.md) | Winter vs summer modes | Beginner |
 | [Arbitrage Margin](explanation/arbitrage-margin.md) | Profitability calculations | Advanced |
 
-**💡 Read these to understand the "why" behind the "how"**
+Read these to understand the "why" behind the "how".
 
 ---
 
-### 📖 Reference *(Information-oriented)*
-*Look up technical details and specifications*
+### Reference *(Information-oriented)*
+Look up technical details and specifications.
 
 | Document | Type | Description |
 |----------|------|-------------|
@@ -82,21 +82,21 @@ This documentation is organized using the **Diátaxis methodology**, which categ
 | [Architecture](reference/architecture.md) | Architecture | AppDaemon lifecycle and callbacks |
 | [Algorithms](reference/algorithms.md) | Algorithms | Formulas and calculations |
 
-**📚 Consult these for technical details and specifications**
+Consult these for technical details and specifications.
 
 ---
 
-## 🚀 Quick Start Guide
+## Quick Start Guide
 
 New to SessyStrategy HA? Follow these steps:
 
-### 1️⃣ Install
+### Step 1: Install
 Copy the strategy file to your AppDaemon apps directory:
 ```bash
 cp files/sessy_strategy.py /config/appdaemon/apps/
 ```
 
-### 2️⃣ Configure
+### Step 2: Configure
 Add a basic configuration to your `apps.yaml`:
 ```yaml
 sessy_strategy:
@@ -106,18 +106,18 @@ sessy_strategy:
   price_sensor: sensor.your_energy_price
 ```
 
-### 3️⃣ Run
+### Step 3: Run
 Restart AppDaemon and check for the status sensor:
 ```
 sensor.sessy_strategy_status
 ```
 
-### 4️⃣ Learn
+### Step 4: Learn
 Continue with the full [Getting Started Tutorial](tutorials/getting-started.md)
 
 ---
 
-## 📊 Documentation Statistics
+## Documentation Statistics
 
 | Category | Documents | Purpose |
 |----------|-----------|---------|
@@ -129,16 +129,16 @@ Continue with the full [Getting Started Tutorial](tutorials/getting-started.md)
 
 ---
 
-## 🎨 Documentation Structure
+## Documentation Structure
 
 ```
 docs/
-├── 📚 tutorials/
+├── tutorials/
 │   ├── getting-started.md
 │   ├── first-day-operation.md
 │   └── dashboard-setup.md
 │
-├── 🛠️ how-to/
+├── how-to/
 │   ├── configure-seasonal-mode.md
 │   ├── tune-price-thresholds.md
 │   ├── override-manual-mode.md
@@ -146,7 +146,7 @@ docs/
 │   ├── debug-strategy-decisions.md
 │   └── migrate-from-older-version.md
 │
-├── 💡 explanation/
+├── explanation/
 │   ├── strategy-priority-chain.md
 │   ├── price-basis-raw-vs-import.md
 │   ├── adaptive-spread-windows.md
@@ -154,7 +154,7 @@ docs/
 │   ├── seasonal-operation.md
 │   └── arbitrage-margin.md
 │
-└── 📖 reference/
+└── reference/
     ├── configuration/
     │   └── apps-yaml.md
     ├── entity-reference.md
@@ -167,7 +167,7 @@ docs/
 
 ---
 
-## 🤝 Contributing to Documentation
+## Contributing to Documentation
 
 Found an error or want to improve the documentation? 
 
@@ -179,13 +179,13 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for more details.
 
 ---
 
-## 📄 License
+## License
 
 This documentation is licensed under [MIT License](../LICENSE).
 
 ---
 
-## 🔗 External Links
+## External Links
 
 - [Sessy Integration](https://github.com/andrew-codechimp/Sessy)
 - [AppDaemon Documentation](https://appdaemon.readthedocs.io)
@@ -194,7 +194,7 @@ This documentation is licensed under [MIT License](../LICENSE).
 
 ---
 
-## 📞 Support
+## Support
 
 - **Documentation Issues:** [GitHub Issues](https://github.com/your-repo/issues)
 - **General Questions:** [GitHub Discussions](https://github.com/your-repo/discussions)
@@ -202,7 +202,7 @@ This documentation is licensed under [MIT License](../LICENSE).
 
 ---
 
-## 📝 Recent Updates
+## Recent Updates
 
 | Date | Document | Change | Author |
 |------|----------|--------|--------|

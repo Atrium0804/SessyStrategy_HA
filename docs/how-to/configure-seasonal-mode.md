@@ -21,7 +21,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Seasonal Operation Explained](../explanation/seasonal-operation.md)
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
@@ -29,7 +29,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 Understanding Seasonal Mode
+## Understanding Seasonal Mode
 
 ### What Seasonal Mode Does
 
@@ -54,7 +54,7 @@ The strategy uses the hour of the day's minimum energy price to automatically in
 
 ---
 
-## ✅ Solution Steps
+## Solution Steps
 
 ### Step 1: Choose Your Configuration Method
 
@@ -167,7 +167,7 @@ sessy_strategy:
 
 ---
 
-## 🔍 Verification
+## Verification
 
 To confirm your seasonal mode is configured correctly:
 
@@ -196,7 +196,7 @@ To confirm your seasonal mode is configured correctly:
 
 ---
 
-## ⚠️ Common Issues
+## Common Issues
 
 ### Issue 1: Season Mode Not Changing
 
@@ -255,7 +255,7 @@ To confirm your seasonal mode is configured correctly:
 
 ---
 
-## 🎯 Alternative Approaches
+## Alternative Approaches
 
 ### Approach 1: Static Season Mode Only
 
@@ -305,18 +305,18 @@ To confirm your seasonal mode is configured correctly:
 
 ---
 
-## 📝 Best Practices
+## Best Practices
 
-- ✅ **Do:** Start with `season_mode: auto` to let the strategy adapt automatically
-- ✅ **Do:** Use live entities if you want to experiment with different modes
-- ✅ **Do:** Set winter overrides only if you need different winter behavior
-- ✅ **Do:** Monitor the `active_season` attribute in your status sensor
+- [x] **Do:** Start with `season_mode: auto` to let the strategy adapt automatically
+- [x] **Do:** Use live entities if you want to experiment with different modes
+- [x] **Do:** Set winter overrides only if you need different winter behavior
+- [x] **Do:** Monitor the `active_season` attribute in your status sensor
 - ❌ **Don't:** Mix static and live configuration without a clear purpose
 - ❌ **Don't:** Set winter overrides to the same values as base values (redundant)
 
 ---
 
-## 🔗 See Also
+## See Also
 
 - [Seasonal Operation Explained](../explanation/seasonal-operation.md)
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
@@ -325,7 +325,7 @@ To confirm your seasonal mode is configured correctly:
 
 ---
 
-## 📊 Quick Checklist
+## Quick Checklist
 
 - [ ] Decided between static (`season_mode`) or live (`season_mode_entity`) configuration
 - [ ] Set up input_select entity if using live mode

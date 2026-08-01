@@ -20,7 +20,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 What You Will Learn
+## What You Will Learn
 
 - What to expect during your first day with SessyStrategy
 - How the strategy behaves during different times of day
@@ -28,23 +28,23 @@ last_updated: 2026-08-01
 - How to interpret strategy decisions and entity changes
 - When and why the strategy switches between different modes
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before starting this tutorial, ensure you have:
 
-- ✅ **SessyStrategy installed** — Completed [Getting Started Tutorial](getting-started.md)
-- ✅ **AppDaemon running** — No errors in the AppDaemon log
-- ✅ **All entities available** — Status sensor, SOC sensor, price sensor all show data
-- ✅ **Basic monitoring set up** — Ability to watch entity states and logs
+- [x] **SessyStrategy installed** — Completed [Getting Started Tutorial](getting-started.md)
+- [x] **AppDaemon running** — No errors in the AppDaemon log
+- [x] **All entities available** — Status sensor, SOC sensor, price sensor all show data
+- [x] **Basic monitoring set up** — Ability to watch entity states and logs
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Getting Started](getting-started.md) — Installation and setup guide
 - [Dashboard Setup](dashboard-setup.md) — Create visual monitoring for your strategy
 
 ---
 
-## 🌅 Morning: The Day Begins
+## Morning: The Day Begins
 
 ### What to Expect
 
@@ -89,7 +89,7 @@ At moderate prices (below `price_discharge` threshold), the strategy defaults to
 
 ---
 
-## ☀️ Mid-Morning to Afternoon: Solar Charging
+## Mid-Morning to Afternoon: Solar Charging
 
 ### What to Expect
 
@@ -140,7 +140,7 @@ If your battery fills up before the evening:
 
 ---
 
-## 🌇 Pre-Peak Window: Preparing for Evening
+## Pre-Peak Window: Preparing for Evening
 
 ### What to Expect
 
@@ -196,7 +196,7 @@ This prevents "churning" — charging at €0.46 to discharge at €0.47 would w
 
 ---
 
-## 🌃 Evening Peak: Discharging When It Counts
+## Evening Peak: Discharging When It Counts
 
 ### What to Expect
 
@@ -255,7 +255,7 @@ INFO sessy_strategy: EVENING PEAK EXCESS: SOC 82% > target 70% — grid export s
 
 ---
 
-## 🌙 Night: Cheap Price Charging
+## Night: Cheap Price Charging
 
 ### What to Expect
 
@@ -299,7 +299,7 @@ Charging during cheap/negative price periods:
 
 ---
 
-## 📊 Real-World First Day Example
+## Real-World First Day Example
 
 ### Scenario: Sunny Summer Day
 
@@ -345,7 +345,7 @@ Charging during cheap/negative price periods:
 
 ---
 
-## 🔍 How to Monitor Your First Day
+## How to Monitor Your First Day
 
 ### Method 1: Status Sensor Attributes
 
@@ -384,7 +384,7 @@ Use Home Assistant's **History** panel to see:
 
 ---
 
-## 🎯 Checking Status
+## Checking Status
 
 ### Quick Health Check
 
@@ -428,7 +428,7 @@ Use Home Assistant's **History** panel to see:
 
 ---
 
-## ✅ First Day Checklist
+## First Day Checklist
 
 - [ ] AppDaemon is running without errors
 - [ ] SessyStrategy logs show regular updates (every 5 minutes)
@@ -441,7 +441,7 @@ Use Home Assistant's **History** panel to see:
 
 ---
 
-## 🎉 Success!
+## Success!
 
 You've successfully observed SessyStrategy through its first day of operation! You should now have a good understanding of how it behaves and what to expect.
 
@@ -471,7 +471,7 @@ You've successfully observed SessyStrategy through its first day of operation! Y
 
 ---
 
-## 📝 Feedback
+## Feedback
 
 Found an issue or have suggestions for this tutorial? [Open an issue](https://github.com/your-repo/issues) or contribute improvements via pull request.
 

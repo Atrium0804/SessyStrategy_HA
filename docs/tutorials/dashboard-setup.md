@@ -21,7 +21,7 @@ last_updated: 2026-08-01
 
 ---
 
-## 🎯 What You Will Learn
+## What You Will Learn
 
 - Install and configure the ApexCharts card for Home Assistant
 - Create a status card to monitor current strategy state
@@ -30,16 +30,16 @@ last_updated: 2026-08-01
 - Combine all elements into a comprehensive battery strategy dashboard
 - Add advanced features like thresholds and branch indicators
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before starting this tutorial, ensure you have:
 
-- ✅ **SessyStrategy installed** — Completed [Getting Started Tutorial](getting-started.md)
-- ✅ **SessyStrategy running** — Strategy making decisions and updating entities
-- ✅ **Basic dashboard** — Familiarity with Lovelace dashboard editor
-- ✅ **HACS installed** — For easy ApexCharts card installation (recommended)
+- [x] **SessyStrategy installed** — Completed [Getting Started Tutorial](getting-started.md)
+- [x] **SessyStrategy running** — Strategy making decisions and updating entities
+- [x] **Basic dashboard** — Familiarity with Lovelace dashboard editor
+- [x] **HACS installed** — For easy ApexCharts card installation (recommended)
 
-## 📚 Related Documentation
+## Related Documentation
 
 - [Getting Started](getting-started.md) — Installation and setup guide
 - [First Day Operation](first-day-operation.md) — Understand strategy behavior
@@ -839,23 +839,24 @@ Add visual gauges and meters for quick at-a-glance information.
 
 ---
 
-## ✅ Verification
+## Verification
 
 To confirm your dashboard is working correctly:
 
-1. ✅ ApexCharts card is installed and available
-2. ✅ All charts display data without errors
-3. ✅ Status card shows current strategy information
-4. ✅ Price chart shows thresholds correctly
-5. ✅ SOC chart shows battery level with targets
-6. ✅ Setpoint charts show strategy decisions
-7. ✅ Dashboard loads quickly and is responsive
-8. ✅ All data updates in real-time (within 5 minutes)
+1. [x] ApexCharts card is installed and available
+2. [x] All charts display data without errors
+3. [x] Status card shows current strategy information
+4. [x] Price chart shows thresholds correctly
+5. [x] SOC chart shows battery level with targets
+6. [x] Setpoint charts show strategy decisions
+7. [x] Dashboard loads quickly and is responsive
+8. [x] All data updates in real-time (within 5 minutes)
 
 ---
 
-## 🎉 Success!
+## Success
 
+[!note]
 You've successfully created a comprehensive dashboard for monitoring SessyStrategy HA! Your dashboard now provides:
 
 - **Real-time monitoring** of strategy state and key metrics
@@ -901,7 +902,7 @@ Show a warning when battery is low:
        below: 25
    card:
      type: markdown
-     content: "⚠️ Battery SOC is low! Consider adjusting charge settings."
+     content: "Battery SOC is low! Consider adjusting charge settings."
      style: |
        ha-card {
          background: #ffcc00;
@@ -913,7 +914,7 @@ Show a warning when battery is low:
 
 ---
 
-## 📝 Feedback
+## Feedback
 
 Found an issue or have suggestions for this tutorial? [Open an issue](https://github.com/your-repo/issues) or contribute improvements via pull request.
 

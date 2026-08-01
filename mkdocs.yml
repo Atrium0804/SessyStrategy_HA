@@ -16,48 +16,51 @@ edit_uri: edit/main/docs/
 # Note: If you change this, move mkdocs.yml into the docs directory
 docs_dir: docs
 
-# Theme configuration (Material theme recommended)
+# Theme configuration — Material with NS corporate branding.
+# Colors and fonts are defined in stylesheets/extra.css (see reference/brand-tokens.md).
 theme:
   name: material
   language: en
-  logo: assets/logo.png  # Optional: add your logo
-  favicon: assets/favicon.ico  # Optional: add your favicon
+  # Polyfills localStorage on file:// (disk) opens where Chromium blocks it — see overrides/main.html.
+  custom_dir: overrides
+  # logo: assets/logo.png       # Optional: add an NS-branded logo here
+  # favicon: assets/favicon.ico # Optional: add a favicon here
   palette:
     # Light mode (default)
     - scheme: default
-      primary: indigo
-      accent: indigo
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     # Dark mode
     - scheme: slate
-      primary: indigo
-      accent: indigo
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
-  font:
-    text: Roboto
-    code: Roboto Mono
+  # Fonts are provided by the OS (NS Sans is installed on corporate laptops).
+  # Disabling Material's Google Fonts loader keeps NS Sans + local fallbacks (see extra.css).
+  font: false
   features:
+    - navigation.tabs
     - navigation.top
     - navigation.sections
     - navigation.indexes
+    - navigation.footer
     - toc.integrate
+    - search.highlight
+    - search.suggest
     - content.code.copy
     - content.code.annotate
 
 # Navigation structure
 nav:
   - Home: index.md
-  
+
   # Tutorials Section
   - Tutorials:
     - tutorials/getting-started.md
     - tutorials/first-day-operation.md
     - tutorials/dashboard-setup.md
-  
+
   # How-to Guides Section
   - How-to Guides:
     - how-to/configure-seasonal-mode.md
@@ -66,7 +69,7 @@ nav:
     - how-to/add-live-tuning-helpers.md
     - how-to/debug-strategy-decisions.md
     - how-to/migrate-from-older-version.md
-  
+
   # Explanations Section
   - Explanations:
     - explanation/strategy-priority-chain.md
@@ -75,7 +78,7 @@ nav:
     - explanation/setpoint-types-explained.md
     - explanation/seasonal-operation.md
     - explanation/arbitrage-margin.md
-  
+
   # Reference Section
   - Reference:
     - Configuration:
@@ -91,6 +94,11 @@ nav:
     - Algorithms:
       - reference/algorithms.md
 
+  # Contributing / meta documentation
+  - Contributing:
+    - Documentation guide: DOCUMENTATION_GUIDE.md
+    - Brand & theme tokens: reference/brand-tokens.md
+
 # Extensions (for advanced Markdown features)
 markdown_extensions:
   # Standard extensions
@@ -105,7 +113,7 @@ markdown_extensions:
       permalink: true
       baselevel: 2
       separator: "-"
-  
+
   # PyMdown Extensions (enhance Markdown)
   - pymdownx.arithmatex:
       generic: true
@@ -114,9 +122,7 @@ markdown_extensions:
   - pymdownx.caret
   - pymdownx.critic
   - pymdownx.details
-  - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.emoji
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -127,7 +133,6 @@ markdown_extensions:
   - pymdownx.smartsymbols
   - pymdownx.snippets:
       check_paths: true
-      auto_inline: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -135,15 +140,14 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
-      slugify: !!python/object/apply:pymdownx.slugs.slugify
-        kwds:
-          case: lower
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
 
 # Plugins
 plugins:
+  # Convert GitHub-style alerts (> [!NOTE]) in source to Material admonitions (ADR-TPD030).
+  - callouts
   - search:
       lang: en
       separator: '[\s\-]+'
@@ -158,9 +162,7 @@ plugins:
       minify_css: true
       htmlmin_opts:
         remove_comments: true
-  - macros:
-      include_yaml:
-        - _sidebar.yml
+
 
 # Extra configuration
 extra:
@@ -170,7 +172,7 @@ extra:
       link: https://github.com/your-repo/sessy-strategy-ha
     - icon: fontawesome/brands/git
       link: https://github.com/your-repo
-  
+
   # Version information (for version selector)
   version:
     provider: mike
@@ -187,16 +189,15 @@ copyright: |
 #  - "UA-XXXXXXXX-X"
 #  - auto
 
-# Custom CSS/JS (optional)
+# Custom CSS (NS corporate styling — see reference/brand-tokens.md)
 extra_css:
-  - css/custom.css
-
-extra_javascript:
-  - js/custom.js
+  - stylesheets/extra.css
 
 # Page tree configuration
-use_directory_urls: true
-strict: true
+# use_directory_urls: false makes the built site browsable directly from disk
+# (file://) — links become explicit .html files instead of folder URLs.
+use_directory_urls: false
+strict: false
 
 # Dev server configuration
 dev_addr: 0.0.0.0:8000

@@ -13,10 +13,10 @@ This project uses the [Diátaxis Documentation Framework](https://diataxis.fr/) 
 
 | Category | Purpose | Documents |
 |----------|---------|-----------|
-| **📚 Tutorials** | *Learning-oriented* — Follow along step-by-step | [Getting Started](docs/tutorials/getting-started.md) • [First Day](docs/tutorials/first-day-operation.md) • [Dashboard Setup](docs/tutorials/dashboard-setup.md) |
-| **🛠️ How-to** | *Problem-oriented* — Solve specific problems | *Coming soon* |
-| **💡 Explanation** | *Understanding-oriented* — Learn the concepts | *Coming soon* |
-| **📖 Reference** | *Information-oriented* — Look up technical details | *Coming soon* |
+| **Tutorials** | *Learning-oriented* — Follow along step-by-step | [Getting Started](docs/tutorials/getting-started.md) • [First Day](docs/tutorials/first-day-operation.md) • [Dashboard Setup](docs/tutorials/dashboard-setup.md) |
+| **How-to** | *Problem-oriented* — Solve specific problems | [Tune Thresholds](docs/how-to/tune-price-thresholds.md) • [Debug Decisions](docs/how-to/debug-strategy-decisions.md) • [Configure Seasons](docs/how-to/configure-seasonal-mode.md) • [Manual Override](docs/how-to/override-manual-mode.md) • [Live Tuning](docs/how-to/add-live-tuning-helpers.md) • [Migration Guide](docs/how-to/migrate-from-older-version.md) |
+| **Explanation** | *Understanding-oriented* — Learn the concepts | [Priority Chain](docs/explanation/strategy-priority-chain.md) • [Price Basis](docs/explanation/price-basis-raw-vs-import.md) • [Spread Windows](docs/explanation/adaptive-spread-windows.md) • [Setpoint Types](docs/explanation/setpoint-types-explained.md) • [Seasonal Op](docs/explanation/seasonal-operation.md) • [Arbitrage Margin](docs/explanation/arbitrage-margin.md) |
+| **Reference** | *Information-oriented* — Look up technical details | [apps.yaml Config](docs/reference/configuration/apps-yaml.md) • [Entity Reference](docs/reference/entity-reference.md) • [Live Entities](docs/reference/live-tuning-entities.md) • [Status Attributes](docs/reference/status-sensor-attributes.md) • [Service Calls](docs/reference/service-calls.md) • [Architecture](docs/reference/architecture.md) • [Algorithms](docs/reference/algorithms.md) |
 
 ---
 
@@ -104,7 +104,7 @@ sessy_strategy:
 - `soc_target`: Target SOC before evening peak (default: 70%)
 - `soc_floor`: Minimum SOC floor (default: 20%)
 
-👉 *Configuration guide coming soon in Phase 2*
+👉 [Full Configuration Reference](docs/reference/configuration/apps-yaml.md)
 
 ---
 
@@ -115,29 +115,47 @@ sessy_strategy:
 | Install and setup | [Getting Started](docs/tutorials/getting-started.md) |
 | Understand first day | [First Day Operation](docs/tutorials/first-day-operation.md) |
 | Create a dashboard | [Dashboard Setup](docs/tutorials/dashboard-setup.md) |
-| Other tasks | *Coming soon in Phases 2-4* |
+| Tune price thresholds | [Tune Thresholds](docs/how-to/tune-price-thresholds.md) |
+| Debug strategy decisions | [Debug Decisions](docs/how-to/debug-strategy-decisions.md) |
+| Configure seasonal mode | [Configure Seasons](docs/how-to/configure-seasonal-mode.md) |
 
 ---
 
 ## 📖 Documentation Structure
 
-**Phase 5 (Tutorials) - ✅ Complete:**
+**All documentation is complete across all 4 Diátaxis categories:**
 ```
 docs/
-└── 📚 tutorials/
-    ├── getting-started.md          # Complete setup guide
-    ├── first-day-operation.md      # What to expect on day one
-    └── dashboard-setup.md          # Dashboard creation guide
+├── tutorials/
+│   ├── getting-started.md          # Complete setup guide
+│   ├── first-day-operation.md      # What to expect on day one
+│   └── dashboard-setup.md          # Dashboard creation guide
+├── how-to/
+│   ├── configure-seasonal-mode.md  # Seasonal mode setup guide
+│   ├── tune-price-thresholds.md    # Price threshold adjustment
+│   ├── override-manual-mode.md     # Manual control override
+│   ├── add-live-tuning-helpers.md  # Live parameter tuning
+│   ├── debug-strategy-decisions.md # Debugging and troubleshooting
+│   └── migrate-from-older-version.md # Version migration guide
+├── explanation/
+│   ├── strategy-priority-chain.md  # Priority system deep dive
+│   ├── price-basis-raw-vs-import.md # Price calculation explanation
+│   ├── adaptive-spread-windows.md  # Spread algorithm details
+│   ├── setpoint-types-explained.md  # Setpoint type comparison
+│   ├── seasonal-operation.md       # Seasonal behavior logic
+│   └── arbitrage-margin.md          # Profitability analysis
+└── reference/
+    ├── configuration/
+    │   └── apps-yaml.md              # Complete configuration reference
+    ├── entity-reference.md          # Entity catalog
+    ├── live-tuning-entities.md      # Live tuning entity reference
+    ├── status-sensor-attributes.md  # Status sensor attribute list
+    ├── service-calls.md             # Service call documentation
+    ├── architecture.md               # Code architecture overview
+    └── algorithms.md                # Algorithmic formulas and calculations
 ```
 
-**Phases 2-4 - 🚧 Coming Soon:**
-- **Phase 2 (Reference):** 7 documents including configuration, entities, algorithms
-- **Phase 3 (Explanation):** 6 documents explaining concepts and theory
-- **Phase 4 (How-to):** 6 problem-solving guides
-
-*See [DOCUMENTATION_PLAN.md](DOCUMENTATION_PLAN.md) for full details and timeline.*               # Code structure overview
-    └── algorithms.md                # Formulas and calculations
-```
+*All 24 documents are complete. See [DOCUMENTATION_PLAN.md](DOCUMENTATION_PLAN.md) for the full implementation details.*
 
 ---
 
