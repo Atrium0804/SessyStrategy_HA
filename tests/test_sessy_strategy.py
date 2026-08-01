@@ -182,27 +182,25 @@ class TestPostPeakDischargeSetpoint:
 
 
 class TestCheapChargeSetpoint:
-    def test_spreads_over_cheap_hours(self):
+    def test_charges_at_max_power_when_below_target(self):
         app = make_app()
-        # gap = (100-60)/100 * 5000 = 2000 Wh / 4h → 500 W
         result = app._cheap_charge_setpoint(soc=60, cheap_soc_target=100, window_h=4)
-        assert result == pytest.approx(500.0)
+        assert result == app.max_power_w
 
     def test_already_at_ceiling_returns_zero(self):
         app = make_app()
         result = app._cheap_charge_setpoint(soc=100, cheap_soc_target=100, window_h=3)
         assert result == 0
 
-    def test_zero_cheap_hours_returns_zero(self):
+    def test_charges_at_max_power_regardless_of_window(self):
         app = make_app()
         result = app._cheap_charge_setpoint(soc=50, cheap_soc_target=100, window_h=0)
-        assert result == 0
+        assert result == app.max_power_w
 
-    def test_respects_lower_ceiling(self):
+    def test_charges_at_max_power_with_lower_ceiling(self):
         app = make_app()
-        # ceiling 80 → gap = (80-60)/100 * 5000 = 1000 Wh / 2h → 500 W
         result = app._cheap_charge_setpoint(soc=60, cheap_soc_target=80, window_h=2)
-        assert result == pytest.approx(500.0)
+        assert result == app.max_power_w
 
 
 # ===========================================================================

@@ -30,13 +30,13 @@ class SessyStrategy(hass.Hass):
         self.surcharge            = float(self.args.get("surcharge", 0.11))
         self.price_discharge      = float(self.args.get("price_discharge", 0.39))
         self.price_charge         = float(self.args.get("price_charge", -0.10))
-        self.prepeak_start        = int(self.args.get("prepeak_start", 16))
-        self.prepeak_end          = int(self.args.get("prepeak_end", 18))
+        self.prepeak_start        = int(self.args.get("prepeak_start", 15))
+        self.prepeak_end          = int(self.args.get("prepeak_end", 17))
         self.prepeak_window_h     = float(self.args.get("prepeak_window_h", 2.0))
         # Adaptive spread window: charge/discharge is spread over the contiguous run
         # of hours the price stays past the threshold, floored at min_window_h.
         # Wider spread = lower power = lower round-trip losses.
-        self.min_window_h         = float(self.args.get("min_window_h", 2.0))
+        self.min_window_h         = float(self.args.get("min_window_h", 0.5))
         # Seconds to wait after a live input changes before re-running, so a slider
         # drag coalesces into a single run instead of one per intermediate value.
         self.rerun_debounce_s     = float(self.args.get("rerun_debounce_s", 2.0))
@@ -342,7 +342,7 @@ class SessyStrategy(hass.Hass):
             self.log("Strategy select entity not available", level="WARNING")
             self._publish_branch(branch, sessy_strategy=strategy_option)
             return
-        
+
         try:
             current = self.get_state(self.strategy_select)
             if current != strategy_option:
@@ -406,15 +406,11 @@ class SessyStrategy(hass.Hass):
     def _cheap_charge_setpoint(self, soc: float, cheap_soc_target: float, window_h: float) -> float:
         """
         Watts to charge from the grid during a cheap-price window.
-        Spreads the gap to cheap_soc_target over window_h, so a short dip charges
-        hard and a long cheap block charges gently.
-        Clamped at max_power_w; the Sessy enforces its own hardware limit below that.
+        Always charges at max_power_w when below cheap_soc_target.
         """
         if soc >= cheap_soc_target:
             return 0
-        gap_wh   = (cheap_soc_target - soc) / 100.0 * self.capacity_wh
-        spread_w = gap_wh / window_h
-        return max(50, min(spread_w, self.max_power_w))
+        return self.max_power_w
 
     def _evening_peak_excess_setpoint(self, soc: float, soc_target: float, hours_remaining: float) -> float:
         """
@@ -434,7 +430,7 @@ class SessyStrategy(hass.Hass):
         if not self._entity_exists(self.strategy_select) or not self._entity_exists(self.grid_target):
             self.log("Grid setpoint entities not available", level="WARNING")
             return
-        
+
         try:
             current_strategy = self.get_state(self.strategy_select)
             if current_strategy != "nom":
@@ -460,7 +456,7 @@ class SessyStrategy(hass.Hass):
         if not self._entity_exists(self.strategy_select) or not self._entity_exists(self.battery_setpoint):
             self.log("Battery setpoint entities not available", level="WARNING")
             return
-        
+
         try:
             current_strategy = self.get_state(self.strategy_select)
             if current_strategy != "api":
