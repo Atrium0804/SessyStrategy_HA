@@ -7,9 +7,7 @@
 
 ---
 
-## 📚 Documentation (Diátaxis)
-
-This project uses the [Diátaxis Documentation Framework](https://diataxis.fr/) to organize documentation into four categories based on user needs.
+## 📚 Documentation
 
 | Category | Purpose | Documents |
 |----------|---------|-----------|
