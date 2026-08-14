@@ -8,9 +8,9 @@
 
 The `sensor.sessy_strategy_status` entity is created and maintained by the SessyStrategy app. It serves as the primary monitoring and debugging interface, providing complete visibility into the strategy's current state and decision context.
 
-**Entity type:** Sensor  
-**Default ID:** `sensor.sessy_strategy_status` (configurable via `status_sensor` in apps.yaml)  
-**State:** Current active season (`summer` or `winter`)  
+**Entity type:** Sensor
+**Default ID:** `sensor.sessy_strategy_status` (configurable via `status_sensor` in apps.yaml)
+**State:** Current active season (`summer` or `winter`)
 **Attributes:** Comprehensive decision context (see tables below)
 
 ---

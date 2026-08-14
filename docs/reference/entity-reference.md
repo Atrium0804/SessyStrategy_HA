@@ -42,7 +42,7 @@ These entities **must** be configured in `apps.yaml` and must exist in your Home
 sessy_strategy:
   module: sessy_strategy
   class: SessyStrategy
-  
+
   # REQUIRED: Map these to your entities
   strategy_select: select.sessy_battery_alt9_power_strategy
   grid_target: number.sessy_pwkn_grid_target
@@ -90,7 +90,7 @@ These allow runtime adjustment without restarting AppDaemon. The app reads these
 ```yaml
 sessy_strategy:
   # ... other config ...
-  
+
   # Live tuning entities
   mode_select: select.home_battery_mode
   setpoint_entity: number.home_battery_setpoint
@@ -101,7 +101,7 @@ sessy_strategy:
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
   season_mode_entity: input_select.sessy_season_mode
-  
+
   # Sessy strategy option strings (for standby modes)
   sessy_dynamic_option: roi
   eco_option: eco
@@ -211,7 +211,7 @@ When setting up SessyStrategy, you need to map the default entity IDs to your ow
 sessy_strategy:
   module: sessy_strategy
   class: SessyStrategy
-  
+
   # Replace these with your entities
   strategy_select: select.sessy_battery_my_battery_id_power_strategy
   grid_target: number.sessy_my_id_grid_target

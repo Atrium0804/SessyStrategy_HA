@@ -153,7 +153,7 @@ Only the required entity IDs need to be specified. All other values use sensible
 sessy_strategy:
   module: sessy_strategy
   class: SessyStrategy
-  
+
   # Required: map to your Sessy entities
   strategy_select: select.sessy_battery_myid_power_strategy
   grid_target: number.sessy_myid_grid_target

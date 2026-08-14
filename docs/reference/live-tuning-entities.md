@@ -83,7 +83,7 @@ Add the entity references to your `apps.yaml`:
 sessy_strategy:
   module: sessy_strategy
   class: SessyStrategy
-  
+
   # Static defaults (used when live entities are unavailable)
   soc_target: 70
   soc_floor: 20
@@ -92,7 +92,7 @@ sessy_strategy:
   price_charge: -0.10
   min_arbitrage_margin: 0.05
   season_mode: auto
-  
+
   # Live tuning entity links
   soc_target_entity: number.home_battery_soc_target
   soc_floor_entity: number.home_battery_soc_floor
@@ -178,7 +178,7 @@ input_number:
     unit_of_measurement: "%"
     icon: mdi:battery-60
     initial: 70
-    
+
   home_battery_soc_floor:
     name: SOC Floor
     min: 0
@@ -187,7 +187,7 @@ input_number:
     unit_of_measurement: "%"
     icon: mdi:battery-outline
     initial: 20
-    
+
   home_battery_soc_ceiling:
     name: SOC Ceiling
     min: 0
@@ -196,7 +196,7 @@ input_number:
     unit_of_measurement: "%"
     icon: mdi:battery
     initial: 100
-    
+
   home_battery_price_discharge:
     name: Discharge Price
     min: -1
@@ -205,7 +205,7 @@ input_number:
     unit_of_measurement: "€/kWh"
     icon: mdi:lightning-bolt
     initial: 0.39
-    
+
   home_battery_price_charge:
     name: Charge Price
     min: -1
@@ -214,7 +214,7 @@ input_number:
     unit_of_measurement: "€/kWh"
     icon: mdi:lightning-bolt
     initial: -0.10
-    
+
   home_battery_min_arbitrage_margin:
     name: Min Arbitrage Margin
     min: 0
@@ -270,7 +270,7 @@ automation:
       - service: number.set_value
         entity_id: number.home_battery_soc_floor
         value: 30
-    
+
   - alias: "Reset SOC floor on warm days"
     trigger:
       - platform: numeric_state
