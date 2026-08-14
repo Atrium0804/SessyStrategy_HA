@@ -2,7 +2,7 @@
 title: Getting Started with SessyStrategy HA
 doc_type: tutorial
 audience: beginners
-prerequisites: 
+prerequisites:
   - Home Assistant (tested on 2024.6+)
   - AppDaemon (4.x+)
   - Sessy integration installed
@@ -124,7 +124,7 @@ Copy the SessyStrategy application file and sample configuration to your AppDaem
 
 2. **Copy the strategy file:**
    Use one of these methods:
-   
+
    **Method A: Using File Editor add-on**
    - Install the "File Editor" add-on if not already installed
    - Open File Editor from the sidebar
@@ -179,7 +179,7 @@ Configure the SessyStrategy application to match your specific battery system an
    sessy_strategy:
      module: sessy_strategy
      class: SessyStrategy
-     
+
      # Required entity IDs — UPDATE THESE TO MATCH YOUR SETUP
      strategy_select: select.sessy_battery_alt9_power_strategy
      grid_target: number.sessy_pwkn_grid_target
@@ -301,7 +301,7 @@ If you prefer not to use the Home Battery integration, you can create the helper
        step: 1
        unit_of_measurement: "%"
        icon: mdi:battery-90
-       
+
      home_battery_soc_floor:
        name: "SOC Floor"
        min: 0
@@ -309,7 +309,7 @@ If you prefer not to use the Home Battery integration, you can create the helper
        step: 1
        unit_of_measurement: "%"
        icon: mdi:battery-20
-       
+
      home_battery_price_discharge:
        name: "Price Discharge Threshold"
        min: -1
@@ -317,7 +317,7 @@ If you prefer not to use the Home Battery integration, you can create the helper
        step: 0.01
        unit_of_measurement: "€/kWh"
        icon: mdi:currency-eur
-       
+
      home_battery_price_charge:
        name: "Price Charge Threshold"
        min: -2
@@ -562,8 +562,8 @@ To confirm everything is working correctly:
 
 ## Success
 
-[!note]
-You have successfully installed and configured SessyStrategy HA! Your battery is now making intelligent decisions based on real-time energy prices.
+!!! note
+    You have successfully installed and configured SessyStrategy HA! Your battery is now making intelligent decisions based on real-time energy prices.
 
 ### Next Steps
 

@@ -106,7 +106,21 @@ sessy_strategy:
 
 ---
 
-## 🔧 Common Tasks
+## � Boiler Strategy (add-on)
+
+A companion AppDaemon app, `files/boiler_strategy.py` (config in `apps.yaml` under `boiler_strategy`), drives an electric boiler using the same price/SOC pattern as the battery strategy, plus weekly legionella prevention:
+
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| **P1** | Boiler hasn't reached `legionella_temp` in `legionella_boost_days` | Force mode `boost`, temporarily raise setpoint to `legionella_temp` |
+| **P2** | Boiler hasn't reached `legionella_temp` in `legionella_hybrid_days` | Force mode `hybrid` at the normal setpoint |
+| **P3** | Otherwise | Compare the relevant price (import if battery SOC < `soc_full_threshold`, export if full) against a gas-equivalent price to pick `off` / `heatpump` / `hybrid` |
+
+The last-reached timestamp is tracked in an `input_datetime` helper (`legionella_last_ok_entity`) that the app stamps itself — no separate history-stats sensor needed. See `files/apps.yaml` for all tunables (gas price, boiler efficiency, COP, price surcharges) and `tests/test_boiler_strategy.py` for behaviour examples.
+
+---
+
+## �🔧 Common Tasks
 
 | Task | Guide |
 |------|-------|

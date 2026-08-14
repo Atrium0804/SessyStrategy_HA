@@ -1,6 +1,6 @@
 # Entity Reference
 
-*Last updated: 2026-08-01 | Part of [Reference Documentation](../)*
+*Last updated: 2026-08-01 | Part of [Reference Documentation](../index.md)*
 
 ---
 
@@ -242,4 +242,4 @@ After configuration, verify entities are working:
 - [Live Tuning Entities](live-tuning-entities.md) — Runtime-adjustable helpers
 - [Status Sensor Attributes](status-sensor-attributes.md) — Complete attribute list
 - [Service Calls](service-calls.md) — Services used by the app
-- [Setpoint Types Explained](../../explanation/setpoint-types-explained.md) — Understanding control modes
+- [Setpoint Types Explained](../explanation/setpoint-types-explained.md) — Understanding control modes

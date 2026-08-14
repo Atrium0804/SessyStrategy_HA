@@ -85,3 +85,43 @@ sessy_strategy:
   # If set, this overrides season_mode from the UI.
   season_mode_entity: input_select.sessy_season_mode
 
+boiler_strategy:
+  module: boiler_strategy
+  class: BoilerStrategy
+
+  # ── Boiler setpoint ──────────────────────────────────────────────────
+  setpoint_c: 60             # Fixed setpoint (C) except during a legionella boost
+
+  # ── Battery SOC ──────────────────────────────────────────────────────
+  soc_full_threshold: 95     # % SOC above which to compare against export price instead of import
+
+  # ── Gas-equivalent pricing ───────────────────────────────────────────
+  gas_price: 1.50            # EUR/m3
+  boiler_efficiency: 95      # % HRE boiler efficiency
+  cop: 2.0                   # Heat pump COP
+  calorific_value: 9.77      # kWh/m3 — standard NL natural gas conversion
+
+  # ── Weekly legionella prevention ─────────────────────────────────────
+  legionella_temp: 65             # C the boiler must reach periodically
+  legionella_hybrid_days: 6       # Days without reaching legionella_temp before forcing hybrid
+  legionella_boost_days: 7        # Days without reaching legionella_temp before forcing a boost
+
+  rerun_debounce_s: 2.0
+
+  # ── Entity IDs (map these to your own installation) ─────────────────
+  temp_sensor: sensor.boiler_temperature
+  buy_price_sensor: sensor.energy_buy_price    # Full import price (EUR/kWh), taxes/surcharges included
+  sell_price_sensor: sensor.energy_sell_price  # Full export price (EUR/kWh), surcharges included
+  soc_sensor: sensor.sessy_battery_alt9_state_of_charge
+  boiler_mode_select: select.boiler_modus
+  boiler_setpoint_entity: number.boiler_setpoint
+  # input_datetime helper this app stamps whenever the boiler reaches legionella_temp
+  legionella_last_ok_entity: input_datetime.boiler_legionella_last_ok
+  status_sensor: sensor.boiler_strategy_status
+
+  # ── Optional live-tuning helpers ─────────────────────────────────────
+  # soc_full_threshold_entity: number.boiler_soc_drempel
+  # gas_price_entity: number.boiler_gasprijs
+  # boiler_efficiency_entity: number.boiler_ketelrendement
+  # cop_entity: number.boiler_cop
+

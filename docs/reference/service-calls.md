@@ -1,6 +1,6 @@
 # Service Calls
 
-*Last updated: 2026-08-01 | Part of [Reference Documentation](../)*
+*Last updated: 2026-08-01 | Part of [Reference Documentation](../index.md)*
 
 ---
 
@@ -332,4 +332,4 @@ parameters:
 - [Entity Reference](entity-reference.md) — Entities targeted by these services
 - [Architecture](architecture.md) — AppDaemon lifecycle and callbacks
 - [Live Tuning Entities](live-tuning-entities.md) — Triggers for immediate re-runs
-- [Override Manual Mode](../../how-to/override-manual-mode.md) — Using manual setpoint modes
+- [Override Manual Mode](../how-to/override-manual-mode.md) — Using manual setpoint modes

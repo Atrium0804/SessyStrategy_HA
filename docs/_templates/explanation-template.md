@@ -46,8 +46,8 @@ last_updated: 2026-08-01
 
 ## Deep Dive
 
-[!note]
-This section provides technical depth for those who want to understand the underlying mechanisms.
+!!! note
+    This section provides technical depth for those who want to understand the underlying mechanisms.
 
 ### [Section 1: Core Concept]
 
@@ -89,8 +89,8 @@ Result: [output]
 
 ## Visual Representation
 
-[!note]
-Diagrams use Mermaid with neutral theme for clarity and professional appearance.
+!!! note
+    Diagrams use Mermaid with neutral theme for clarity and professional appearance.
 
 ### Diagram
 
@@ -145,8 +145,8 @@ Action:   Charge   Hold     Discharge Hold     Charge
 
 ## Trade-offs and Considerations
 
-[!caution]
-Understand these trade-offs before making configuration changes.
+!!! caution
+    Understand these trade-offs before making configuration changes.
 
 ### Advantages
 
@@ -210,13 +210,13 @@ Understand these trade-offs before making configuration changes.
    - A) [Option 1]
    - B) [Option 2 - correct]
    - C) [Option 3]
-   
+
    **Answer:** [B - Explanation]
 
 2. **Question:** [Application question]?
    - A) [Option 1 - correct]
    - B) [Option 2]
-   
+
    **Answer:** [A - Explanation]
 
 ---

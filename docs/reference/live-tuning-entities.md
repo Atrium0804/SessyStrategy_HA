@@ -1,6 +1,6 @@
 # Live Tuning Entities
 
-*Last updated: 2026-08-01 | Part of [Reference Documentation](../)*
+*Last updated: 2026-08-01 | Part of [Reference Documentation](../index.md)*
 
 ---
 
@@ -319,5 +319,5 @@ If live entities aren't working:
 - [Configuration Reference](configuration/apps-yaml.md) — Static apps.yaml parameters
 - [Entity Reference](entity-reference.md) — All entities used by the app
 - [Status Sensor Attributes](status-sensor-attributes.md) — Monitor live values in action
-- [Tune Price Thresholds](../../how-to/tune-price-thresholds.md) — Practical guide to threshold tuning
-- [Add Live Tuning Helpers](../../how-to/add-live-tuning-helpers.md) — Step-by-step setup guide
+- [Tune Price Thresholds](../how-to/tune-price-thresholds.md) — Practical guide to threshold tuning
+- [Add Live Tuning Helpers](../how-to/add-live-tuning-helpers.md) — Step-by-step setup guide

@@ -1,6 +1,6 @@
 # Architecture
 
-*Last updated: 2026-08-01 | Part of [Reference Documentation](../)*
+*Last updated: 2026-08-01 | Part of [Reference Documentation](../index.md)*
 
 ---
 
@@ -373,5 +373,5 @@ SessyStrategy_HA/
 - [Entity Reference](entity-reference.md) — Entities used and created
 - [Service Calls](service-calls.md) — Services called by the app
 - [Algorithms](algorithms.md) — Calculation formulas and logic
-- [Strategy Priority Chain](../../explanation/strategy-priority-chain.md) — Decision flow details
-- [Setpoint Types Explained](../../explanation/setpoint-types-explained.md) — Control mode architecture
+- [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — Decision flow details
+- [Setpoint Types Explained](../explanation/setpoint-types-explained.md) — Control mode architecture

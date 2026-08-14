@@ -1,6 +1,6 @@
 # Algorithms
 
-*Last updated: 2026-08-01 | Part of [Reference Documentation](../)*
+*Last updated: 2026-08-01 | Part of [Reference Documentation](../index.md)*
 
 ---
 
@@ -556,6 +556,6 @@ The adaptive spread window optimizes for inverter efficiency:
 ## See Also
 
 - [Configuration Reference](configuration/apps-yaml.md) — Parameters used in these formulas
-- [Strategy Priority Chain](../../explanation/strategy-priority-chain.md) — When each algorithm is used
-- [Adaptive Spread Windows](../../explanation/adaptive-spread-windows.md) — Deep dive on window sizing
-- [Arbitrage Margin](../../explanation/arbitrage-margin.md) — How the margin calculation works
+- [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — When each algorithm is used
+- [Adaptive Spread Windows](../explanation/adaptive-spread-windows.md) — Deep dive on window sizing
+- [Arbitrage Margin](../explanation/arbitrage-margin.md) — How the margin calculation works

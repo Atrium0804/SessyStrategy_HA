@@ -1,6 +1,6 @@
 # Configuration Reference — apps.yaml
 
-*Last updated: 2026-08-01 | Part of [Reference Documentation](../../)*
+*Last updated: 2026-08-01 | Part of [Reference Documentation](../../index.md)*
 
 ---
 

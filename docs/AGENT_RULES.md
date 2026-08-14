@@ -1,6 +1,6 @@
 # Documentation Style Guide for AI Agents
 
-**For Typora Editor | Stephen Few Minimal Distraction Principle**
+**For MkDocs Material | Stephen Few Minimal Distraction Principle**
 
 This document provides mandatory rules for AI agents (Vibe, Copilot, etc.) when generating or editing documentation for SessyStrategy HA.
 
@@ -9,9 +9,9 @@ This document provides mandatory rules for AI agents (Vibe, Copilot, etc.) when 
 ## Core Principles
 
 1. **Stephen Few minimal distraction**: Eliminate all non-essential visual elements
-2. **Typora native features**: Use Typora's built-in Markdown extensions
+2. **MkDocs Material native features**: Use the `admonition` and `pymdownx` extensions configured in `mkdocs.yml`
 3. **Mermaid for diagrams**: Visual explanations via Mermaid with neutral colors
-4. **Call-out boxes**: Use `[!note]`, `[!warning]`, `[!caution]` for emphasis
+4. **Admonitions**: Use `!!! note`, `!!! warning`, `!!! tip` for emphasis
 
 ---
 
@@ -21,9 +21,9 @@ This document provides mandatory rules for AI agents (Vibe, Copilot, etc.) when 
 |---------|--------|---------|---------|
 | Plain headers | `# Header` | Section titles | `# Configuration` |
 | Mermaid diagrams | ```mermaid | Visual explanations | See below |
-| Call-out note | `[!note]` | Informational | `[!note] Tip:` |
-| Call-out warning | `[!warning]` | Important caution | `[!warning] Must:` |
-| Call-out caution | `[!caution]` | Risk of error | `[!caution] Risk:` |
+| Admonition note | `!!! note` | Informational | `!!! note` |
+| Admonition warning | `!!! warning` | Important caution | `!!! warning` |
+| Admonition tip | `!!! tip` | Helpful shortcut | `!!! tip` |
 | Checklists | `- [x]`, `- [ ]` | Task tracking | `- [x] Done` |
 | Fault indicators | `❌`, `⚠️` | Errors/warnings only | `❌ Error:` |
 | Bold text | `**text**` | UI elements, keys | `**Save** button` |
@@ -92,9 +92,9 @@ flowchart TD
 If custom colors are absolutely necessary, use muted palette:
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 
-  'primaryColor': '#666666', 
-  'primaryTextColor': '#333333', 
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#666666',
+  'primaryTextColor': '#333333',
   'lineColor': '#999999',
   'secondaryColor': '#cccccc',
   'tertiaryColor': '#e0e0e0'
@@ -103,46 +103,48 @@ If custom colors are absolutely necessary, use muted palette:
 
 ---
 
-## Call-Out Box Usage
+## Admonition Usage
 
-Typora renders these as styled boxes. Use for important information that needs visual emphasis.
+MkDocs Material renders these as styled boxes via the `admonition` extension configured in
+`mkdocs.yml`. Use for important information that needs visual emphasis. Content under the
+marker line must be indented by four spaces.
 
 ### When to Use Each
 
-| Call-out | Use Case | Typical Content |
-|----------|----------|-----------------|
-| `[!note]` | Additional context, tips, background info | "This setting affects all charge cycles" |
-| `[!warning]` | Critical information, must-read | "This action cannot be undone" |
-| `[!caution]` | Potential pitfalls, risks | "Values above 100% may trigger safety limits" |
+| Admonition | Use Case | Typical Content |
+|------------|----------|-----------------|
+| `!!! note` | Additional context, tips, background info | "This setting affects all charge cycles" |
+| `!!! warning` | Critical information, must-read | "This action cannot be undone" |
+| `!!! tip` | Helpful shortcut | "Use the live-tuning helper to test values live" |
 
 ### Syntax
 ```markdown
-[!note]
-This is a note call-out box. Use for informational content.
+!!! note
+    This is a note admonition. Use for informational content.
 
-[!warning]
-This is a warning call-out box. Use for critical information.
+!!! warning
+    This is a warning admonition. Use for critical information.
 
-[!caution]
-This is a caution call-out box. Use for potential risks.
+!!! tip
+    This is a tip admonition. Use for helpful shortcuts.
 ```
 
-### Formatting Inside Call-Outs
+### Formatting Inside Admonitions
 - First line can be a brief title/label
-- Use standard Markdown formatting
+- Use standard Markdown formatting, indented four spaces under the marker
 - Keep concise (2-4 lines max)
 - No emoji except ❌/⚠️
 
 ### Example
 ```markdown
-[!note]
-This parameter is only used in winter mode. In summer mode, it is ignored.
+!!! note
+    This parameter is only used in winter mode. In summer mode, it is ignored.
 
-[!warning]
-Changing `price_discharge` to a very low value may cause the battery to discharge continuously.
+!!! warning
+    Changing `price_discharge` to a very low value may cause the battery to discharge continuously.
 
-[!caution]
-Do not set `soc_floor` below 10% without understanding the risks to battery longevity.
+!!! tip
+    Use the live-tuning `input_number` helper to test values without restarting AppDaemon.
 ```
 
 ---
@@ -295,8 +297,8 @@ last_updated: YYYY-MM-DD
 
 Clear introduction paragraph explaining the document's purpose.
 
-[!note]
-Additional context or prerequisites.
+!!! note
+    Additional context or prerequisites.
 
 ## Section 1
 
@@ -310,8 +312,8 @@ More content.
 %%{init: {'theme': 'neutral'}}%%
 ```
 
-[!warning]
-Critical information.
+!!! warning
+    Critical information.
 
 ## Section 2
 
@@ -336,9 +338,9 @@ Critical information.
 
 ```
 STYLE: SessyStrategy HA documentation rules.
-- Editor: Typora
+- Renderer: MkDocs Material (see mkdocs.yml)
 - Diagrams: Mermaid with %%{init: {'theme': 'neutral'}}%%
-- Call-outs: [!note], [!warning], [!caution]
+- Admonitions: !!! note, !!! warning, !!! tip (content indented 4 spaces)
 - NO emoji except ❌ (error) and ⚠️ (warning)
 - NO colored text
 - Headers: plain text only (# Header, not # 📚 Header)
@@ -357,7 +359,7 @@ Follow Stephen Few's minimal distraction principle. Violations will be rejected.
 ```
 □ Headers: #, ##, ### only (plain text, sentence case)
 □ Diagrams: Mermaid with neutral theme
-□ Call-outs: [!note], [!warning], [!caution]
+□ Admonitions: !!! note, !!! warning, !!! tip (4-space indented content)
 □ Checklists: [x], [ ] only
 □ Faults: ❌ (error), ⚠️ (warning) only
 □ NO other emoji
@@ -376,7 +378,7 @@ When updating existing documentation:
 
 1. **Remove all emoji** except ❌ and ⚠️
 2. **Replace images** with Mermaid diagrams
-3. **Add call-out boxes** for important notes
+3. **Add admonitions** (`!!! note`/`!!! warning`/`!!! tip`) for important notes
 4. **Standardize headers** (remove emoji, use sentence case)
 5. **Convert checklists** to `[x]`/`[ ]` format
 6. **Add Mermaid theme** spec to all diagrams
@@ -389,6 +391,7 @@ When updating existing documentation:
 |------|--------|--------|
 | 2026-08-01 | Initial agent rules created | System |
 | 2026-08-01 | Added Typora + Mermaid + call-out guidelines | System |
+| 2026-08-14 | Corrected call-out syntax to MkDocs Material admonitions (`!!! note`) — the previous `[!note]` syntax does not render with the site's configured extensions | System |
 
 ---
 

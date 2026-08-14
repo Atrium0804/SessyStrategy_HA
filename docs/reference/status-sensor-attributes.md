@@ -1,6 +1,6 @@
 # Status Sensor Attributes
 
-*Last updated: 2026-08-01 | Part of [Reference Documentation](../)*
+*Last updated: 2026-08-01 | Part of [Reference Documentation](../index.md)*
 
 ---
 
@@ -322,5 +322,5 @@ Home Assistant Updates Entity
 - [Entity Reference](entity-reference.md) — All entities used by the app
 - [Configuration Reference](configuration/apps-yaml.md) — apps.yaml parameters that map to these attributes
 - [Live Tuning Entities](live-tuning-entities.md) — How to make these values adjustable at runtime
-- [Debug Strategy Decisions](../../how-to/debug-strategy-decisions.md) — Practical guide using these attributes
-- [Strategy Priority Chain](../../explanation/strategy-priority-chain.md) — Understanding what each branch does
+- [Debug Strategy Decisions](../how-to/debug-strategy-decisions.md) — Practical guide using these attributes
+- [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — Understanding what each branch does

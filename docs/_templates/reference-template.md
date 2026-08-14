@@ -112,8 +112,8 @@ example:
 
 ## Usage Notes
 
-[!note]
-Following best practices ensures optimal performance and reliability.
+!!! note
+    Following best practices ensures optimal performance and reliability.
 
 ### Best Practices
 

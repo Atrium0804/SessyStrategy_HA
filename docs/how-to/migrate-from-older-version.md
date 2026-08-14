@@ -57,13 +57,14 @@ last_updated: 2026-08-01
 - [x] **New**: Priority 4 — Evening peak excess discharge
 - [x] **New**: Pre-peak arbitrage margin check
 
-[!warning]
-The following changes require attention:
-- **Changed**: Price threshold logic now uses raw prices exclusively
-- **Changed**: SOC target for pre-peak is separate from cheap charge
-- **Changed**: `min_window_h` parameter added for adaptive spreading
-- **Changed**: `rerun_debounce_s` parameter added for live input handling
-- **Changed**: Entity naming convention standardized
+!!! warning
+    The following changes require attention:
+
+    - **Changed**: Price threshold logic now uses raw prices exclusively
+    - **Changed**: SOC target for pre-peak is separate from cheap charge
+    - **Changed**: `min_window_h` parameter added for adaptive spreading
+    - **Changed**: `rerun_debounce_s` parameter added for live input handling
+    - **Changed**: Entity naming convention standardized
 
 **Configuration changes required:**
 
@@ -79,7 +80,7 @@ sessy_strategy:
   soc_max: 100
   price_high: 0.50  # This was IMPORT price
   price_low: 0.10   # This was IMPORT price
-  
+
 # NEW v3.x configuration
 sessy_strategy:
   module: sessy_strategy
@@ -101,7 +102,7 @@ sessy_strategy:
 # OLD: price_high = 0.50 (import price)
 # NEW: price_discharge = 0.50 - 0.11 = 0.39 (raw price)
 
-# OLD: price_low = 0.10 (import price)  
+# OLD: price_low = 0.10 (import price)
 # NEW: price_charge = 0.10 - 0.11 = -0.01 (raw price)
 ```
 
@@ -124,8 +125,8 @@ sessy_strategy:
   min_soc: 10
   high_price: 0.45
   low_price: 0.05
-  
-# NEW v3.x configuration  
+
+# NEW v3.x configuration
 sessy_strategy:
   module: sessy_strategy
   class: SessyStrategy
@@ -219,7 +220,7 @@ cp /config/configuration.yaml /config/configuration.yaml.backup
    # OLD import prices → NEW raw prices
    price_high: 0.50  →  price_discharge: 0.39  # 0.50 - 0.11 = 0.39
    price_low: 0.10   →  price_charge: -0.01    # 0.10 - 0.11 = -0.01
-   
+
    # Add surcharge parameter
    surcharge: 0.11
    ```
@@ -480,7 +481,7 @@ sessy_strategy:
    ```bash
    # Check SOC sensor
    curl -s "http://your-ha:8123/api/states/sensor.your_soc_sensor" | jq '.state'
-   
+
    # Check price sensor
    curl -s "http://your-ha:8123/api/states/sensor.your_price_sensor" | jq '.state'
    ```
@@ -507,7 +508,7 @@ sessy_strategy:
    # If you had import price thresholds:
    old_price_high = 0.50
    old_price_low = 0.10
-   
+
    # Convert to raw prices:
    new_price_discharge = old_price_high - surcharge
    new_price_charge = old_price_low - surcharge
@@ -574,7 +575,7 @@ sessy_strategy:
    ```yaml
    # Option A: Force explicit season
    season_mode: summer  # or winter
-   
+
    # Option B: Adjust auto detection
    season_mode: auto
    season_day_start: 7   # Earlier for your location
@@ -630,7 +631,7 @@ If you encounter issues that you cannot resolve, you can roll back to your previ
    ```bash
    # Restore apps.yaml
    cp /config/appdaemon/apps/apps.yaml.backup /config/appdaemon/apps/apps.yaml
-   
+
    # Restore strategy file
    cp /config/appdaemon/apps/sessy_strategy.py.backup /config/appdaemon/apps/sessy_strategy.py
    ```

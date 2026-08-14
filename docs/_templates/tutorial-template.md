@@ -2,7 +2,7 @@
 title: Tutorial Template
 doc_type: tutorial
 audience: beginners
-prerequisites: 
+prerequisites:
   - Home Assistant installed
   - AppDaemon installed
   - Sessy integration configured
@@ -33,8 +33,8 @@ Before starting this tutorial, ensure you have:
 - [ ] [Prerequisite 2](link-to-prerequisite-doc)
 - [ ] [Prerequisite 3](link-to-prerequisite-doc)
 
-[!warning]
-All prerequisites must be completed before starting this tutorial.
+!!! warning
+    All prerequisites must be completed before starting this tutorial.
 
 ## Related Documentation
 
@@ -95,8 +95,8 @@ To confirm everything is working correctly:
 
 ## Success
 
-[!note]
-You have successfully completed this tutorial.
+!!! note
+    You have successfully completed this tutorial.
 
 ### Next Steps
 

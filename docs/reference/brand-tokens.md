@@ -1,6 +1,6 @@
 # Brand & Theme Tokens
 
-*Last updated: 2026-08-01 | Part of [Reference Documentation](../)*
+*Last updated: 2026-08-01 | Part of [Reference Documentation](../index.md)*
 
 Source: **NS Huisstijl Richtlijnen v4.4** (corporate brand guide). This page translates the
 print-oriented corporate identity into web tokens for the MkDocs **Material** theme so the

@@ -2,7 +2,7 @@
 title: Dashboard Setup with ApexCharts for SessyStrategy HA
 doc_type: tutorial
 audience: intermediate
-prerequisites: 
+prerequisites:
   - SessyStrategy successfully installed and running
   - ApexCharts card installed in Home Assistant
   - Basic Lovelace dashboard experience
@@ -219,7 +219,7 @@ Create an interactive chart showing energy prices over time, with threshold line
                color: '#fff'
                background: '#ff0000'
              text: "Discharge Threshold"
-           
+
          - y: -0.10
            borderColor: '#00ff00'
            strokeDashArray: 4
@@ -249,7 +249,7 @@ Create an interactive chart showing energy prices over time, with threshold line
        group_by:
          func: avg
          duration: 1h
-   
+
    apex_config:
      yaxis:
        - min: -0.2
@@ -267,7 +267,7 @@ Create an interactive chart showing energy prices over time, with threshold line
                color: '#fff'
                background: '#E63946'
              text: "Discharge > €0.39"
-             
+
          - y: -0.10
            borderColor: '#009E73'
            strokeDashArray: 4
@@ -277,7 +277,7 @@ Create an interactive chart showing energy prices over time, with threshold line
                color: '#fff'
                background: '#009E73'
              text: "Charge < -€0.10"
-   
+
    card_mod:
      style: |
        ha-card {
@@ -318,7 +318,7 @@ Create a chart showing battery SOC over time, with target and floor indicators.
        group_by:
          func: avg
          duration: 1h
-   
+
    apex_config:
      yaxis:
        - min: 0
@@ -336,7 +336,7 @@ Create a chart showing battery SOC over time, with target and floor indicators.
                color: '#fff'
                background: '#0072B2'
              text: "Target: 70%"
-             
+
          - y: 20
            borderColor: '#D55E00'
            strokeDashArray: 4
@@ -346,7 +346,7 @@ Create a chart showing battery SOC over time, with target and floor indicators.
                color: '#fff'
                background: '#D55E00'
              text: "Floor: 20%"
-             
+
          - y: 100
            borderColor: '#7BCAB4'
            strokeDashArray: 4
@@ -390,7 +390,7 @@ Create a chart showing strategy setpoints over time, with color coding by strate
        group_by:
          func: avg
          duration: 5min
-     
+
      - entity: number.sessy_pwkn_grid_target
        name: Grid Target
        type: line
@@ -399,7 +399,7 @@ Create a chart showing strategy setpoints over time, with color coding by strate
        group_by:
          func: avg
          duration: 5min
-   
+
    apex_config:
      yaxis:
        - title:
@@ -479,12 +479,12 @@ views:
             name: Current Strategy
             entity: sensor.sessy_strategy_status
             icon: mdi:battery-heart-variant
-            
+
           - type: custom:button-card
             name: Battery SOC
             entity: sensor.sessy_battery_alt9_state_of_charge
             icon: mdi:battery-90
-            
+
           - type: custom:button-card
             name: Energy Price
             entity: sensor.sessy_dnhh_energy_price
@@ -628,9 +628,9 @@ views:
       - type: markdown
         title: Configuration Summary
         content: |
-          **Battery:** {{ states('sensor.sessy_battery_alt9_state_of_charge') }}% SOC  
-          **Price:** €{{ states('sensor.sessy_dnhh_energy_price') }} /kWh  
-          **Strategy:** {{ state_attr('sensor.sessy_strategy_status', 'active_branch') }}  
+          **Battery:** {{ states('sensor.sessy_battery_alt9_state_of_charge') }}% SOC
+          **Price:** €{{ states('sensor.sessy_dnhh_energy_price') }} /kWh
+          **Strategy:** {{ state_attr('sensor.sessy_strategy_status', 'active_branch') }}
           **Season:** {{ state_attr('sensor.sessy_strategy_status', 'active_season') }}
 
       # Quick Actions
@@ -682,7 +682,7 @@ Create a chart that changes color based on the active strategy branch:
          if (branch.includes('prepeak')) return {y: 1, color: '#0072B2'};
          if (branch === 'evening_peak_excess') return {y: 1, color: '#D55E00'};
          return {y: 1, color: '#7BCAB4'};
-   
+
    apex_config:
      yaxis:
        - show: false
@@ -718,7 +718,7 @@ Show price and SOC on the same chart to see correlations:
        group_by:
          func: avg
          duration: 1h
-     
+
      - entity: sensor.sessy_battery_alt9_state_of_charge
        name: SOC (%)
        type: line
@@ -728,7 +728,7 @@ Show price and SOC on the same chart to see correlations:
        group_by:
          func: avg
          duration: 1h
-   
+
    apex_config:
      yaxis:
        - min: -0.2
@@ -768,7 +768,7 @@ Create a stacked chart showing power flow:
        group_by:
          func: avg
          duration: 5min
-     
+
      - entity: number.sessy_pwkn_grid_target
        name: Grid
        type: line
@@ -777,7 +777,7 @@ Create a stacked chart showing power flow:
        group_by:
          func: avg
          duration: 5min
-   
+
    apex_config:
      yaxis:
        - title:
@@ -856,14 +856,14 @@ To confirm your dashboard is working correctly:
 
 ## Success
 
-[!note]
-You've successfully created a comprehensive dashboard for monitoring SessyStrategy HA! Your dashboard now provides:
+!!! note
+    You've successfully created a comprehensive dashboard for monitoring SessyStrategy HA! Your dashboard now provides:
 
-- **Real-time monitoring** of strategy state and key metrics
-- **Historical visualization** of prices, SOC, and setpoints
-- **Threshold indicators** showing when strategy triggers occur
-- **Correlation views** to understand strategy behavior
-- **Quick access** to configuration and control
+    - **Real-time monitoring** of strategy state and key metrics
+    - **Historical visualization** of prices, SOC, and setpoints
+    - **Threshold indicators** showing when strategy triggers occur
+    - **Correlation views** to understand strategy behavior
+    - **Quick access** to configuration and control
 
 ### What You've Created
 

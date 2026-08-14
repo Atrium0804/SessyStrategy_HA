@@ -16,7 +16,7 @@ This is a condensed reference for human contributors. For AI agent-specific rule
 |---------|--------|---------|
 | Headers | `#`, `##`, `###` | `# Configuration` |
 | Mermaid diagrams | ```mermaid | See below |
-| Call-out boxes | `[!note]`, `[!warning]`, `[!caution]` | `[!note] Tip:` |
+| Admonitions | `!!! note`, `!!! warning`, `!!! tip` | `!!! note` |
 | Checklists | `- [x]`, `- [ ]` | `- [x] Complete` |
 | Fault indicators | `❌`, `⚠️` | `❌ Error:` |
 | Code blocks | ```yaml | ```yaml\nkey: value\n``` |
@@ -46,22 +46,27 @@ This is a condensed reference for human contributors. For AI agent-specific rule
 
 ---
 
-## Editor Configuration (Typora)
+## Rendering (MkDocs Material)
 
-### Recommended Settings
+The published site is built with `mkdocs` + the Material theme (see `mkdocs.yml`). Admonitions
+require the `!!! type` block syntax from the `admonition` extension — the older `[!note]`-style
+call-out does not render and shows up as literal text.
 
-- **Theme**: Use light theme for best readability
-- **Mermaid**: Enable in Preferences > Markdown > Diagram
-- **Code blocks**: Enable syntax highlighting
-- **Spell check**: Enable for documentation
+### Admonition Types Used
 
-### Typora Extensions Used
+| Type | Syntax | Rendered As |
+|------|--------|-------------|
+| Note | `!!! note` | Styled box with note icon |
+| Warning | `!!! warning` | Styled box with warning icon |
+| Tip | `!!! tip` | Styled box with tip icon |
+| Caution | `!!! caution` | Styled box (generic icon) |
 
-| Extension | Syntax | Rendered As |
-|-----------|--------|-------------|
-| Call-out note | `[!note]` | Styled box with note icon |
-| Call-out warning | `[!warning]` | Styled box with warning icon |
-| Call-out caution | `[!caution]` | Styled box with caution icon |
+Content under the marker must be indented by four spaces:
+
+```markdown
+!!! note
+    This is a note. Content is indented four spaces under the marker line.
+```
 
 ---
 
@@ -80,8 +85,8 @@ last_updated: YYYY-MM-DD
 
 Introduction paragraph.
 
-[!note]
-Optional call-out for important context.
+!!! note
+    Optional admonition for important context.
 
 ## Section
 
@@ -144,5 +149,5 @@ More content.
 
 ---
 
-*Last updated: 2026-08-01*
+*Last updated: 2026-08-14*
 

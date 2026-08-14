@@ -48,8 +48,8 @@ Common scenarios:
 
 ## Solution Steps
 
-[!note]
-Follow these steps in order. Each step builds on the previous one.
+!!! note
+    Follow these steps in order. Each step builds on the previous one.
 
 ### Step 1: [First Step]
 
@@ -94,8 +94,8 @@ To confirm your solution is working:
 
 ## Common Issues
 
-[!caution]
-If you encounter issues, verify each step was completed correctly before troubleshooting.
+!!! caution
+    If you encounter issues, verify each step was completed correctly before troubleshooting.
 
 ### Issue 1: [Problem Title]
 
@@ -119,8 +119,8 @@ If you encounter issues, verify each step was completed correctly before trouble
 
 ## Alternative Approaches
 
-[!note]
-Alternative approaches may be more suitable for your specific setup.
+!!! note
+    Alternative approaches may be more suitable for your specific setup.
 
 ### Approach 1: [Method Name]
 

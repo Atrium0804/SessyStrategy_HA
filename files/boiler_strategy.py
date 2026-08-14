@@ -12,8 +12,8 @@ Strategy (priority order):
   2. Legionella warning (temp hasn't reached legionella_temp in legionella_hybrid_days):
      force mode 'hybrid' at the normal setpoint, giving the resistance a head
      start before the hard boost deadline hits.
-  3. Price/SOC optimisation: compare the relevant price (import price if the
-     battery isn't full, export price if it is) against a gas-equivalent
+  3. Price/SOC optimisation: compare the relevant price (buy price if the
+     battery isn't full, sell price if it is) against a gas-equivalent
      price to decide 'off' / 'heatpump' / 'hybrid'.
 
 The setpoint is held fixed at setpoint_c except during a legionella boost.
@@ -33,10 +33,6 @@ class BoilerStrategy(hass.Hass):
         self.boiler_efficiency    = float(self.args.get("boiler_efficiency", 95))
         self.cop                  = float(self.args.get("cop", 2.0))
         self.calorific_value      = float(self.args.get("calorific_value", 9.77))
-        self.buy_surcharge        = float(self.args.get("buy_surcharge", 0.025))
-        self.energy_tax           = float(self.args.get("energy_tax", 0.0916))
-        self.vat                  = float(self.args.get("vat", 1.21))
-        self.sell_surcharge       = float(self.args.get("sell_surcharge", 0.025))
 
         # ── Weekly legionella prevention ─────────────────────────────────────
         self.legionella_temp        = float(self.args.get("legionella_temp", 65))
@@ -48,13 +44,14 @@ class BoilerStrategy(hass.Hass):
         self.rerun_debounce_s = float(self.args.get("rerun_debounce_s", 2.0))
 
         # ── Entity IDs (overridable from apps.yaml) ─────────────────────────
-        self.temp_sensor           = self.args.get("temp_sensor",           "sensor.boiler_temperature")
-        self.price_sensor          = self.args.get("price_sensor",          "sensor.nordpool_actuele_prijs")
-        self.soc_sensor             = self.args.get("soc_sensor",            "sensor.sessy_battery_alt9_state_of_charge")
-        self.boiler_mode_select    = self.args.get("boiler_mode_select",    "select.boiler_modus")
+        self.temp_sensor            = self.args.get("temp_sensor",            "sensor.boiler_temperature")
+        self.buy_price_sensor      = self.args.get("buy_price_sensor",      "sensor.energy_buy_price")
+        self.sell_price_sensor     = self.args.get("sell_price_sensor",     "sensor.energy_sell_price")
+        self.soc_sensor             = self.args.get("soc_sensor",             "sensor.sessy_battery_alt9_state_of_charge")
+        self.boiler_mode_select     = self.args.get("boiler_mode_select",     "select.boiler_modus")
         self.boiler_setpoint_entity = self.args.get("boiler_setpoint_entity", "number.boiler_setpoint")
         self.legionella_last_ok_entity = self.args.get("legionella_last_ok_entity", "input_datetime.boiler_legionella_last_ok")
-        self.status_sensor         = self.args.get("status_sensor",         "sensor.boiler_strategy_status")
+        self.status_sensor          = self.args.get("status_sensor",          "sensor.boiler_strategy_status")
 
         # Optional live-tuning helpers (input_number). If set, these override the
         # corresponding static default each cycle, so the value can be changed
@@ -72,7 +69,8 @@ class BoilerStrategy(hass.Hass):
 
         live_inputs = [
             self.temp_sensor,
-            self.price_sensor,
+            self.buy_price_sensor,
+            self.sell_price_sensor,
             self.soc_sensor,
             self.soc_full_threshold_entity,
             self.gas_price_entity,
@@ -86,12 +84,13 @@ class BoilerStrategy(hass.Hass):
     # ── Main logic ────────────────────────────────────────────────────────────
 
     def update_strategy(self, kwargs):
-        temp  = self._get_temp()
-        price = self._get_current_price()
-        soc   = self._get_soc()
+        temp       = self._get_temp()
+        buy_price  = self._get_buy_price()
+        sell_price = self._get_sell_price()
+        soc        = self._get_soc()
 
-        if temp is None or price is None or soc is None:
-            self.log("Could not read temp, price or SOC — skipping this cycle", level="WARNING")
+        if temp is None or buy_price is None or sell_price is None or soc is None:
+            self.log("Could not read temp, prices or SOC — skipping this cycle", level="WARNING")
             return
 
         self._record_legionella_ok_if_reached(temp)
@@ -102,10 +101,8 @@ class BoilerStrategy(hass.Hass):
         boiler_efficiency   = self._tunable(self.boiler_efficiency, self.boiler_efficiency_entity)
         cop                 = self._tunable(self.cop, self.cop_entity)
 
-        buy_price, sell_price = self._compute_prices(price)
         status_fields = dict(
             temp=temp,
-            raw_price=price,
             buy_price=buy_price,
             sell_price=sell_price,
             soc=soc,
@@ -193,14 +190,6 @@ class BoilerStrategy(hass.Hass):
             return self.legionella_hybrid_days
         return (self.datetime() - last_ok).total_seconds() / 86400.0
 
-    # ── Pricing ───────────────────────────────────────────────────────────────
-
-    def _compute_prices(self, raw_price: float) -> tuple[float, float]:
-        """Import price (bought when charging from grid) and export price (opportunity cost)."""
-        buy_price  = (raw_price + self.buy_surcharge + self.energy_tax) * self.vat
-        sell_price = raw_price - self.sell_surcharge
-        return buy_price, sell_price
-
     # ── Live-input re-run ────────────────────────────────────────────────────
 
     def _on_input_change(self, entity, attribute, old, new, kwargs):
@@ -265,9 +254,15 @@ class BoilerStrategy(hass.Hass):
         except (TypeError, ValueError):
             return None
 
-    def _get_current_price(self) -> float | None:
+    def _get_buy_price(self) -> float | None:
         try:
-            return float(self.get_state(self.price_sensor))
+            return float(self.get_state(self.buy_price_sensor))
+        except (TypeError, ValueError):
+            return None
+
+    def _get_sell_price(self) -> float | None:
+        try:
+            return float(self.get_state(self.sell_price_sensor))
         except (TypeError, ValueError):
             return None
 
