@@ -193,7 +193,7 @@ The surcharge is present on both sides, but it must stay because the decision is
 !!! note
     This is deliberately **not** grid trading. When trading (buy to later export), taxes and fees paid on the import are a pure loss. Priority 3 only manages self-consumed energy, so it uses the buy price on both sides. The trading decision (hold vs sell) is Priority 4 and uses `min_arbitrage_margin`.
 
-### Priority 4: Evening Peak Excess Discharge
+### Priority 4: Evening Peak Sell-off Discharge
 
 - **Comparison:** `max_remaining_price < price_discharge`
 - **Raw threshold:** €0.39/kWh

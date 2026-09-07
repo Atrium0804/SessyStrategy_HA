@@ -54,7 +54,7 @@ last_updated: 2026-08-01
 - [x] **New**: Seasonal mode support (`auto`, `summer`, `winter`)
 - [x] **New**: Live tuning entities for all major parameters
 - [x] **New**: Adaptive spread windows for charge/discharge
-- [x] **New**: Priority 4 — Evening peak excess discharge
+- [x] **New**: Priority 4 — Evening peak sell-off discharge
 - [x] **New**: Afternoon top-up margin check (evening peak import vs current import)
 
 !!! warning

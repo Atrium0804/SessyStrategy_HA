@@ -121,9 +121,9 @@ return max_power_w  # Always charge at maximum power
 
 ---
 
-### 4. Evening Peak Excess Discharge Setpoint
+### 4. Evening Peak Sell-off Discharge Setpoint
 
-**Method:** `_evening_peak_excess_setpoint(soc: float, soc_target: float, hours_remaining: float) -> float`
+**Method:** `_evening_peak_selloff_setpoint(soc: float, soc_target: float, hours_remaining: float) -> float`
 
 **Purpose:** Calculate power to discharge excess SOC during evening peak (Priority 4).
 
@@ -236,7 +236,7 @@ result = max(run_h, min_window_h)
 
 **Use cases:**
 - Afternoon charge: Check if the evening peak import price > current import price + afternoon_margin
-- Evening peak excess: Check if any remaining hour exceeds discharge threshold
+- Evening peak sell-off: Check if any remaining hour exceeds discharge threshold
 
 **Example:**
 - `start_hour = 18`, `end_hour = 24`
@@ -506,7 +506,7 @@ result = max_power_w = 2200 W
 
 ### Division by Zero Protection
 
-- `_evening_peak_excess_setpoint`: Uses `max(hours_remaining, 0.083)` (5 minutes)
+- `_evening_peak_selloff_setpoint`: Uses `max(hours_remaining, 0.083)` (5 minutes)
 - Prevents infinite power when window is very small
 
 ### Null Handling

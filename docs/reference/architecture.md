@@ -193,7 +193,7 @@ for entity in live_inputs:
 | `_charge_setpoint(soc, target, window_h)` | Afternoon charge power | `(target - soc)/100 * capacity / window_h * 1.5` |
 | `_discharge_setpoint(soc, floor, window_h)` | Price-spike discharge | `(soc - floor)/100 * capacity / window_h` |
 | `_cheap_charge_setpoint(soc, ceiling, window_h)` | Cheap charge | `max_power_w` (always max when charging) |
-| `_evening_peak_excess_setpoint(soc, target, hours)` | Excess discharge | `(soc - target)/100 * capacity / hours` |
+| `_evening_peak_selloff_setpoint(soc, target, hours)` | Excess discharge | `(soc - target)/100 * capacity / hours` |
 
 ### Sensor Reader Methods
 

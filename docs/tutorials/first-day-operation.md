@@ -226,7 +226,7 @@ INFO sessy_strategy: DISCHARGE override: import price 0.575 > 0.50 — battery s
 **Why This is Priority #1:**
 Avoiding expensive grid imports is the highest-value action. Even with round-trip losses, discharging stored energy at €0.575/kWh import price saves significantly compared to importing.
 
-### Mechanism 2: Evening Peak Excess Discharge (Priority 4)
+### Mechanism 2: Evening Peak Sell-off Discharge (Priority 4)
 
 **Trigger:**
 - Within `evening_peak_start` to `evening_peak_end` (default 8:00-10:00 PM)
@@ -236,17 +236,17 @@ Avoiding expensive grid imports is the highest-value action. Even with round-tri
 **What You Should See:**
 ```
 INFO sessy_strategy: Hour=20  SOC=82%  Raw price=0.18900  Import price=0.29900
-INFO sessy_strategy: EVENING PEAK EXCESS: SOC 82% > target 70% — grid export setpoint -350W (spread over 2.00h remaining peak window)
+INFO sessy_strategy: EVENING PEAK SELL-OFF: SOC 82% > target 70% — grid export setpoint -350W (spread over 2.00h remaining peak window)
 ```
 
-- **Status Sensor:** `evening_peak_excess`
+- **Status Sensor:** `evening_peak_selloff`
 - **Strategy Select:** `nom` (grid setpoint mode)
 - **Grid Target:** Negative value (export)
 - **Behavior:** Battery covers household load + export target simultaneously
 
 ### Key Differences
 
-| Aspect | Price Spike | Evening Peak Excess |
+| Aspect | Price Spike | Evening Peak Sell-off |
 |--------|-------------|---------------------|
 | **Setpoint Type** | Battery (`api`) | Grid (`nom`) |
 | **Goal** | Avoid expensive import | Sell surplus energy |

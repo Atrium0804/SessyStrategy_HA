@@ -32,7 +32,7 @@ _SWITCHES: tuple[_Spec, ...] = (
     _Spec("rule_price_spike", "Rule: price-spike discharge", "mdi:transmission-tower-export"),
     _Spec("rule_cheap_charge", "Rule: cheap/negative charge", "mdi:transmission-tower-import"),
     _Spec("rule_afternoon_charge", "Rule: afternoon charge", "mdi:battery-charging-high"),
-    _Spec("rule_evening_peak", "Rule: evening peak excess", "mdi:weather-sunset-down"),
+    _Spec("rule_evening_peak", "Rule: evening peak sell-off", "mdi:weather-sunset-down"),
     _Spec("rule_morning_selloff", "Rule: morning sell-off", "mdi:weather-sunset-up"),
 )
 

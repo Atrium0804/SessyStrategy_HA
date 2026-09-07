@@ -12,7 +12,7 @@ Strategy (priority order, each rule individually switchable from the GUI):
   3. Afternoon charge, SOC < target_afternoon_charging, and the evening peak buy price
      beats the current buy price by afternoon_margin: battery setpoint, charge at max power.
      Peak-shaving (avoid net import at the evening peak), not grid trading.
-  4. Evening peak excess, SOC > target_peak_discharge, no spike remaining and evening
+  4. Evening peak sell-off, SOC > target_peak_discharge, no spike remaining and evening
      beats tomorrow's morning peak: grid setpoint export
   5. Morning sell-off, SOC > target_morning_soc: grid setpoint export spread over the window
   6. Default: grid setpoint = 0W (absorb solar, block export)
@@ -338,7 +338,7 @@ class SessyStrategy(hass.Hass):
             self._set_battery_setpoint(-charge_w)   # negative = charge
             return
 
-        # ── Priority 4: evening peak excess discharge ────────────────────────
+        # ── Priority 4: evening peak sell-off discharge ────────────────────────
         if self._rule_enabled(self.rule_evening_peak_entity) and \
                 self.evening_peak_start <= now_hour < self.evening_peak_end and soc > target_peak_discharge:
             max_remaining_price = self._max_price_in_window(now_hour, 24, kind="sell")
@@ -359,11 +359,11 @@ class SessyStrategy(hass.Hass):
                 # load AND the export target. A high home load makes the battery
                 # work harder instead of pulling the shortfall from the grid.
                 self.log(
-                    f"EVENING PEAK EXCESS: SOC {soc:.0f}% > target {target_peak_discharge:.0f}% — "
+                    f"EVENING PEAK SELL-OFF: SOC {soc:.0f}% > target {target_peak_discharge:.0f}% — "
                     f"grid export setpoint -{discharge_w:.0f}W "
                     f"(spread over {hours_remaining:.2f}h remaining peak window)"
                 )
-                self._publish_status("evening_peak_excess", **status_fields)
+                self._publish_status("evening_peak_selloff", **status_fields)
                 self._set_grid_setpoint(-discharge_w)
                 return
 

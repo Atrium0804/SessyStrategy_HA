@@ -216,7 +216,7 @@ else:                                                        charge_w = max_powe
 
 ---
 
-## Priority 4: Evening Peak Excess Discharge
+## Priority 4: Evening Peak Sell-off Discharge
 
 ### When It Triggers
 
@@ -325,7 +325,7 @@ This covers the **bulk of the day** — typically daytime hours with moderate pr
 | 1 | Price-spike discharge | sell_price > price_discharge | Battery | api | Sell into peaks / avoid imports |
 | 2 | Cheap price charge | buy_price < price_charge | Battery | api | Capture cheap energy |
 | 3 | Afternoon charge | In afternoon window + SOC < target_afternoon_charging + afternoon margin met | Battery | api | Prepare for evening peak |
-| 4 | Evening peak excess | In evening peak + SOC > target_peak_discharge + no spikes remaining + evening beats morning | Grid | nom | Monetize excess SOC, reserve for morning |
+| 4 | Evening peak sell-off | In evening peak + SOC > target_peak_discharge + no spikes remaining + evening beats morning | Grid | nom | Monetize excess SOC, reserve for morning |
 | 5 | Morning sell-off | In morning window + SOC > target_morning_soc | Grid | nom | Sell the reserved morning energy |
 | 6 | Default | None of above | Grid | nom | Maximize self-consumption |
 

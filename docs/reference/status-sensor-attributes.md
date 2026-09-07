@@ -93,13 +93,13 @@ The `active_branch` attribute indicates which priority rule matched. Each branch
 - `afternoon_full`: SOC already at target, holding at grid 0W
 - `afternoon_skip`: Evening peak import barely above current import, not worth topping up
 
-### Priority 4: Evening Peak Excess Discharge (`active_branch: "evening_peak_excess"`)
+### Priority 4: Evening Peak Sell-off Discharge (`active_branch: "evening_peak_selloff"`)
 
 **Trigger:** Inside evening peak window, SOC > target, no remaining spike
 
 | Attribute | Type | Description | Example |
 |---|---|---|---|
-| `active_branch` | str | Branch identifier | `evening_peak_excess` |
+| `active_branch` | str | Branch identifier | `evening_peak_selloff` |
 | All common attributes | | See above | |
 
 **What it means:** The battery has excess SOC above target with no further price spikes expected, so it's discharging the surplus.

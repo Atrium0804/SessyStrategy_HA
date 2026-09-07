@@ -680,7 +680,7 @@ Create a chart that changes color based on the active strategy branch:
          if (branch === 'discharge') return {y: 1, color: '#E63946'};
          if (branch === 'cheap_charge') return {y: 1, color: '#009E73'};
          if (branch.includes('afternoon')) return {y: 1, color: '#0072B2'};
-         if (branch === 'evening_peak_excess') return {y: 1, color: '#D55E00'};
+         if (branch === 'evening_peak_selloff') return {y: 1, color: '#D55E00'};
          return {y: 1, color: '#7BCAB4'};
 
    apex_config:

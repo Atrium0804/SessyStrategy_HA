@@ -55,7 +55,7 @@ SessyStrategy evaluates conditions in strict priority order. **The first matchin
 │  └─ Condition: (evening_peak_buy - buy) >= afternoon_margin     │
 │  └─ Action: Battery setpoint, charge toward target             │
 ├─────────────────────────────────────────────────────────────┤
-│  Priority 4: Evening Peak Excess Discharge                      │
+│  Priority 4: Evening Peak Sell-off Discharge                    │
 │  ├─ Condition: evening_peak_start <= hour < evening_peak_end   │
 │  ├─ Condition: soc > soc_target                                │
 │  └─ Action: Grid setpoint, export excess                       │
@@ -133,7 +133,7 @@ The `active_branch` attribute tells you exactly which decision path was taken:
 | `afternoon_charge` | 3 | Afternoon charging active |
 | `afternoon_full` | 3 | In afternoon window but SOC already at target |
 | `afternoon_skip` | 3 | In afternoon window but import-price reduction too small |
-| `evening_peak_excess` | 4 | Evening peak excess discharge active |
+| `evening_peak_selloff` | 4 | Evening peak sell-off discharge active |
 | `default` | 5 | Default grid setpoint 0W |
 | `manual_grid` | - | Manual grid setpoint mode |
 | `manual_battery` | - | Manual battery setpoint mode |
@@ -196,7 +196,7 @@ If this condition is **NOT met**, check Priority 4.
 
 **Note:** `evening_peak_buy` is the highest import price (raw + surcharge) during the evening peak window; `current_buy` is the current import price. The rule tops up only when charging now meaningfully undercuts importing at the evening peak.
 
-#### Priority 4: Evening Peak Excess Discharge
+#### Priority 4: Evening Peak Sell-off Discharge
 ```
 Condition 1: evening_peak_start <= current_hour < evening_peak_end
 Condition 2: soc > soc_target
@@ -250,7 +250,7 @@ The logs provide detailed information about each strategy decision.
 
    # Priority 4 example:
    Hour=20  SOC=85%  Raw price=0.40000  Import price=0.51000
-   EVENING PEAK EXCESS: SOC 85% > target 70% — grid export setpoint -800W (spread over 2.50h remaining peak window)
+   EVENING PEAK SELL-OFF: SOC 85% > target 70% — grid export setpoint -800W (spread over 2.50h remaining peak window)
    ```
 
 3. **Enable debug logging (if needed):**
@@ -568,7 +568,7 @@ else:
 # Priority 4
 if evening_peak_start <= current_hour < evening_peak_end:
     if soc > soc_target:
-        print("P4: EVENING PEAK EXCESS - soc", soc, "> soc_target", soc_target)
+        print("P4: EVENING PEAK SELL-OFF - soc", soc, "> soc_target", soc_target)
         exit()
     else:
         print("P4: NOT MATCHED - soc", soc, "<= soc_target", soc_target)

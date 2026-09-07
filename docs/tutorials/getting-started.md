@@ -512,7 +512,7 @@ Monitor SessyStrategy during its first few cycles to ensure it's working correct
      - `discharge`: Price spike discharge
      - `cheap_charge`: Charging during cheap price periods
      - `afternoon_charge`: Afternoon charging window
-     - `evening_peak_excess`: Evening peak excess discharge
+     - `evening_peak_selloff`: Evening peak sell-off discharge
 
 3. **Check status sensor attributes:**
    - View the attributes of `sensor.sessy_strategy_status`

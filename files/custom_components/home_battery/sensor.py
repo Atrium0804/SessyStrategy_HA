@@ -43,7 +43,7 @@ _BRANCH_NAMES: dict[str, str] = {
     "afternoon_charge":    "Afternoon — charging",
     "afternoon_full":      "Afternoon — battery full",
     "afternoon_skip":      "Afternoon — spread too small",
-    "evening_peak_excess": "Evening peak — discharging",
+    "evening_peak_selloff": "Evening peak — discharging",
     "default":             "Idle — self consumption mode",
     "manual_grid":         "Manual — grid setpoint",
     "manual_battery":      "Manual — battery setpoint",

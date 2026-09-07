@@ -126,7 +126,7 @@ The strategy uses grid setpoint (`nom` mode) in the following priority branches:
 
 | Priority | Name | Use Case | Setpoint Behavior |
 |----------|------|----------|-------------------|
-| 4 | Evening peak excess | Discharge excess SOC | Negative value, export surplus |
+| 4 | Evening peak sell-off | Discharge excess SOC | Negative value, export surplus |
 | 5 | Default | Normal operation | Zero, absorb solar/block export |
 
 Additionally, grid setpoint is used in **manual mode** when `grid_setpoint` mode is selected.
@@ -146,7 +146,7 @@ Additionally, grid setpoint is used in **manual mode** when `grid_setpoint` mode
 
 ### Mathematical Control
 
-**Priority 4 (Evening Peak Excess):**
+**Priority 4 (Evening Peak Sell-off):**
 ```
 gap_wh = (soc - soc_target) / 100 × capacity_wh
 spread_w = gap_wh / max(hours_remaining, 0.083)
@@ -178,7 +178,7 @@ This means:
 
 ### Example Scenarios
 
-**Scenario 1: Evening Peak Excess**
+**Scenario 1: Evening Peak Sell-off**
 ```
 SOC: 95%, soc_target: 70%, capacity: 5000 Wh
 Hours remaining in peak: 2 hours

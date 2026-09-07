@@ -158,7 +158,7 @@ self.call_service("number/set_value", entity_id=battery_setpoint, value=-1200)
 self.set_state(status_sensor, state="summer", attributes={...})
 ```
 
-### Priority 4: Evening Peak Excess Discharge
+### Priority 4: Evening Peak Sell-off Discharge
 
 ```python
 # Switch to grid setpoint mode

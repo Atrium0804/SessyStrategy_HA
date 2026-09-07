@@ -54,21 +54,21 @@ _NUMBERS: tuple[_Spec, ...] = (
         0, 100, 5, PERCENTAGE, 30, NumberMode.SLIDER,
     ),
     _Spec(
-        "soc_floor", "Full discharge limit", "mdi:battery-20",
+        "soc_floor", "Discharge at high prices limit", "mdi:battery-20",
         0, 100, 5, PERCENTAGE, 20, NumberMode.SLIDER,
     ),
     _Spec(
-        "soc_ceiling", "Full charge limit", "mdi:battery-charging-100",
+        "soc_ceiling", "Charge at low price limit", "mdi:battery-charging-100",
         0, 100, 5, PERCENTAGE, 100, NumberMode.SLIDER,
     ),
     # Price thresholds (€/kWh) the optimizer reads each cycle. Previously lived
     # as input_number helpers in sessy_helpers.yaml; now owned by this device.
     _Spec(
-        "price_discharge", "Full discharge above", "mdi:cash-plus",
+        "price_discharge", "Discharge at high prices", "mdi:cash-plus",
         0, 1, 0.01, "€/kWh", 0.45, NumberMode.BOX,
     ),
     _Spec(
-        "price_charge", "Full charge below", "mdi:cash-minus",
+        "price_charge", "Charge at low price", "mdi:cash-minus",
         -0.5, 0.2, 0.01, "€/kWh", -0.10, NumberMode.BOX,
     ),
     _Spec(
