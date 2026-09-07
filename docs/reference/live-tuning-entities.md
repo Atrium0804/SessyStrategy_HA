@@ -33,12 +33,14 @@ The app runs every 5 minutes, and **immediately whenever a live input changes** 
 
 | Entity ID | apps.yaml Key | Description | Range | Default Fallback | Unit |
 |---|---|---|---|---|---|
-| `number.home_battery_soc_target` | `soc_target_entity` | Target SOC for pre-peak charge | 0-100 | `soc_target` from apps.yaml | % |
+| `number.home_battery_soc_target` | `soc_target_entity` | Target SOC for afternoon charge | 0-100 | `soc_target` from apps.yaml | % |
 | `number.home_battery_soc_floor` | `soc_floor_entity` | Minimum SOC floor | 0-100 | `soc_floor` from apps.yaml | % |
 | `number.home_battery_soc_ceiling` | `cheap_soc_target_entity` | Target SOC for cheap-price charging | 0-100 | `cheap_soc_target` from apps.yaml | % |
 | `number.home_battery_price_discharge` | `price_discharge_entity` | Price threshold for discharge | any | `price_discharge` from apps.yaml | €/kWh |
 | `number.home_battery_price_charge` | `price_charge_entity` | Price threshold for charging | any | `price_charge` from apps.yaml | €/kWh |
-| `number.home_battery_min_arbitrage_margin` | `min_arbitrage_margin_entity` | Minimum spread for pre-peak charge | ≥ 0 | `min_arbitrage_margin` from apps.yaml | €/kWh |
+| `number.home_battery_min_arbitrage_margin` | `min_arbitrage_margin_entity` | Minimum spread for the evening peak hold-vs-sell decision (P4) | ≥ 0 | `min_arbitrage_margin` from apps.yaml | €/kWh |
+| `number.home_battery_target_afternoon_charging` | `target_afternoon_charging_entity` | Target SOC to reach before the evening peak (P3) | 0-100 | `target_afternoon_charging` from apps.yaml | % |
+| `number.home_battery_afternoon_margin` | `afternoon_margin_entity` | Minimum import-price reduction (evening peak vs now) to justify afternoon charge (P3) | 0-0.5 | `afternoon_margin` from apps.yaml | €/kWh |
 
 ### Mode Selector (input_select)
 
@@ -68,6 +70,8 @@ Use Home Assistant's UI to create the helpers:
 | Price Discharge | `number.home_battery_price_discharge` | -1 | 1 | 0.01 | €/kWh | mdi:lightning-bolt |
 | Price Charge | `number.home_battery_price_charge` | -1 | 1 | 0.01 | €/kWh | mdi:lightning-bolt |
 | Min Arbitrage Margin | `number.home_battery_min_arbitrage_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:swap-horizontal |
+| Afternoon Charge Target | `number.home_battery_target_afternoon_charging` | 0 | 100 | 5 | % | mdi:battery-charging-90 |
+| Afternoon Margin | `number.home_battery_afternoon_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:scale-balance |
 
 **Mode Selector (input_select):**
 

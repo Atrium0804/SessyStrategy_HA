@@ -222,7 +222,7 @@ Configure the SessyStrategy application to match your specific battery system an
    surcharge: 0.11            # Import surcharge €/kWh (raw export → import)
    price_discharge: 0.39      # Raw price above which to force discharge
    price_charge: -0.10        # Raw price below which to charge from grid
-   min_arbitrage_margin: 0.05 # Min €/kWh spread to justify pre-peak charge
+   min_arbitrage_margin: 0.05 # Min €/kWh spread for the evening hold-vs-sell (P4)
    ```
 
 6. **Save the configuration:**
@@ -511,7 +511,7 @@ Monitor SessyStrategy during its first few cycles to ensure it's working correct
      - `DEFAULT`: Normal operation, grid setpoint 0W
      - `discharge`: Price spike discharge
      - `cheap_charge`: Charging during cheap price periods
-     - `prepeak_charge`: Pre-peak charging window
+     - `afternoon_charge`: Afternoon charging window
      - `evening_peak_excess`: Evening peak excess discharge
 
 3. **Check status sensor attributes:**

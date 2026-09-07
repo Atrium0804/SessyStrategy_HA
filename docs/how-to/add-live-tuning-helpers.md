@@ -55,12 +55,13 @@ SessyStrategy supports live tuning for these parameters:
 
 | Parameter | Entity Type | Purpose | Default Static Value |
 |-----------|-------------|---------|---------------------|
-| `soc_target_entity` | input_number | Target SOC for pre-peak charging | `soc_target: 70` |
+| `soc_target_entity` | input_number | Target SOC for afternoon charging | `soc_target: 70` |
 | `soc_floor_entity` | input_number | Minimum SOC — never discharge below | `soc_floor: 0` |
 | `cheap_soc_target_entity` | input_number | Maximum SOC for cheap-price charging | `cheap_soc_target: 100` |
 | `price_discharge_entity` | input_number | Raw price threshold for discharging | `price_discharge: 0.39` |
 | `price_charge_entity` | input_number | Raw price threshold for charging | `price_charge: -0.10` |
-| `min_arbitrage_margin_entity` | input_number | Minimum price spread for pre-peak charging | `min_arbitrage_margin: 0.05` |
+| `min_arbitrage_margin_entity` | input_number | Minimum price spread for the evening peak hold-vs-sell decision (P4) | `min_arbitrage_margin: 0.05` |
+| `afternoon_margin_entity` | input_number | Minimum import-price reduction to justify afternoon charge (P3) | `afternoon_margin: 0.05` |
 | `season_mode_entity` | input_select | Live season mode override | `season_mode: auto` |
 
 **Note:** The `mode_select` entity is also live-tuned and controls the operating mode.
@@ -84,12 +85,13 @@ Decide which parameters you want to make adjustable:
 **Essential (Recommended for all users):**
 - `price_discharge_entity` — Adjust when to sell energy
 - `price_charge_entity` — Adjust when to buy energy
-- `soc_target_entity` — Adjust target SOC for pre-peak
+- `soc_target_entity` — Adjust target SOC for afternoon charge
 
 **Useful for optimization:**
 - `soc_floor_entity` — Adjust minimum SOC
 - `cheap_soc_target_entity` — Adjust cheap charge ceiling
-- `min_arbitrage_margin_entity` — Adjust pre-peak spread requirement
+- `min_arbitrage_margin_entity` — Adjust evening peak hold-vs-sell spread requirement (P4)
+- `afternoon_margin_entity` — Adjust afternoon charge import-price reduction requirement (P3)
 
 **Seasonal control:**
 - `season_mode_entity` — Switch between summer/winter/auto
@@ -106,7 +108,7 @@ For each parameter you want to live-tune, create an input_number helper.
 2. Click **Add Helper** and select **Input Number**
 3. Create entities with these configurations:
 
-#### SOC Target (for pre-peak charging)
+#### SOC Target (for afternoon charging)
 ```yaml
 # Input Number Helper Configuration
 name: "SOC Target"
@@ -179,6 +181,18 @@ initial: 0.05  # Match your static value
 mode: box
 ```
 
+#### Afternoon Margin
+```yaml
+name: "Afternoon margin"
+entity_id: number.home_battery_afternoon_margin
+min: 0.0
+max: 0.5
+step: 0.01
+unit: "€/kWh"
+initial: 0.05  # Match your static value
+mode: box
+```
+
 ### Step 3: Create Season Mode Entity (Optional)
 
 If you want live control over season mode:
@@ -204,7 +218,7 @@ initial: auto
 sessy_strategy:
   module: sessy_strategy
   class: SessyStrategy
-  
+
   # Static fallback values (used if entities unavailable)
   soc_target: 70
   soc_floor: 0
@@ -212,8 +226,9 @@ sessy_strategy:
   price_discharge: 0.39
   price_charge: -0.10
   min_arbitrage_margin: 0.05
+  afternoon_margin: 0.05
   season_mode: auto
-  
+
   # Live entity overrides
   soc_target_entity: number.home_battery_soc_target
   soc_floor_entity: number.home_battery_soc_floor
@@ -221,6 +236,7 @@ sessy_strategy:
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
+  afternoon_margin_entity: number.home_battery_afternoon_margin
   season_mode_entity: input_select.sessy_season_mode
 ```
 
@@ -258,58 +274,63 @@ Set up a dedicated dashboard for tuning your strategy.
     # Price Thresholds Section
     - type: markdown
       content: "### Price Thresholds"
-    
+
     - type: horizontal-stack
       cards:
         - type: entity
           entity: number.home_battery_price_discharge
           name: Discharge Threshold
           icon: mdi:export
-        
+
         - type: entity
           entity: number.home_battery_price_charge
           name: Charge Threshold
           icon: mdi:import
-    
+
     - type: entity
       entity: number.home_battery_min_arbitrage_margin
       name: Arbitrage Margin
       icon: mdi:margin
-    
+
+    - type: entity
+      entity: number.home_battery_afternoon_margin
+      name: Afternoon margin
+      icon: mdi:margin
+
     # SOC Targets Section
     - type: markdown
       content: "### SOC Targets"
-    
+
     - type: horizontal-stack
       cards:
         - type: entity
           entity: number.home_battery_soc_target
-          name: Pre-Peak Target
+          name: Afternoon Target
           icon: mdi:target
-        
+
         - type: entity
           entity: number.home_battery_soc_floor
           name: Minimum SOC
           icon: mdi:floor
-        
+
         - type: entity
           entity: number.home_battery_soc_ceiling
           name: Cheap Charge Ceiling
           icon: mdi:ceiling
-    
+
     # Season Mode Section
     - type: markdown
       content: "### Season Mode"
-    
+
     - type: entity
       entity: input_select.sessy_season_mode
       name: Season Mode
       icon: mdi:weather-seasons
-    
+
     # Current Status Section
     - type: markdown
       content: "### Current Status"
-    
+
     - type: entity
       entity: sensor.sessy_strategy_status
       name: Strategy Status
@@ -390,7 +411,7 @@ To confirm your live tuning setup is working:
    ```yaml
    # apps.yaml
    price_discharge_entity: number.home_battery_price_discharge
-   
+
    # Home Assistant entity must be:
    # entity_id: number.home_battery_price_discharge
    ```

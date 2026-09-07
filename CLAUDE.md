@@ -40,7 +40,7 @@ Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
 
 1. **Price spike** — raw price > `price_discharge` → discharge toward SOC floor over an adaptive window (the hours price stays above the threshold, floored at `min_window_h`)
 2. **Cheap/negative price** — raw price < `price_charge` → charge toward 100% SOC over remaining cheap window
-3. **Pre-peak charge** — in time window (16–18h) AND SOC < target AND evening peak beats current price by margin → charge toward SOC target
+3. **Afternoon charge** — in time window (16–18h) AND SOC < target AND the evening peak import price beats the current import price by `afternoon_margin` → charge toward SOC target (peak-shaving, not trading)
 4. **Evening peak excess** — inside `evening_peak_start`–`evening_peak_end` (20–22h) AND SOC > target AND no price spike remaining → export excess via grid setpoint
 5. **Default** — grid setpoint = 0W (absorb solar, block export)
 
@@ -64,7 +64,7 @@ All tunables live in `files/apps.yaml`. **No magic numbers in Python** — if a 
 - SOC targets: `soc_target` (70%), `soc_floor` (0%), `cheap_soc_target` (100%)
 - Price thresholds: `price_discharge` (0.39), `price_charge` (-0.10), `min_arbitrage_margin` (0.05)
 - Spread window: `min_window_h` (2.0)
-- Time windows: `prepeak_start/end`, `evening_peak_start/end`, winter variants
+- Time windows: `afternoon_start/end`, `evening_peak_start/end`, winter variants
 - Season auto-detect: `season_day_start/end` (8–18h)
 
 Optional `sessy_helpers.yaml` adds `input_number` / `input_select` HA helpers for live runtime tuning without restarting AppDaemon.

@@ -2,7 +2,10 @@
 
 ## Overview
 
-The **arbitrage margin** (`min_arbitrage_margin`) is a critical safeguard in the SessyStrategy that prevents uneconomic battery cycling. It ensures that the strategy only charges the battery from the grid when the expected future savings justify the current cost, accounting for round-trip losses and the strategy's own overhead.
+The **arbitrage margin** (`min_arbitrage_margin`) is a critical safeguard in the SessyStrategy that prevents uneconomic battery cycling. It governs the **Priority 4 evening peak hold-vs-sell decision**: it ensures that stored energy is only sold (or that charging for a later sell is only pursued) when the expected price spread justifies the round-trip losses and the strategy's own overhead.
+
+!!! note
+    `min_arbitrage_margin` is a **trading** safeguard used by Priority 4. It is not used by Priority 3 (afternoon charge). Priority 3 uses a separate `afternoon_margin`, a peak-shaving check that compares two **import** prices. See [Strategy Priority Chain](../explanation/strategy-priority-chain.md).
 
 ---
 
@@ -35,7 +38,7 @@ This is **worse than doing nothing** — you've cycled the battery, incurred wea
 
 ### The Solution
 
-The `min_arbitrage_margin` sets a **minimum price spread** that must be exceeded before the strategy will charge the battery in preparation for a future peak. This ensures that only **economically viable** arbitrage opportunities are pursued.
+The `min_arbitrage_margin` sets a **minimum price spread** that must be exceeded before the strategy will trade stored energy across the evening peak. This ensures that only **economically viable** arbitrage opportunities are pursued.
 
 ---
 
@@ -66,28 +69,20 @@ min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
 
 ## How It Works
 
-### In Priority 3: Pre-Peak Charge
+### In Priority 4: Evening peak hold-vs-sell
 
-The arbitrage margin is used in the **pre-peak charge window** (Priority 3) to determine whether charging now to discharge later is economically justified.
+The arbitrage margin is used in the **evening peak** (Priority 4) to determine whether holding or selling stored energy across the peak is economically justified.
 
 **Condition:**
 ```python
-if prepeak_start <= now_hour < prepeak_end:
-    if soc >= soc_target:
-        # Already at target, no need to charge
-        return
-    
-    # Arbitrage check
-    expected_peak = self._max_price_in_window(now_hour, 24)
-    if expected_peak is not None and \
-            (expected_peak - price) < min_arbitrage_margin:
-        # Spread too small, skip charging
-        return
-    
-    # Spread is sufficient, proceed with charging
-    charge_w = self._charge_setpoint(soc, soc_target, prepeak_window_h)
-    self._set_battery_setpoint(-charge_w)
+# Evening peak hold-vs-sell decision (Priority 4)
+expected_peak = self._max_price_in_window(now_hour, 24)
+if expected_peak is not None and \
+        (expected_peak - price) < min_arbitrage_margin:
+    # Spread too small, hold energy rather than churn
     return
+
+# Spread is sufficient, the trade clears the margin
 ```
 
 ### The Arbitrage Calculation
@@ -198,7 +193,7 @@ Rationale: Not worth the battery cycling
 
 ### The Profitability Condition
 
-Charging in the pre-peak window is profitable when:
+Charging or holding energy for the evening peak is profitable when:
 
 ```
 expected_peak_raw - current_raw_price >= min_arbitrage_margin
@@ -216,19 +211,19 @@ xychart-beta
     title "Arbitrage Decision Space"
     x-axis "Current Raw Price (€/kWh)" 0 --> 0.60
     y-axis "Expected Peak Raw (€/kWh)" 0 --> 0.60
-    
+
     %% Diagonal line: equal prices (no arbitrage)
     line [0.0, 0.0, 0.6, 0.6] as equal
     text "No arbitrage" at [0.3, 0.25]
-    
+
     %% Margin line: current + margin
     line [0.0, 0.05, 0.55, 0.60] as margin
     text "min_arbitrage_margin = 0.05" at [0.3, 0.35]
-    
+
     %% Regions
     fill [0.0, 0.0, 0.55, 0.05]
     text "SKIP" at [0.2, 0.02]
-    
+
     fill [0.0, 0.05, 0.6, 0.6]
     text "CHARGE" at [0.4, 0.4]
 ```
@@ -376,18 +371,18 @@ The arbitrage margin works together with `soc_target` to determine when to charg
 - **High `soc_target`** (e.g., 80%) + **Low margin** (e.g., 0.03): More aggressive charging, higher SOC
 - **Low `soc_target`** (e.g., 60%) + **High margin** (e.g., 0.10): More conservative, only clear opportunities
 
-### Relationship with `prepeak_window_h`
+### Relationship with the evening peak window
 
-The pre-peak window affects how charging is spread:
+The evening peak window affects how the hold-vs-sell decision plays out:
 
-- **Wider window** (e.g., 4h) + **Low margin**: Charge gently over long period, capture small spreads
-- **Narrow window** (e.g., 1h) + **High margin**: Only charge at high power for clear opportunities
+- **Wider window** + **Low margin**: Trade gently across a long peak, capture small spreads
+- **Narrow window** + **High margin**: Only trade for clear, high-value spreads
 
 ### Relationship with Seasonal Overrides
 
 In winter, consider:
 - **Higher margin** (e.g., 0.08-0.10): Account for narrower spreads
-- **Wider pre-peak window** (e.g., 4h): More time to capture opportunities
+- **Wider evening peak window**: More time to capture opportunities
 - **Higher `soc_target`** (e.g., 80%): More energy for heating demand
 
 ---
@@ -410,8 +405,8 @@ A: Monitor your strategy's behavior and outcomes:
 
 1. **Check logs** for arbitrage decisions:
    ```
-   PRE-PEAK SKIP: best remaining price 0.48 vs current 0.46 (spread < margin 0.05)
-   PRE-PEAK CHARGE: battery setpoint -1200W (SOC 65% → target 70% over 2h)
+   EVENING PEAK: holding energy, best remaining price 0.48 vs current 0.46 (spread < margin 0.05)
+   EVENING PEAK: discharging excess, spread clears margin 0.05
    ```
 
 2. **Calculate actual outcomes:**
@@ -443,7 +438,7 @@ A: Currently, the strategy only supports a single `min_arbitrage_margin` value. 
 
 1. **Use the live entity** (`min_arbitrage_margin_entity`) and manually adjust it per season
 2. **Create automation** in Home Assistant to adjust the margin based on season
-3. **Adjust other parameters** seasonally (prepeak window, soc_target) to compensate
+3. **Adjust other parameters** seasonally (afternoon window, soc_target) to compensate
 
 **Future enhancement:** You could extend the code to support `min_arbitrage_margin_winter` similar to other seasonal overrides.
 
@@ -455,7 +450,7 @@ A: They serve different purposes:
 |-----------|---------|-----------------|
 | `price_discharge` | Trigger for selling stored energy | P1: Price spike discharge |
 | `price_charge` | Trigger for buying cheap energy | P2: Cheap price charge |
-| `min_arbitrage_margin` | Minimum spread for pre-peak charging | P3: Pre-peak charge |
+| `min_arbitrage_margin` | Minimum spread for evening peak hold-vs-sell | P4: Evening peak |
 
 **No direct relationship** — they're independent thresholds that each serve a specific purpose in the priority chain.
 
@@ -463,7 +458,7 @@ A: They serve different purposes:
 
 ## See Also
 
-- [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — Where arbitrage margin is used (P3)
+- [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — Where arbitrage margin is used (P4)
 - [Price Basis: Raw vs Import](../explanation/price-basis-raw-vs-import.md) — Understanding the price calculations
 - [Seasonal Operation](../explanation/seasonal-operation.md) — How winter affects arbitrage opportunities
 - [Tune Price Thresholds](../how-to/tune-price-thresholds.md) — Adjusting all price-related parameters

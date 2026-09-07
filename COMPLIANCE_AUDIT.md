@@ -44,7 +44,7 @@ The project lacks a `tests/` directory and has no unit tests. This violates the 
 1. `test_charge_setpoint_tapers_as_gap_shrinks()` — gap approaches zero → setpoint → 50W (min)
 2. `test_discharge_setpoint_capped_at_c_rate()` — verify C-rate cap enforcement
 3. `test_cheap_hours_counter_stops_at_price_threshold()` — boundary condition
-4. `test_prepeak_charge_skipped_if_peak_spread_too_small()` — arbitrage guard works
+4. `test_afternoon_charge_skipped_if_peak_spread_too_small()` — peak-shaving guard works
 5. `test_priority_1_overrides_priority_2()` — excessive price beats cheap window
 6. `test_priority_3_skipped_if_soc_above_target()` — no unnecessary charge
 7. `test_seasonal_override_applied_in_winter()` — winter tunables take effect

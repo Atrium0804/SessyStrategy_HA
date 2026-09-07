@@ -8,9 +8,6 @@
 *.yaml text=auto eol=lf
 *.yml text=auto eol=lf
 
-# Sidebars and configuration
-_sidebar.yml text=auto eol=lf
-
 # Ignore files
 .gitignore text=auto eol=lf
 

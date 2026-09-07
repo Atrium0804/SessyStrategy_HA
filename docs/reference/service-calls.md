@@ -147,7 +147,7 @@ self.call_service("number/set_value", entity_id=battery_setpoint, value=-2200)
 self.set_state(status_sensor, state="winter", attributes={...})
 ```
 
-### Priority 3: Pre-Peak Charge
+### Priority 3: Afternoon Charge
 
 ```python
 # Switch to battery setpoint mode

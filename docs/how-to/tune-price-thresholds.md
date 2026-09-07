@@ -151,7 +151,7 @@ Charge when: Raw Price < Your Break-Even Charge Price
 
 **For negative prices:** These are "pay to use" — you get paid to consume energy. Always charge during negative prices unless your battery is full.
 
-**Recommendation:** 
+**Recommendation:**
 - **Normal conditions**: Set `price_charge` to **€0.10-0.20** (raw) — charge when you expect to export at > €0.21-0.31 later
 - **Aggressive**: Set to **€0.00-0.10** (raw) — charge more frequently
 - **Conservative**: Set to **-0.10-0.00** (raw) — only charge during very cheap periods
@@ -164,10 +164,10 @@ Charge when: Raw Price < Your Break-Even Charge Price
 sessy_strategy:
   module: sessy_strategy
   class: SessyStrategy
-  
+
   # Your energy costs
   surcharge: 0.11  # Your actual surcharge in €/kWh
-  
+
   # Price thresholds (raw prices)
   price_discharge: 0.39  # Discharge when raw > €0.39 (import > ~€0.50)
   price_charge: -0.10    # Charge when raw < -€0.10 (very cheap/negative)
@@ -196,13 +196,13 @@ sessy_strategy:
    sessy_strategy:
      module: sessy_strategy
      class: SessyStrategy
-     
+
      # Static fallbacks (used if entities unavailable)
      surcharge: 0.11
      price_discharge: 0.39
      price_charge: -0.10
      min_arbitrage_margin: 0.05
-     
+
      # Live entity overrides
      price_discharge_entity: number.home_battery_price_discharge
      price_charge_entity: number.home_battery_price_charge
@@ -213,25 +213,49 @@ sessy_strategy:
 
 ### Step 5: Configure Arbitrage Margin (Optional)
 
-The `min_arbitrage_margin` prevents charging in the pre-peak window if the price spread is too small to be worthwhile.
+The `min_arbitrage_margin` governs the **Priority 4 evening peak hold-vs-sell decision**. It prevents trading stored energy across the peak when the price spread is too small to be worthwhile.
 
-**What it does:** In Priority 3 (pre-peak charging), the strategy only charges if:
+**What it does:** In Priority 4 (evening peak), the strategy only trades energy if:
 ```
 (expected_peak_price - current_price) >= min_arbitrage_margin
 ```
 
-**Default:** €0.05/kWh — requires at least 5 cent spread to justify charging
+**Default:** €0.05/kWh — requires at least 5 cent spread to justify the trade
 
 **Recommendations:**
-- **Conservative (€0.08-0.15)**: Only charge when significant savings are guaranteed
+- **Conservative (€0.08-0.15)**: Only trade when significant savings are guaranteed
 - **Moderate (€0.05-0.08)**: Default — good balance
-- **Aggressive (€0.02-0.05)**: Charge even with small spreads
-- **Very aggressive (€0.00-0.02)**: Charge whenever future prices are higher
+- **Aggressive (€0.02-0.05)**: Trade even with small spreads
+- **Very aggressive (€0.00-0.02)**: Trade whenever future prices are higher
 
 **Configuration:**
 ```yaml
 sessy_strategy:
   min_arbitrage_margin: 0.05  # Default
+```
+
+### Step 6: Configure Afternoon Margin (Optional)
+
+The `afternoon_margin` governs the **Priority 3 afternoon charge**. Unlike `min_arbitrage_margin`, this is a **peak-shaving** check, not a trading check: it compares two **import (buy)** prices to decide whether topping up now avoids a more expensive grid import during the evening peak.
+
+**What it does:** In the afternoon window, if SOC is below `target_afternoon_charging`, the strategy charges only if:
+```
+(evening_peak_buy_price - current_buy_price) >= afternoon_margin
+```
+
+Both prices are import prices (raw + surcharge). The rule tops up self-consumed energy at a low afternoon import price to avoid net grid import during the evening peak. It is not grid trading, so no export taxes or fees enter the calculation.
+
+**Default:** €0.05/kWh — the evening peak import price must beat the current import price by at least 5 cent
+
+**Recommendations:**
+- **Conservative (€0.08-0.15)**: Only top up when the peak is clearly more expensive
+- **Moderate (€0.05-0.08)**: Default — good balance
+- **Aggressive (€0.02-0.05)**: Top up even for modest import-price reductions
+
+**Configuration:**
+```yaml
+sessy_strategy:
+  afternoon_margin: 0.05  # Default
 ```
 
 ---
@@ -249,15 +273,15 @@ To confirm your price thresholds are working correctly:
    ```
    # Look for these patterns in AppDaemon logs:
    Hour=14  SOC=65%  Raw price=0.25000  Import price=0.36000
-   
+
    # Priority 1 trigger (discharge):
    DISCHARGE override: import price 0.500 > 0.50 — battery setpoint 1500W
-   
+
    # Priority 2 trigger (charge):
    CHEAP CHARGE: raw price -0.15000 < -0.10 — battery setpoint -2200W
-   
-   # Priority 3 skip (insufficient margin):
-   PRE-PEAK SKIP: best remaining price 0.350 vs current 0.320 (spread < margin 0.05)
+
+   # Priority 3 skip (insufficient import-price reduction):
+   AFTERNOON SKIP: evening peak buy 0.350 vs current buy 0.320 (spread < margin 0.05)
    ```
 
 3. **Test threshold behavior:**

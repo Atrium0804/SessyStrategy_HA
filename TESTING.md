@@ -104,7 +104,7 @@ All tests live in [`tests/test_sessy_strategy.py`](tests/test_sessy_strategy.py)
 
 | Test class | What it covers |
 |---|---|
-| `TestChargeSetpoint` | Watt calculation for pre-peak charging |
+| `TestChargeSetpoint` | Watt calculation for afternoon charging |
 | `TestDischargeSetpoint` | Watt calculation for price-spike discharge |
 | `TestCheapChargeSetpoint` | Watt calculation during cheap / negative prices |
 | `TestPostPeakDischargeSetpoint` | Watt calculation for post-peak excess drain |
@@ -146,7 +146,7 @@ A minimal example — testing that a very small charge gap still returns the
 def test_minimum_50w(self):
     app = make_app()
     # Gap: (90-89)/100 * 5000 Wh / 2 h = 25 W → floor at 50 W
-    result = app._charge_setpoint(soc=89, soc_target=90, prepeak_window_h=2.0)
+    result = app._charge_setpoint(soc=89, soc_target=90, afternoon_window_h=2.0)
     assert result == pytest.approx(50.0)
 ```
 

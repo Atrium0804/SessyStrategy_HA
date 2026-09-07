@@ -154,7 +154,7 @@ Do not hardcode colors in page content. Color lives in the theme, defined once f
 - [ ] Admonitions and Mermaid use the approved syntax/theme.
 - [ ] No raster images, decorative emoji, or hardcoded colors.
 - [ ] First mention of each concept links to its canonical page.
-- [ ] `mkdocs serve` renders the page with no build warnings.
+- [ ] Markdown renders correctly and all relative links resolve.
 
 ---
 

@@ -7,15 +7,26 @@ sessy_strategy:
   max_power_w: 2200          # Inverter/battery max power in W — final setpoint clamp
 
   # ── State-of-charge targets ─────────────────────────────────────────
-  soc_target: 70             # % SOC to reach before the evening peak
+  # Per-rule SOC targets (fall back to soc_target when omitted).
+  target_afternoon_charging: 70 # % SOC to reach before the evening peak (P3)
+  target_peak_discharge: 70     # % SOC above which evening excess is sold (P4)
+  target_morning_soc: 30        # % SOC to unload down to in the morning window (P5)
   soc_floor: 0              # % SOC floor — never discharge below this
   cheap_soc_target: 100      # % SOC ceiling for cheap-price charging
 
   # ── Pricing ─────────────────────────────────────────────────────────
-  surcharge: 0.11            # Import surcharge €/kWh (raw export → import)
-  price_discharge: 0.39      # Raw price above which to force discharge
-  price_charge: -0.10        # Raw price below which to charge from grid
-  min_arbitrage_margin: 0.05 # Min €/kWh spread to justify pre-peak charge
+  # surcharge is only used as a fallback: when buy_price_sensor is not set, the
+  # buy price is derived as the raw sensor value + surcharge.
+  surcharge: 0.11            # €/kWh added to the raw sensor to derive the buy price
+  price_discharge: 0.39      # Sell price above which to force discharge (P1)
+  price_charge: 0.01         # Buy price below which to charge from grid (P2)
+  min_arbitrage_margin: 0.05 # Min €/kWh spread for the evening hold-vs-sell decision (P4)
+  afternoon_margin: 0.05     # Min €/kWh by which the evening peak import beats now to justify afternoon charge (P3)
+
+  # ── Grid-connection guard (P0) ──────────────────────────────────────
+  # Every setpoint is clamped so grid power stays within max_grid_w * grid_utilization.
+  max_grid_w: 8000           # Physical connection limit in W (1x35A @ 230V ≈ 8 kW)
+  grid_utilization: 0.9      # Fraction of the limit we allow
 
   # ── Adaptive spread window ──────────────────────────────────────────
   # Price-spike discharge and cheap charge spread over the contiguous run of
@@ -25,11 +36,12 @@ sessy_strategy:
   rerun_debounce_s: 2.0      # Delay before re-running after a live input changes
 
   # ── Time windows (local hours) ──────────────────────────────────────
-  prepeak_start: 16
-  prepeak_end: 18
-  prepeak_window_h: 2.0
+  afternoon_start: 16
+  afternoon_end: 18
   evening_peak_start: 20
   evening_peak_end: 22
+  morning_selloff_start: 7
+  morning_selloff_end: 9
 
   # ── Seasonal mode (auto | summer | winter) ─────────────────────────
   # auto infers from the hour of today's minimum raw price:
@@ -41,9 +53,8 @@ sessy_strategy:
 
   # Optional winter-specific overrides. If omitted, base values are used.
   soc_floor_winter: 0
-  prepeak_start_winter: 14
-  prepeak_end_winter: 18
-  prepeak_window_h_winter: 4.0
+  afternoon_start_winter: 14
+  afternoon_end_winter: 18
 
   # ── Entity IDs (map these to your own Sessy entities) ───────────────
   strategy_select: select.sessy_battery_alt9_power_strategy
@@ -51,6 +62,14 @@ sessy_strategy:
   battery_setpoint: number.sessy_battery_alt9_power_setpoint
   soc_sensor: sensor.sessy_battery_alt9_state_of_charge
   price_sensor: sensor.sessy_dnhh_energy_price
+  # Optional explicit buy/sell price sensors (each with an hourly energy_prices
+  # attribute). If omitted, both fall back to price_sensor and the buy price is
+  # derived as raw + surcharge. Uncomment to use dedicated sensors.
+  # buy_price_sensor: sensor.energy_buy_price
+  # sell_price_sensor: sensor.energy_sell_price
+  # Optional live grid/house power sensor, used by the grid guard for battery
+  # (api-mode) setpoints. Without it, only grid (nom-mode) setpoints are bounded.
+  grid_power_sensor: sensor.sessy_pwkn_p1_power
   status_sensor: sensor.sessy_strategy_status
 
   # ── Operating-mode selector (master control) ────────────────────────
@@ -74,12 +93,23 @@ sessy_strategy:
   # to the static values above if a helper is missing or unreadable. Remove any
   # line to keep that value static.
   # SOC numbers and price thresholds all come from the Home Battery integration.
-  soc_target_entity: number.home_battery_soc_target
+  target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
+  target_peak_discharge_entity: number.home_battery_target_peak_discharge
+  target_morning_soc_entity: number.home_battery_target_morning_soc
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
+  afternoon_margin_entity: number.home_battery_afternoon_margin
+
+  # Per-rule enable switches (Home Battery integration). Omit to keep a rule
+  # always enabled. The grid guard and default fall-through are always active.
+  rule_price_spike_entity: switch.home_battery_rule_price_spike
+  rule_cheap_charge_entity: switch.home_battery_rule_cheap_charge
+  rule_afternoon_charge_entity: switch.home_battery_rule_afternoon_charge
+  rule_evening_peak_entity: switch.home_battery_rule_evening_peak
+  rule_morning_selloff_entity: switch.home_battery_rule_morning_selloff
 
   # Optional live season mode selector (input_select with auto/summer/winter).
   # If set, this overrides season_mode from the UI.

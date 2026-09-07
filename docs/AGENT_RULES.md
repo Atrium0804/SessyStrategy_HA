@@ -1,6 +1,6 @@
 # Documentation Style Guide for AI Agents
 
-**For MkDocs Material | Stephen Few Minimal Distraction Principle**
+**Stephen Few Minimal Distraction Principle**
 
 This document provides mandatory rules for AI agents (Vibe, Copilot, etc.) when generating or editing documentation for SessyStrategy HA.
 
@@ -9,7 +9,7 @@ This document provides mandatory rules for AI agents (Vibe, Copilot, etc.) when 
 ## Core Principles
 
 1. **Stephen Few minimal distraction**: Eliminate all non-essential visual elements
-2. **MkDocs Material native features**: Use the `admonition` and `pymdownx` extensions configured in `mkdocs.yml`
+2. **Portable Markdown**: Keep pages as standard Markdown so they render on GitHub and any static-site generator
 3. **Mermaid for diagrams**: Visual explanations via Mermaid with neutral colors
 4. **Admonitions**: Use `!!! note`, `!!! warning`, `!!! tip` for emphasis
 
@@ -105,8 +105,7 @@ If custom colors are absolutely necessary, use muted palette:
 
 ## Admonition Usage
 
-MkDocs Material renders these as styled boxes via the `admonition` extension configured in
-`mkdocs.yml`. Use for important information that needs visual emphasis. Content under the
+Static-site generators that support the `admonition` extension render these as styled boxes; on GitHub they appear as indented text. Use for important information that needs visual emphasis. Content under the
 marker line must be indented by four spaces.
 
 ### When to Use Each
@@ -338,7 +337,7 @@ More content.
 
 ```
 STYLE: SessyStrategy HA documentation rules.
-- Renderer: MkDocs Material (see mkdocs.yml)
+- Format: portable Markdown (renders on GitHub and static-site generators)
 - Diagrams: Mermaid with %%{init: {'theme': 'neutral'}}%%
 - Admonitions: !!! note, !!! warning, !!! tip (content indented 4 spaces)
 - NO emoji except ❌ (error) and ⚠️ (warning)

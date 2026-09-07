@@ -40,7 +40,7 @@ The strategy uses battery setpoint (`api` mode) in the following priority branch
 |----------|------|----------|-------------------|
 | 1 | Price-spike discharge | Avoid expensive imports | Positive value, discharge toward SOC floor |
 | 2 | Cheap price charge | Capture cheap energy | Negative value, charge toward 100% |
-| 3 | Pre-peak charge | Prepare for evening peak | Negative value, charge toward SOC target |
+| 3 | Afternoon charge | Prepare for evening peak | Negative value, charge toward SOC target |
 
 ### Control Characteristics
 
@@ -94,7 +94,7 @@ Discharge power: 3000 / 2 = 1500 W
 Setpoint: +1500 W (battery discharges at 1500W)
 ```
 
-**Scenario 2: Pre-Peak Charge**
+**Scenario 2: Afternoon Charge**
 ```
 SOC: 60%, soc_target: 70%, capacity: 5000 Wh
 Window: 2 hours
@@ -251,15 +251,15 @@ The strategy **automatically switches** between `api` and `nom` modes based on w
 ```python
 # In _set_battery_setpoint:
 if current_strategy != "api":
-    call_service("select/select_option", 
-                entity_id=strategy_select, 
+    call_service("select/select_option",
+                entity_id=strategy_select,
                 option="api")
     log("Strategy → api (battery setpoint)")
 
 # In _set_grid_setpoint:
 if current_strategy != "nom":
-    call_service("select/select_option", 
-                entity_id=strategy_select, 
+    call_service("select/select_option",
+                entity_id=strategy_select,
                 option="nom")
     log("Strategy → nom (grid setpoint)")
 ```
@@ -323,11 +323,11 @@ xychart-beta
     title "Battery vs Grid Setpoint Response"
     x-axis ["Low Load", "Medium Load", "High Load"]
     y-axis "Power (W)" -2500 --> 2500
-    
+
     %% Battery setpoint: fixed battery power
     line [1500, 1500, 1500]
     text "Battery setpoint: +1500W" at [0, 1600]
-    
+
     %% Grid setpoint: battery adjusts to maintain grid target
     bar [0, 0, 0]
     text "Grid setpoint: 0W" at [0, 200]

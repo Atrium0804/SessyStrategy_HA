@@ -49,11 +49,11 @@ SessyStrategy evaluates conditions in strict priority order. **The first matchin
 │  ├─ Condition: price < price_charge AND soc < cheap_soc_target │
 │  └─ Action: Battery setpoint, charge toward ceiling             │
 ├─────────────────────────────────────────────────────────────┤
-│  Priority 3: Pre-Peak Charge Window                            │
-│  ├─ Condition: prepeak_start <= hour < prepeak_end             │
-│  ├─ Condition: soc < soc_target                                │
-│  └─ Condition: (expected_peak - price) >= min_arbitrage_margin  │
-│  └─ Action: Battery setpoint, charge toward soc_target          │
+│  Priority 3: Afternoon Charge Window                           │
+│  ├─ Condition: afternoon_start <= hour < afternoon_end         │
+│  ├─ Condition: soc < target_afternoon_charging                 │
+│  └─ Condition: (evening_peak_buy - buy) >= afternoon_margin     │
+│  └─ Action: Battery setpoint, charge toward target             │
 ├─────────────────────────────────────────────────────────────┤
 │  Priority 4: Evening Peak Excess Discharge                      │
 │  ├─ Condition: evening_peak_start <= hour < evening_peak_end   │
@@ -110,10 +110,11 @@ price_charge: -0.10          # Current charge threshold
 soc_target: 70               # Current SOC target
 soc_floor: 0                # Current SOC floor
 cheap_soc_target: 100        # Current cheap charge ceiling
-min_arbitrage_margin: 0.05   # Current arbitrage margin
-prepeak_start: 15           # Current pre-peak window start
-prepeak_end: 17             # Current pre-peak window end
-prepeak_window_h: 2.0       # Current pre-peak charge window
+min_arbitrage_margin: 0.05   # Current arbitrage margin (P4)
+afternoon_margin: 0.05       # Current afternoon margin (P3)
+afternoon_start: 15         # Current afternoon window start
+afternoon_end: 17           # Current afternoon window end
+afternoon_window_h: 2.0     # Current afternoon charge window
 daily_min_price_hour: 3      # Hour of day's minimum price
 daily_min_price: 0.15000     # Value of day's minimum price
 ```
@@ -129,9 +130,9 @@ The `active_branch` attribute tells you exactly which decision path was taken:
 | `discharge` | 1 | Price-spike discharge active |
 | `cheap_charge` | 2 | Cheap price charging active |
 | `cheap_charge_full` | 2 | Cheap price but SOC already at ceiling |
-| `prepeak_charge` | 3 | Pre-peak charging active |
-| `prepeak_full` | 3 | In pre-peak window but SOC already at target |
-| `prepeak_skip` | 3 | In pre-peak window but arbitrage margin too small |
+| `afternoon_charge` | 3 | Afternoon charging active |
+| `afternoon_full` | 3 | In afternoon window but SOC already at target |
+| `afternoon_skip` | 3 | In afternoon window but import-price reduction too small |
 | `evening_peak_excess` | 4 | Evening peak excess discharge active |
 | `default` | 5 | Default grid setpoint 0W |
 | `manual_grid` | - | Manual grid setpoint mode |
@@ -182,18 +183,18 @@ Evaluation: (0.25000 < -0.10) AND (65.3 < 100)? NO → Priority 2 not triggered
 
 If this condition is **NOT met**, check Priority 3.
 
-#### Priority 3: Pre-Peak Charge Window
+#### Priority 3: Afternoon Charge Window
 ```
-Condition 1: prepeak_start <= current_hour < prepeak_end
-Condition 2: soc < soc_target
-Condition 3: (expected_peak - price) >= min_arbitrage_margin
-Your values: prepeak_start = 15, prepeak_end = 17, hour = 14, soc = 65.3, soc_target = 70
+Condition 1: afternoon_start <= current_hour < afternoon_end
+Condition 2: soc < target_afternoon_charging
+Condition 3: (evening_peak_buy - current_buy) >= afternoon_margin
+Your values: afternoon_start = 15, afternoon_end = 17, hour = 14, soc = 65.3, target = 70
 Evaluation: (15 <= 14 < 17)? NO → Priority 3 not triggered
 ```
 
 If this condition is **NOT met**, check Priority 4.
 
-**Note:** To see `expected_peak`, you may need to check logs or add debug logging. The strategy calculates this as the maximum remaining raw price for the day.
+**Note:** `evening_peak_buy` is the highest import price (raw + surcharge) during the evening peak window; `current_buy` is the current import price. The rule tops up only when charging now meaningfully undercuts importing at the evening peak.
 
 #### Priority 4: Evening Peak Excess Discharge
 ```
@@ -230,23 +231,23 @@ The logs provide detailed information about each strategy decision.
    # Format: Hour=XX  SOC=XX%  Raw price=X.XXXXX  Import price=X.XXXXX
    Hour=14  SOC=65%  Raw price=0.25000  Import price=0.36000
    DEFAULT: grid setpoint 0W — absorb solar, block export
-   
+
    # Priority 1 example:
    Hour=19  SOC=85%  Raw price=0.45000  Import price=0.56000
    DISCHARGE override: import price 0.560 > 0.50 — battery setpoint 1800W (SOC 85% → floor 0% over 2.50h)
-   
+
    # Priority 2 example:
    Hour=03  SOC=45%  Raw price=-0.15000  Import price=-0.04000
    CHEAP CHARGE: raw price -0.15000 < -0.10 — battery setpoint -2200W (SOC 45% → 100% over 2.00h cheap window)
-   
+
    # Priority 3 example:
    Hour=16  SOC=65%  Raw price=0.25000  Import price=0.36000
-   PRE-PEAK CHARGE: battery setpoint -2000W (SOC 65% → target 70% over 2.0h)
-   
+   AFTERNOON CHARGE: battery setpoint -2000W (SOC 65% → target 70% over 2.0h)
+
    # Priority 3 skip example:
    Hour=16  SOC=65%  Raw price=0.32000  Import price=0.43000
-   PRE-PEAK SKIP: best remaining price 0.350 vs current 0.320 (spread < margin 0.05) — holding grid setpoint 0W
-   
+   AFTERNOON SKIP: evening peak import 0.450 vs current import 0.430 (spread < margin 0.05) — holding grid setpoint 0W
+
    # Priority 4 example:
    Hour=20  SOC=85%  Raw price=0.40000  Import price=0.51000
    EVENING PEAK EXCESS: SOC 85% > target 70% — grid export setpoint -800W (spread over 2.50h remaining peak window)
@@ -278,7 +279,7 @@ The strategy requires these entities to function:
 #### Price Sensor Data
 The strategy needs both:
 - **Current price**: From sensor state or `energy_prices` attribute
-- **Daily prices**: From `energy_prices` attribute for spread window and pre-peak calculations
+- **Daily prices**: From `energy_prices` attribute for spread window and afternoon calculations
 
 **Check `energy_prices` attribute:**
 ```yaml
@@ -368,28 +369,28 @@ price_discharge: 0.35  # Discharge when raw > €0.35
 soc_floor: 5  # Keep at least 5% charge
 ```
 
-### Issue 3: "It's not charging in pre-peak window"
+### Issue 3: "It's not charging in afternoon window"
 
 **Symptoms:**
-- Strategy shows `default` or `prepeak_skip` instead of `prepeak_charge`
+- Strategy shows `default` or `afternoon_skip` instead of `afternoon_charge`
 - Battery doesn't charge before evening peak
 
 **Checklist:**
-- [ ] Is current hour within pre-peak window?
-  - Current: `hour = 14, prepeak_start = 15, prepeak_end = 17`
+- [ ] Is current hour within afternoon window?
+  - Current: `hour = 14, afternoon_start = 15, afternoon_end = 17`
   - Evaluation: `15 <= 14 < 17`? NO
-  - Fix: Adjust `prepeak_start` to `14`
+  - Fix: Adjust `afternoon_start` to `14`
 
 - [ ] Is SOC below target?
-  - Current: `soc = 75, soc_target = 70`
+  - Current: `soc = 75, target_afternoon_charging = 70`
   - Evaluation: `75 < 70`? NO
-  - Fix: Lower `soc_target` to `75` or wait for SOC to drop
+  - Fix: Lower `target_afternoon_charging` to `75` or wait for SOC to drop
 
-- [ ] Is arbitrage margin sufficient?
-  - Current: `expected_peak = 0.35, price = 0.32, min_arbitrage_margin = 0.05`
-  - Calculation: `0.35 - 0.32 = 0.03`
+- [ ] Is the afternoon margin met?
+  - Current: `evening_peak_buy = 0.46, current_buy = 0.43, afternoon_margin = 0.05`
+  - Calculation: `0.46 - 0.43 = 0.03`
   - Evaluation: `0.03 >= 0.05`? NO
-  - Fix: Lower `min_arbitrage_margin` to `0.02` or wait for better spread
+  - Fix: Lower `afternoon_margin` to `0.02` or wait for a cheaper afternoon vs the evening peak
 
 - [ ] Are price forecasts available?
   - Check: `energy_prices` attribute exists and has future prices
@@ -398,8 +399,8 @@ soc_floor: 5  # Keep at least 5% charge
 **Example fix:**
 ```yaml
 # In apps.yaml
-prepeak_start: 14  # Start pre-peak at 14:00
-min_arbitrage_margin: 0.02  # Lower margin requirement
+afternoon_start: 14  # Start afternoon window at 14:00
+afternoon_margin: 0.02  # Lower margin requirement
 ```
 
 ### Issue 4: "It's charging/discharging too aggressively"
@@ -520,8 +521,8 @@ soc_target = 70
 soc_floor = 0
 cheap_soc_target = 100
 current_hour = 14
-prepeak_start = 15
-prepeak_end = 17
+afternoon_start = 15
+afternoon_end = 17
 evening_peak_start = 18
 evening_peak_end = 23
 
@@ -546,22 +547,23 @@ else:
     print("P2: NOT MATCHED")
 
 # Priority 3
-if prepeak_start <= current_hour < prepeak_end:
+if afternoon_start <= current_hour < afternoon_end:
     if soc >= soc_target:
-        print("P3: PRE-PEAK FULL - soc", soc, ">= soc_target", soc_target)
+        print("P3: AFTERNOON FULL - soc", soc, ">= target", soc_target)
         exit()
     else:
-        # Need expected_peak from logs or status
-        expected_peak = 0.45  # Example value
-        min_arbitrage_margin = 0.05
-        if (expected_peak - raw_price) >= min_arbitrage_margin:
-            print("P3: PRE-PEAK CHARGE - soc", soc, "< soc_target", soc_target, "AND spread", expected_peak - raw_price, ">= margin", min_arbitrage_margin)
+        # evening_peak_buy and current_buy are import prices (raw + surcharge)
+        evening_peak_buy = 0.56  # Example value
+        current_buy = import_price
+        afternoon_margin = 0.05
+        if (evening_peak_buy - current_buy) >= afternoon_margin:
+            print("P3: AFTERNOON CHARGE - soc", soc, "< target", soc_target, "AND spread", evening_peak_buy - current_buy, ">= margin", afternoon_margin)
             exit()
         else:
-            print("P3: PRE-PEAK SKIP - spread", expected_peak - raw_price, "< margin", min_arbitrage_margin)
+            print("P3: AFTERNOON SKIP - spread", evening_peak_buy - current_buy, "< margin", afternoon_margin)
             exit()
 else:
-    print("P3: NOT IN WINDOW - hour", current_hour, "not in", prepeak_start, "-", prepeak_end)
+    print("P3: NOT IN WINDOW - hour", current_hour, "not in", afternoon_start, "-", afternoon_end)
 
 # Priority 4
 if evening_peak_start <= current_hour < evening_peak_end:
@@ -600,7 +602,7 @@ def log_debug_info(self):
     soc = self._get_soc()
     price = self._get_current_price()
     import_price = price + self.surcharge if price else None
-    
+
     self.log(
         f"DEBUG: Hour={self.datetime().hour:02d}  "
         f"SOC={soc:.1f}%  "
@@ -609,7 +611,7 @@ def log_debug_info(self):
         f"Mode={self._active_mode()}  "
         f"Season={self._active_season_mode()}"
     )
-    
+
     # Log all threshold values
     self.log(
         f"DEBUG: Thresholds - "
@@ -636,9 +638,9 @@ if prices:
             hourly_prices.append(float(prices[key]))
         else:
             hourly_prices.append(None)
-    
+
     self.log(f"DEBUG: Hourly prices for {today}: {hourly_prices}")
-    
+
     # Check for missing data
     missing = [i for i, p in enumerate(hourly_prices) if p is None]
     if missing:

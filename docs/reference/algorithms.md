@@ -12,16 +12,16 @@ SessyStrategy uses several key algorithms for calculating charge/discharge power
 
 ## Setpoint Calculation Algorithms
 
-### 1. Charge Setpoint (Pre-Peak)
+### 1. Charge Setpoint (Afternoon)
 
-**Method:** `_charge_setpoint(soc: float, soc_target: float, prepeak_window_h: float) -> float`
+**Method:** `_charge_setpoint(soc: float, soc_target: float, afternoon_window_h: float) -> float`
 
-**Purpose:** Calculate power to charge the battery during the pre-peak window (Priority 3).
+**Purpose:** Calculate power to charge the battery during the afternoon window (Priority 3).
 
 **Formula:**
 ```
 gap_wh = (soc_target - soc) / 100.0 * capacity_wh
-spread_w = gap_wh / prepeak_window_h
+spread_w = gap_wh / afternoon_window_h
 power_w = spread_w * 1.5  # Charge 50% faster than even spread
 power_w = min(power_w, max_power_w)  # Cap at hardware limit
 min_power_w = max_power_w * 0.66  # Minimum power threshold
@@ -29,14 +29,14 @@ result = max(min_power_w, power_w)
 ```
 
 **Rationale:**
-- Spreads the required energy over the pre-peak window
+- Spreads the required energy over the afternoon window
 - Charges 50% faster than the even spread to finish early
 - Capped at `max_power_w` to avoid exceeding hardware limits
 - Minimum power threshold (66% of max) prevents wasting surplus PV energy when SOC is near target
 
 **Example:**
 - `capacity_wh = 5000` (5 kWh battery)
-- `soc = 40%`, `soc_target = 70%`, `prepeak_window_h = 2.0`
+- `soc = 40%`, `soc_target = 70%`, `afternoon_window_h = 2.0`
 - `max_power_w = 2200`
 
 ```
@@ -235,7 +235,7 @@ result = max(run_h, min_window_h)
 ```
 
 **Use cases:**
-- Pre-peak charge: Check if expected evening peak > current price + margin
+- Afternoon charge: Check if the evening peak import price > current import price + afternoon_margin
 - Evening peak excess: Check if any remaining hour exceeds discharge threshold
 
 **Example:**
@@ -387,7 +387,7 @@ result = max(run_h, min_window_h)
       return base_value
 ```
 
-**Use:** SOC floor, pre-peak window parameters
+**Use:** SOC floor, afternoon window parameters
 
 ---
 
@@ -413,7 +413,7 @@ result = max(run_h, min_window_h)
 
 | Algorithm | Formula | Purpose | Used In |
 |---|---|---|---|
-| Charge Setpoint | `(target-soc)/100 * cap / window * 1.5` | Pre-peak charging | Priority 3 |
+| Charge Setpoint | `(target-soc)/100 * cap / window * 1.5` | Afternoon charging | Priority 3 |
 | Discharge Setpoint | `(soc-floor)/100 * cap / window` | Price spike discharge | Priority 1 |
 | Cheap Charge | `max_power_w` (constant) | Cheap price charging | Priority 2 |
 | Excess Discharge | `(soc-target)/100 * cap / hours` | Evening surplus export | Priority 4 |
@@ -447,19 +447,19 @@ result = max(50, min(1000, 2200)) = 1000 W
 
 ---
 
-### Scenario 2: Pre-Peak Charge
+### Scenario 2: Afternoon Charge
 
 **Conditions:**
 - Battery: 5 kWh, 2.2 kW max
 - SOC: 40%, Target: 70%
-- Current price: €0.15 raw
-- Expected peak: €0.50 raw
-- Arbitrage margin: €0.05
+- Current import price: €0.26 (raw €0.15 + surcharge €0.11)
+- Evening peak import price: €0.61 (raw €0.50 + surcharge €0.11)
+- Afternoon margin: €0.05
 - Window: 2.0 hours
 
 **Check:**
 ```
-expected_peak - current = 0.50 - 0.15 = 0.35 > 0.05 ✓
+evening_peak_import - current_import = 0.61 - 0.26 = 0.35 > 0.05 ✓
 ```
 
 **Calculation:**
@@ -501,7 +501,7 @@ result = max_power_w = 2200 W
 ### Minimum Power Threshold
 
 - **Discharge:** Minimum 50W to ensure some action
-- **Charge (pre-peak):** Minimum 66% of max_power_w to avoid wasting surplus PV
+- **Charge (afternoon):** Minimum 66% of max_power_w to avoid wasting surplus PV
 - **Charge (cheap):** No minimum, always max when triggered
 
 ### Division by Zero Protection

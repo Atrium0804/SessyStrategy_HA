@@ -55,13 +55,13 @@ SessyStrategy is an AppDaemon application that implements a price-optimized batt
 │  ├── Battery/Hardware: capacity_wh, max_power_w               │
 │  ├── SOC Targets: soc_target, soc_floor, cheap_soc_target        │
 │  ├── Pricing: surcharge, price_discharge, price_charge          │
-│  │       min_arbitrage_margin                                   │
-│  ├── Windows: prepeak_start, prepeak_end, prepeak_window_h      │
+│  │       min_arbitrage_margin, afternoon_margin                │
+│  ├── Windows: afternoon_start, afternoon_end, afternoon_window_h│
 │  │           evening_peak_start, evening_peak_end               │
 │  ├── Season: season_mode, season_day_start, season_day_end     │
 │  │          season_auto_fallback                                │
-│  └── Winter overrides: soc_floor_winter, prepeak_start_winter  │
-│                       prepeak_end_winter, prepeak_window_h_winter│
+│  └── Winter overrides: soc_floor_winter, afternoon_start_winter│
+│                       afternoon_end_winter, afternoon_window_h_winter│
 │                                                                 │
 │  Entity IDs (from args)                                         │
 │  ├── Controls: strategy_select, grid_target, battery_setpoint  │
@@ -149,7 +149,7 @@ for entity in live_inputs:
 │  4. Priority Chain (optimized mode only)                       │
 │     ├── P1: price > price_discharge → discharge               │
 │     ├── P2: price < price_charge → cheap charge                │
-│     ├── P3: prepeak window, SOC < target, margin OK → charge    │
+│     ├── P3: afternoon window, SOC < target, margin OK → charge │
 │     │       └─ P3a: SOC >= target → hold at 0W                │
 │     │       └─ P3b: spread < margin → hold at 0W               │
 │     ├── P4: evening peak, SOC > target, no spike left → export │
@@ -190,7 +190,7 @@ for entity in live_inputs:
 
 | Method | Purpose | Formula |
 |---|---|---|
-| `_charge_setpoint(soc, target, window_h)` | Pre-peak charge power | `(target - soc)/100 * capacity / window_h * 1.5` |
+| `_charge_setpoint(soc, target, window_h)` | Afternoon charge power | `(target - soc)/100 * capacity / window_h * 1.5` |
 | `_discharge_setpoint(soc, floor, window_h)` | Price-spike discharge | `(soc - floor)/100 * capacity / window_h` |
 | `_cheap_charge_setpoint(soc, ceiling, window_h)` | Cheap charge | `max_power_w` (always max when charging) |
 | `_evening_peak_excess_setpoint(soc, target, hours)` | Excess discharge | `(soc - target)/100 * capacity / hours` |

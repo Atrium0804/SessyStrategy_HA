@@ -71,7 +71,7 @@ The strategy evaluates conditions in this order (first match wins):
 |----------|-----------|--------|---------|
 | **P1** | Price > discharge threshold | Battery setpoint (discharge) | Avoid expensive imports |
 | **P2** | Price < charge threshold | Battery setpoint (charge) | Capture cheap/negative price energy |
-| **P3** | Pre-peak window + profitable | Battery setpoint (charge) | Prepare for evening peak |
+| **P3** | Afternoon window + evening peak beats now by margin | Battery setpoint (charge) | Prepare for evening peak |
 | **P4** | Evening peak + excess SOC | Grid setpoint (export) | Sell surplus energy |
 | **P5** | Default | Grid setpoint 0W | Absorb solar, block export |
 

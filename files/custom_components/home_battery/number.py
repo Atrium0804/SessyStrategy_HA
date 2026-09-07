@@ -42,8 +42,16 @@ _NUMBERS: tuple[_Spec, ...] = (
         -2200, 1700, 100, UnitOfPower.WATT, 0, NumberMode.SLIDER,
     ),
     _Spec(
-        "soc_target", "Evening target", "mdi:battery-charging-90",
-        0, 100, 5, PERCENTAGE, 60, NumberMode.SLIDER,
+        "target_afternoon_charging", "Afternoon charge target", "mdi:battery-charging-90",
+        0, 100, 5, PERCENTAGE, 70, NumberMode.SLIDER,
+    ),
+    _Spec(
+        "target_peak_discharge", "Evening discharge target", "mdi:battery-charging-60",
+        0, 100, 5, PERCENTAGE, 70, NumberMode.SLIDER,
+    ),
+    _Spec(
+        "target_morning_soc", "Morning sell-off floor", "mdi:battery-40",
+        0, 100, 5, PERCENTAGE, 30, NumberMode.SLIDER,
     ),
     _Spec(
         "soc_floor", "Full discharge limit", "mdi:battery-20",
@@ -65,6 +73,10 @@ _NUMBERS: tuple[_Spec, ...] = (
     ),
     _Spec(
         "min_arbitrage_margin", "Min arbitrage margin", "mdi:scale-balance",
+        0, 0.5, 0.01, "€/kWh", 0.05, NumberMode.BOX,
+    ),
+    _Spec(
+        "afternoon_margin", "Afternoon margin", "mdi:scale-balance",
         0, 0.5, 0.01, "€/kWh", 0.05, NumberMode.BOX,
     ),
 )

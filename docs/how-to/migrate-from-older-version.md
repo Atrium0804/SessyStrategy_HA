@@ -55,13 +55,13 @@ last_updated: 2026-08-01
 - [x] **New**: Live tuning entities for all major parameters
 - [x] **New**: Adaptive spread windows for charge/discharge
 - [x] **New**: Priority 4 — Evening peak excess discharge
-- [x] **New**: Pre-peak arbitrage margin check
+- [x] **New**: Afternoon top-up margin check (evening peak import vs current import)
 
 !!! warning
     The following changes require attention:
 
     - **Changed**: Price threshold logic now uses raw prices exclusively
-    - **Changed**: SOC target for pre-peak is separate from cheap charge
+    - **Changed**: SOC target for afternoon charge is separate from cheap charge
     - **Changed**: `min_window_h` parameter added for adaptive spreading
     - **Changed**: `rerun_debounce_s` parameter added for live input handling
     - **Changed**: Entity naming convention standardized
@@ -87,7 +87,7 @@ sessy_strategy:
   class: SessyStrategy
   capacity_wh: 5000        # Renamed from battery_capacity
   max_power_w: 2200        # Renamed from max_power
-  soc_target: 70           # Changed default, now pre-peak target
+  soc_target: 70           # Changed default, now afternoon charge target
   soc_floor: 0            # Renamed from soc_min
   cheap_soc_target: 100    # Renamed from soc_max
   price_discharge: 0.39    # NOW RAW price (was 0.50 import)
@@ -132,7 +132,7 @@ sessy_strategy:
   class: SessyStrategy
   capacity_wh: 5000
   max_power_w: 2200
-  soc_target: 70           # Pre-peak target
+  soc_target: 70           # Afternoon charge target
   soc_floor: 10           # Minimum SOC
   cheap_soc_target: 90     # Cheap charge ceiling (was target_soc)
   price_discharge: 0.34    # high_price - surcharge
@@ -229,9 +229,9 @@ cp /config/configuration.yaml /config/configuration.yaml.backup
    ```yaml
    min_window_h: 2.0
    rerun_debounce_s: 2.0
-   prepeak_start: 15
-   prepeak_end: 17
-   prepeak_window_h: 2.0
+   afternoon_start: 15
+   afternoon_end: 17
+   afternoon_window_h: 2.0
    evening_peak_start: 18
    evening_peak_end: 23
    season_mode: auto
@@ -239,6 +239,8 @@ cp /config/configuration.yaml /config/configuration.yaml.backup
    season_day_end: 18
    season_auto_fallback: winter
    min_arbitrage_margin: 0.05
+   target_afternoon_charging: 70
+   afternoon_margin: 0.05
    ```
 
 #### If upgrading from v2.0 or v1.x:
@@ -252,7 +254,7 @@ cp /config/configuration.yaml /config/configuration.yaml.backup
    # Start with these sensible defaults
    capacity_wh: 5000          # Your battery capacity
    max_power_w: 2200          # Your inverter max power
-   soc_target: 70             # Pre-peak SOC target
+   soc_target: 70             # Afternoon SOC target
    soc_floor: 0              # Minimum SOC
    cheap_soc_target: 100      # Cheap charge ceiling
    surcharge: 0.11            # Your import surcharge
@@ -419,7 +421,7 @@ sessy_strategy:
 4. **Test each priority:**
    - **Priority 1:** Wait for high prices, verify discharge behavior
    - **Priority 2:** Wait for low/negative prices, verify charge behavior
-   - **Priority 3:** Wait for pre-peak window, verify charge behavior
+   - **Priority 3:** Wait for afternoon window, verify charge behavior
    - **Priority 4:** Wait for evening peak with excess SOC, verify discharge
    - **Priority 5:** Default behavior — grid setpoint 0W
 
@@ -457,7 +459,7 @@ sessy_strategy:
 4. **Adjust configuration:**
    - Fine-tune thresholds based on observed behavior
    - Adjust SOC targets for your usage patterns
-   - Optimize pre-peak windows for your energy prices
+   - Optimize afternoon windows for your energy prices
 
 ---
 

@@ -23,7 +23,7 @@ These attributes are updated on every strategy cycle, regardless of the active b
 
 | Attribute | Type | Description | Example | When Updated |
 |---|---|---|---|---|
-| `active_branch` | str | The currently active priority branch | `discharge`, `prepeak_charge`, `default` | Every cycle |
+| `active_branch` | str | The currently active priority branch | `discharge`, `afternoon_charge`, `default` | Every cycle |
 | `season_mode_source` | str | Source of season mode (apps.yaml or entity) | `auto`, `summer`, `winter` | Every cycle |
 | `daily_min_price_hour` | int \| None | Hour of today's minimum raw price | `3` (03:00) | Every cycle |
 | `daily_min_price` | float \| None | Value of today's minimum raw price | `0.08500` | Every cycle |
@@ -35,10 +35,11 @@ These attributes are updated on every strategy cycle, regardless of the active b
 | `cheap_soc_target` | float | Active cheap SOC target | `100.0` | Every cycle |
 | `price_discharge` | float | Active discharge price threshold | `0.39` | Every cycle |
 | `price_charge` | float | Active charge price threshold | `-0.10` | Every cycle |
-| `min_arbitrage_margin` | float | Active minimum arbitrage margin | `0.05` | Every cycle |
-| `prepeak_start` | int | Active pre-peak start hour | `16` | Every cycle |
-| `prepeak_end` | int | Active pre-peak end hour | `18` | Every cycle |
-| `prepeak_window_h` | float | Active pre-peak spread window | `2.0` | Every cycle |
+| `min_arbitrage_margin` | float | Active minimum arbitrage margin (P4) | `0.05` | Every cycle |
+| `afternoon_margin` | float | Active afternoon charge margin (P3) | `0.05` | Every cycle |
+| `afternoon_start` | int | Active afternoon start hour | `16` | Every cycle |
+| `afternoon_end` | int | Active afternoon end hour | `18` | Every cycle |
+| `afternoon_window_h` | float | Active afternoon spread window | `2.0` | Every cycle |
 
 ### Season-Specific Attributes
 
@@ -78,19 +79,19 @@ The `active_branch` attribute indicates which priority rule matched. Each branch
 
 **`cheap_charge_full`:** SOC is already at or above `cheap_soc_target`, so the strategy holds at grid setpoint 0W.
 
-### Priority 3: Pre-Peak Charge (`active_branch: "prepeak_charge"`, `"prepeak_full"`, or `"prepeak_skip"`)
+### Priority 3: Afternoon Charge (`active_branch: "afternoon_charge"`, `"afternoon_full"`, or `"afternoon_skip"`)
 
-**Trigger:** Inside pre-peak window, SOC < target, and arbitrage margin is sufficient
+**Trigger:** Inside afternoon window, SOC < target, and the evening peak import price beats the current import price by at least `afternoon_margin`
 
 | Attribute | Type | Description | Example |
 |---|---|---|---|
-| `active_branch` | str | Branch identifier | `prepeak_charge`, `prepeak_full`, `prepeak_skip` |
+| `active_branch` | str | Branch identifier | `afternoon_charge`, `afternoon_full`, `afternoon_skip` |
 | All common attributes | | See above | |
 
 **Variants:**
-- `prepeak_charge`: Actively charging toward `soc_target`
-- `prepeak_full`: SOC already at target, holding at grid 0W
-- `prepeak_skip`: Price spread too small, not worth charging
+- `afternoon_charge`: Actively charging toward `target_afternoon_charging` to avoid net import at the evening peak
+- `afternoon_full`: SOC already at target, holding at grid 0W
+- `afternoon_skip`: Evening peak import barely above current import, not worth topping up
 
 ### Priority 4: Evening Peak Excess Discharge (`active_branch: "evening_peak_excess"`)
 
@@ -163,9 +164,10 @@ When the strategy is in a manual or standby mode, the status sensor uses a simpl
 | `price_discharge` | float | any | From live entity or apps.yaml |
 | `price_charge` | float | any | From live entity or apps.yaml |
 | `min_arbitrage_margin` | float | ≥ 0 | From live entity or apps.yaml |
-| `prepeak_start` | integer | 0-23 | From seasonal config |
-| `prepeak_end` | integer | 0-23 | From seasonal config |
-| `prepeak_window_h` | float | > 0 | From seasonal config |
+| `afternoon_margin` | float | 0-0.5 | From live entity or apps.yaml |
+| `afternoon_start` | integer | 0-23 | From seasonal config |
+| `afternoon_end` | integer | 0-23 | From seasonal config |
+| `afternoon_window_h` | float | > 0 | From seasonal config |
 | `season_day_start` | integer | 0-23 | From apps.yaml |
 | `season_day_end` | integer | 0-23 | From apps.yaml |
 | `season_auto_fallback` | string | lowercase | From apps.yaml |
@@ -193,9 +195,10 @@ attributes:
   price_discharge: 0.39
   price_charge: -0.10
   min_arbitrage_margin: 0.05
-  prepeak_start: 16
-  prepeak_end: 18
-  prepeak_window_h: 2.0
+  afternoon_margin: 0.05
+  afternoon_start: 16
+  afternoon_end: 18
+  afternoon_window_h: 2.0
   season_day_start: 8
   season_day_end: 18
   season_auto_fallback: winter

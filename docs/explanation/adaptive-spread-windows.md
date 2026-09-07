@@ -103,7 +103,7 @@ For a 5 kWh battery with 90% round-trip efficiency:
 - Window = 1h, Power = 5000W
   - Losses: ~500 Wh (10%)
   - Energy stored: 4500 Wh
-  
+
 - Window = 2h, Power = 2500W
   - Losses: ~125 Wh (2.5%)
   - Energy stored: 4875 Wh (+7.5% more energy)
@@ -349,7 +349,7 @@ Note: Even though the window is 24 hours, P2 prioritizes fast charging
 
 The `min_window_h` parameter can be seasonally adjusted, though this is not currently implemented as a separate winter/summer parameter. The winter-specific overrides include:
 
-- `prepeak_window_h_winter`: Different spread window for pre-peak charging
+- `afternoon_window_h_winter`: Different spread window for afternoon charging
 - But not `min_window_h_winter` (uses base value)
 
 **Recommendation:** If you experience different price patterns in summer vs winter, consider:

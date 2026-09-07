@@ -174,27 +174,24 @@ The surcharge affects:
 - **Import equivalent:** €0.01/kWh
 - **Logic:** Capture energy when it's essentially free or better
 
-### Priority 3: Pre-Peak Charge
+### Priority 3: Afternoon Charge
 
-- **Comparison:** Uses raw prices for both current and expected peak
-- **Arbitrage calculation:** `expected_peak_raw - current_raw_price >= min_arbitrage_margin`
-- **Raw margin:** €0.05/kWh
-- **Import equivalent:** The surcharge cancels out, so raw comparison is appropriate
-- **Logic:** Only charge if the expected peak is sufficiently higher
+- **Comparison:** Uses **import (buy)** prices for both the current hour and the evening peak
+- **Peak-shaving calculation:** `evening_peak_buy_price - current_buy_price >= afternoon_margin`
+- **Import margin:** €0.05/kWh
+- **Logic:** Top up now at a low afternoon import price to avoid importing at a higher price during the evening peak
 
-**Why raw prices for arbitrage?**
+**Why import prices for afternoon charge?**
 
-The arbitrage calculation compares two raw prices:
+Priority 3 is **peak-shaving, not trading**. Both sides of the comparison are import prices, because the energy you charge now is energy you will **self-consume** during the evening peak instead of importing it from the grid:
 ```
-(expected_peak_raw) - (current_raw_price) >= min_arbitrage_margin
+(evening_peak_raw + surcharge) - (current_raw + surcharge) >= afternoon_margin
 ```
 
-This works because:
-- You'll buy at `current_raw_price + surcharge`
-- You'll sell at `expected_peak_raw + surcharge` (when discharging later)
-- The surcharge terms cancel: `(raw_peak + surcharge) - (raw_now + surcharge) = raw_peak - raw_now`
+The surcharge is present on both sides, but it must stay because the decision is about the **actual import cost avoided**. You compare what you would pay to import during the evening peak against what you pay to charge now. If that reduction is at least `afternoon_margin`, charging is worthwhile.
 
-Therefore, comparing raw prices directly gives the correct economic spread.
+!!! note
+    This is deliberately **not** grid trading. When trading (buy to later export), taxes and fees paid on the import are a pure loss. Priority 3 only manages self-consumed energy, so it uses the buy price on both sides. The trading decision (hold vs sell) is Priority 4 and uses `min_arbitrage_margin`.
 
 ### Priority 4: Evening Peak Excess Discharge
 
@@ -240,19 +237,19 @@ Benefit: Avoid €0.57 imports, sell at €0.46
 Net savings: €0.11/kWh
 ```
 
-### Example 3: Pre-Peak Decision
+### Example 3: Afternoon Charge Decision
 
 ```
 Hour: 16:30
-Current raw price: €0.15/kWh
-Expected peak: €0.50/kWh (at 19:00)
-SOC: 60%
-min_arbitrage_margin: €0.05
+Current import price: €0.26/kWh (raw €0.15 + €0.11 surcharge)
+Evening peak import price: €0.61/kWh (raw €0.50 + €0.11, at 19:00)
+SOC: 60%, target_afternoon_charging: 70%
+afternoon_margin: €0.05
 
-Arbitrage check: €0.50 - €0.15 = €0.35 > €0.05 = PASS
-Action: Charge toward soc_target (Priority 3)
-Benefit: Buy at €0.15+€0.11 = €0.26, sell at €0.50+€0.11 = €0.61
-Net: €0.35 margin per kWh (minus losses)
+Peak-shaving check: €0.61 - €0.26 = €0.35 >= €0.05 = PASS
+Action: Charge toward target_afternoon_charging (Priority 3)
+Benefit: Top up now at €0.26 import instead of importing at €0.61 during the peak
+Avoided import cost: €0.35/kWh (minus round-trip losses)
 ```
 
 ---
@@ -286,7 +283,7 @@ A: Simply update the `surcharge` parameter in `apps.yaml`. All calculations will
 surcharge: 0.15
 # price_discharge: 0.39 means import > €0.54
 
-# For a region with €0.08 surcharge  
+# For a region with €0.08 surcharge
 surcharge: 0.08
 # price_discharge: 0.39 means import > €0.47
 ```

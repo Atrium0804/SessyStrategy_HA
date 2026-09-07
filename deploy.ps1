@@ -22,17 +22,18 @@ $PKG_DIR            = $env:PKG_DIR
 
 Write-Host "Deploying to ${HA_USER}@${HA_HOST} ..."
 
-scp files/sessy_strategy.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/sessy_strategy.py"
-scp files/apps.yaml          "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/apps.yaml"
-scp files/sessy_helpers.yaml "${HA_USER}@${HA_HOST}:${PKG_DIR}/sessy_helpers.yaml"
+# -O forces the legacy SCP protocol; the NAS SFTP subsystem is chrooted elsewhere.
+scp -O files/sessy_strategy.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/sessy_strategy.py"
+scp -O files/apps.yaml          "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/apps.yaml"
+scp -O files/sessy_helpers.yaml "${HA_USER}@${HA_HOST}:${PKG_DIR}/sessy_helpers.yaml"
 
 # Home Battery custom integration (creates the device + entities).
 ssh "${HA_USER}@${HA_HOST}" "mkdir -p ${HA_CONFIG}/custom_components/home_battery"
-scp -r files/custom_components/home_battery/* "${HA_USER}@${HA_HOST}:${HA_CONFIG}/custom_components/home_battery/"
+scp -O -r files/custom_components/home_battery/* "${HA_USER}@${HA_HOST}:${HA_CONFIG}/custom_components/home_battery/"
 
 Write-Host ""
-Write-Host "Restarting Home Assistant ..."
-ssh "${HA_USER}@${HA_HOST}" "cd /srv/homeassistant && sudo docker compose restart"
+Write-Host "Restarting Home Assistant + AppDaemon ..."
+ssh "${HA_USER}@${HA_HOST}" "cd /volume1/docker/homeassistant && sudo -n /usr/local/bin/docker compose restart ha appdaemon"
 
 Write-Host ""
 Write-Host "Done. Home Assistant is restarting. AppDaemon will come back up with it."

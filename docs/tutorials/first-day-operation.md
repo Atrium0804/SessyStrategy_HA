@@ -2,7 +2,7 @@
 title: First Day Operation with SessyStrategy HA
 doc_type: tutorial
 audience: beginners
-prerequisites: 
+prerequisites:
   - SessyStrategy successfully installed and configured
   - AppDaemon running without errors
   - All required entities available
@@ -140,59 +140,59 @@ If your battery fills up before the evening:
 
 ---
 
-## Pre-Peak Window: Preparing for Evening
+## Afternoon Window: Preparing for Evening
 
 ### What to Expect
 
 SessyStrategy has a specific window for topping up the battery before the evening peak.
 
-### Typical Pre-Peak Behavior
+### Typical Afternoon Behavior
 
 **Default: 4:00 - 6:00 PM (Summer: 4:00-6:00 PM, Winter: 2:00-6:00 PM)**
 
 The strategy checks two conditions:
-1. **Time window:** Current hour is within `prepeak_start` to `prepeak_end`
-2. **SOC below target:** Current SOC < `soc_target` (default 70%)
+1. **Time window:** Current hour is within `afternoon_start` to `afternoon_end`
+2. **SOC below target:** Current SOC < `target_afternoon_charging` (default 70%)
 
 ### What You Should See
 
-**Case A: SOC below target, peak is profitable**
+**Case A: SOC below target, evening peak is more expensive**
 ```
 INFO sessy_strategy: Hour=16  SOC=62%  Raw price=0.15678  Import price=0.26678
-INFO sessy_strategy: PRE-PEAK CHARGE: battery setpoint -850W (SOC 62% → target 70% over 2.0h)
+INFO sessy_strategy: AFTERNOON CHARGE: battery setpoint -850W (SOC 62% → target 70% over 2.0h)
 ```
 
-- **Status Sensor:** `prepeak_charge`
+- **Status Sensor:** `afternoon_charge`
 - **Strategy Select:** `api` (battery setpoint mode)
 - **Battery Setpoint:** Negative value (e.g., -850W = charge at 850W)
 
 **Case B: SOC already at target**
 ```
 INFO sessy_strategy: Hour=16  SOC=72%  Raw price=0.15678  Import price=0.26678
-INFO sessy_strategy: PRE-PEAK: SOC 72% already at target 70% — holding grid setpoint 0W
+INFO sessy_strategy: AFTERNOON: SOC 72% already at target 70% — holding grid setpoint 0W
 ```
 
-- **Status Sensor:** `prepeak_full`
+- **Status Sensor:** `afternoon_full`
 - **Strategy Select:** `nom`
 - **Grid Target:** `0`
 
-**Case C: Peak not profitable enough**
+**Case C: Evening peak not enough more expensive**
 ```
 INFO sessy_strategy: Hour=16  SOC=62%  Raw price=0.15678  Import price=0.26678
-INFO sessy_strategy: PRE-PEAK SKIP: best remaining price 0.28 vs current 0.15678 (spread < margin 0.05) — holding grid setpoint 0W
+INFO sessy_strategy: AFTERNOON SKIP: evening peak buy 0.28 vs current buy 0.26678 (spread < margin 0.05) — holding grid setpoint 0W
 ```
 
-- **Status Sensor:** `prepeak_skip`
-- **Reason:** Expected evening peak price minus current price < `min_arbitrage_margin`
+- **Status Sensor:** `afternoon_skip`
+- **Reason:** Evening peak import price minus current import price < `afternoon_margin`
 
 ### Why This Matters
 
-The pre-peak charge is **strategic**: it only charges from grid if:
+The afternoon charge is **peak-shaving**: it only charges from grid if:
 1. Battery SOC is below target
-2. The expected evening peak price is significantly higher than current price
-3. The margin justifies the charge/discharge cycle (including round-trip losses)
+2. The evening peak **import** price is meaningfully higher than the current **import** price
+3. That import-price reduction is at least `afternoon_margin` (covering round-trip losses)
 
-This prevents "churning" — charging at €0.46 to discharge at €0.47 would waste battery cycles for minimal gain.
+Both prices compared are buy/import prices, because the goal is to top up self-consumed energy now to avoid a more expensive grid import during the evening peak. This is not grid trading — when trading, export taxes and fees are a loss, so this rule only manages energy you will consume yourself.
 
 ---
 
@@ -228,7 +228,7 @@ Avoiding expensive grid imports is the highest-value action. Even with round-tri
 
 ### Mechanism 2: Evening Peak Excess Discharge (Priority 4)
 
-**Trigger:** 
+**Trigger:**
 - Within `evening_peak_start` to `evening_peak_end` (default 8:00-10:00 PM)
 - SOC > `soc_target` (you have excess stored energy)
 - No remaining hours today exceed `price_discharge` (no more spikes to save for)
@@ -309,8 +309,8 @@ Charging during cheap/negative price periods:
 | 09:00 | 45% | €0.12 | DEFAULT | Solar charging battery |
 | 12:00 | 78% | €0.10 | DEFAULT | Battery nearly full |
 | 15:00 | 92% | €0.09 | DEFAULT | Battery full, excess solar exported |
-| 16:00 | 92% | €0.11 | prepeak_full | Already at target, no charge needed |
-| 17:00 | 92% | €0.12 | DEFAULT | Pre-peak ended, waiting |
+| 16:00 | 92% | €0.11 | afternoon_full | Already at target, no charge needed |
+| 17:00 | 92% | €0.12 | DEFAULT | Afternoon window ended, waiting |
 | 19:00 | 92% | €0.25 | DEFAULT | Price not high enough |
 | 20:00 | 88% | €0.35 | DEFAULT | Still below discharge threshold |
 | 21:00 | 82% | €0.48 | **discharge** | Price spike! Discharging |
@@ -331,8 +331,8 @@ Charging during cheap/negative price periods:
 | 08:00 | 95% | €0.45 | **discharge** | Morning price spike |
 | 10:00 | 78% | €0.25 | DEFAULT | Price dropped |
 | 14:00 | 62% | €0.18 | DEFAULT | Solar charging |
-| 15:00 | 68% | €0.19 | prepeak_charge | Topping up for evening |
-| 16:00 | 75% | €0.22 | prepeak_charge | Still charging |
+| 15:00 | 68% | €0.19 | afternoon_charge | Topping up for evening |
+| 16:00 | 75% | €0.22 | afternoon_charge | Still charging |
 | 18:00 | 80% | €0.42 | **discharge** | Evening spike, discharging |
 | 20:00 | 65% | €0.68 | **discharge** | Major spike, discharging hard |
 | 22:00 | 52% | €0.45 | **discharge** | Spike continues |
@@ -451,7 +451,7 @@ You've successfully observed SessyStrategy through its first day of operation! Y
 - It uses a priority chain to determine the best action
 - DEFAULT mode (grid 0W) is normal and efficient for most of the day
 - It aggressively charges during cheap prices and discharges during expensive prices
-- The pre-peak window helps prepare for evening demand
+- The afternoon window helps prepare for evening demand
 - All decisions are based on real-time data and configurable thresholds
 
 ### Next Steps

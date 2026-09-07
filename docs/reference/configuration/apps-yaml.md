@@ -45,14 +45,16 @@ The configuration is organized into logical sections:
 | `surcharge` | float | 0.11 | No | Import surcharge €/kWh (raw export → import price conversion) | ≥ 0 | `0.11` |
 | `price_discharge` | float | 0.39 | No | Raw price threshold above which to force discharge | any | `0.39` |
 | `price_charge` | float | -0.10 | No | Raw price threshold below which to charge from grid | any | `-0.10` |
-| `min_arbitrage_margin` | float | 0.05 | No | Minimum €/kWh spread to justify pre-peak charge | ≥ 0 | `0.05` |
+| `min_arbitrage_margin` | float | 0.05 | No | Minimum €/kWh spread for the evening peak hold-vs-sell decision (P4) | ≥ 0 | `0.05` |
+| `target_afternoon_charging` | int | 70 | No | Target SOC to reach before the evening peak (P3) | 0-100 | `70` |
+| `afternoon_margin` | float | 0.05 | No | Minimum €/kWh by which the evening peak import price must beat the current import price to justify afternoon charge (P3) | ≥ 0 | `0.05` |
 | **Adaptive Spread Window** |||||||
 | `min_window_h` | float | 2.0 | No | Minimum adaptive spread window in hours | > 0 | `2.0` |
 | `rerun_debounce_s` | float | 2.0 | No | Delay in seconds before re-running after live input changes | ≥ 0 | `2.0` |
 | **Time Windows (local hours)** |||||||
-| `prepeak_start` | int | 16 | No | Start hour of pre-peak charge window | 0-23 | `16` |
-| `prepeak_end` | int | 18 | No | End hour of pre-peak charge window | 0-23 | `18` |
-| `prepeak_window_h` | float | 2.0 | No | Spread window for pre-peak charge in hours | > 0 | `2.0` |
+| `afternoon_start` | int | 16 | No | Start hour of afternoon charge window | 0-23 | `16` |
+| `afternoon_end` | int | 18 | No | End hour of afternoon charge window | 0-23 | `18` |
+| `afternoon_window_h` | float | 2.0 | No | Spread window for afternoon charge in hours | > 0 | `2.0` |
 | `evening_peak_start` | int | 20 | No | Start hour of evening peak window | 0-23 | `20` |
 | `evening_peak_end` | int | 22 | No | End hour of evening peak window | 0-23 | `22` |
 | **Seasonal Mode** |||||||
@@ -62,9 +64,9 @@ The configuration is organized into logical sections:
 | `season_auto_fallback` | str | "winter" | No | Fallback season when auto-inference fails | summer\|winter | `winter` |
 | **Winter-specific Overrides** |||||||
 | `soc_floor_winter` | float | null | No | Winter SOC floor override (uses base if null) | 0-100 | `30` |
-| `prepeak_start_winter` | int | null | No | Winter pre-peak start hour override | 0-23 | `14` |
-| `prepeak_end_winter` | int | null | No | Winter pre-peak end hour override | 0-23 | `18` |
-| `prepeak_window_h_winter` | float | null | No | Winter pre-peak window override | > 0 | `4.0` |
+| `afternoon_start_winter` | int | null | No | Winter afternoon start hour override | 0-23 | `14` |
+| `afternoon_end_winter` | int | null | No | Winter afternoon end hour override | 0-23 | `18` |
+| `afternoon_window_h_winter` | float | null | No | Winter afternoon window override | > 0 | `4.0` |
 | **Entity IDs** |||||||
 | `strategy_select` | str | "select.sessy_battery_alt9_power_strategy" | **Yes** | Sessy strategy selector entity | valid entity ID | `select.sessy_battery_<id>_power_strategy` |
 | `grid_target` | str | "number.sessy_pwkn_grid_target" | **Yes** | Grid power target entity | valid entity ID | `number.sessy_<id>_grid_target` |
@@ -84,7 +86,9 @@ The configuration is organized into logical sections:
 | `cheap_soc_target_entity` | str | null | No | Live cheap SOC target override (input_number) | valid entity ID | `number.home_battery_soc_ceiling` |
 | `price_discharge_entity` | str | null | No | Live discharge threshold override (input_number) | valid entity ID | `number.home_battery_price_discharge` |
 | `price_charge_entity` | str | null | No | Live charge threshold override (input_number) | valid entity ID | `number.home_battery_price_charge` |
-| `min_arbitrage_margin_entity` | str | null | No | Live arbitrage margin override (input_number) | valid entity ID | `number.home_battery_min_arbitrage_margin` |
+| `min_arbitrage_margin_entity` | str | null | No | Live arbitrage margin override, P4 (input_number) | valid entity ID | `number.home_battery_min_arbitrage_margin` |
+| `target_afternoon_charging_entity` | str | null | No | Live afternoon SOC target override (input_number) | valid entity ID | `number.home_battery_target_afternoon_charging` |
+| `afternoon_margin_entity` | str | null | No | Live afternoon margin override (input_number) | valid entity ID | `number.home_battery_afternoon_margin` |
 | `season_mode_entity` | str | null | No | Live season mode selector (input_select) | valid entity ID | `input_select.sessy_season_mode` |
 
 ---
@@ -102,7 +106,7 @@ These define the physical capabilities of your battery system.
 
 These control how the battery is charged and discharged.
 
-- **`soc_target`**: The target SOC to reach before the evening peak. Used in Priority 3 (pre-peak charge).
+- **`soc_target`**: The target SOC to reach before the evening peak. Used in Priority 3 (afternoon charge).
 - **`soc_floor`**: The minimum SOC level. The battery will never discharge below this percentage.
 - **`cheap_soc_target`**: The target SOC for cheap-price charging (Priority 2). Typically set to 100% to fully charge during cheap hours.
 
@@ -113,7 +117,8 @@ Price-related configuration uses **raw export prices** (what the grid pays you),
 - **`surcharge`**: The tax/fee added to raw prices to get import prices. Default €0.11/kWh for Dutch energy tax.
 - **`price_discharge`**: When raw price exceeds this, Priority 1 (price-spike discharge) triggers.
 - **`price_charge`**: When raw price is below this (typically negative), Priority 2 (cheap charge) triggers.
-- **`min_arbitrage_margin`**: Minimum price spread required for Priority 3 (pre-peak charge) to be profitable.
+- **`min_arbitrage_margin`**: Minimum price spread required for Priority 4 (evening peak hold-vs-sell decision).
+- **`afternoon_margin`**: Minimum amount (€/kWh) by which the evening peak import price must beat the current import price for Priority 3 (afternoon charge) to top up. This is a peak-shaving check to avoid net grid import at the evening peak, not a trading margin.
 
 **Important**: All price thresholds are in **raw export prices**. The import equivalent is `raw_price + surcharge`.
 
@@ -126,7 +131,7 @@ Price-related configuration uses **raw export prices** (what the grid pays you),
 
 All times are in **local hours** (24-hour format).
 
-- **Pre-peak window** (`prepeak_start` to `prepeak_end`): When to charge in preparation for evening peak.
+- **Afternoon window** (`afternoon_start` to `afternoon_end`): When to top up in preparation for the evening peak.
 - **Evening peak window** (`evening_peak_start` to `evening_peak_end`): Evening peak period for Priority 4 (excess discharge).
 
 ### Seasonal Operation
@@ -183,16 +188,18 @@ sessy_strategy:
   surcharge: 0.11
   price_discharge: 0.45      # Discharge when raw > €0.45
   price_charge: -0.15        # Charge when raw < -€0.15
-  min_arbitrage_margin: 0.07 # Need 7c spread for pre-peak
+  min_arbitrage_margin: 0.07 # Need 7c spread for the evening hold-vs-sell (P4)
+  target_afternoon_charging: 70
+  afternoon_margin: 0.05     # Evening peak import must beat now by 5c (P3)
 
   # Adaptive spread window
   min_window_h: 1.5
   rerun_debounce_s: 3.0
 
   # Time windows
-  prepeak_start: 15
-  prepeak_end: 18
-  prepeak_window_h: 3.0
+  afternoon_start: 15
+  afternoon_end: 18
+  afternoon_window_h: 3.0
   evening_peak_start: 19
   evening_peak_end: 23
 
@@ -204,9 +211,9 @@ sessy_strategy:
 
   # Winter-specific overrides
   soc_floor_winter: 20
-  prepeak_start_winter: 14
-  prepeak_end_winter: 18
-  prepeak_window_h_winter: 4.0
+  afternoon_start_winter: 14
+  afternoon_end_winter: 18
+  afternoon_window_h_winter: 4.0
 
   # Entity IDs
   strategy_select: select.sessy_battery_alt9_power_strategy
@@ -230,6 +237,8 @@ sessy_strategy:
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
+  target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
+  afternoon_margin_entity: number.home_battery_afternoon_margin
   season_mode_entity: input_select.sessy_season_mode
 ```
 
@@ -249,15 +258,15 @@ sessy_strategy:
   soc_floor: 20
   price_discharge: 0.39
   price_charge: -0.10
-  prepeak_start: 16
-  prepeak_end: 18
-  prepeak_window_h: 2.0
+  afternoon_start: 16
+  afternoon_end: 18
+  afternoon_window_h: 2.0
 
   # Winter overrides
   soc_floor_winter: 30       # Keep more reserve for heating
-  prepeak_start_winter: 14   # Start charging earlier
-  prepeak_end_winter: 18
-  prepeak_window_h_winter: 4.0  # Longer window for lower power
+  afternoon_start_winter: 14   # Start charging earlier
+  afternoon_end_winter: 18
+  afternoon_window_h_winter: 4.0  # Longer window for lower power
 
   # Season detection
   season_mode: auto
@@ -307,7 +316,7 @@ This means you're effectively avoiding import at €0.50+ and capturing export a
 
 3. **Percentage ranges**: SOC values (`soc_target`, `soc_floor`, `cheap_soc_target`, and winter overrides) must be 0-100.
 
-4. **Time windows**: `prepeak_start` < `prepeak_end`, `evening_peak_start` < `evening_peak_end`, `season_day_start` < `season_day_end`.
+4. **Time windows**: `afternoon_start` < `afternoon_end`, `evening_peak_start` < `evening_peak_end`, `season_day_start` < `season_day_end`.
 
 5. **Mode options**: `season_mode` must be one of: `auto`, `summer`, `winter`.
 
@@ -321,7 +330,7 @@ This means you're effectively avoiding import at €0.50+ and capturing export a
 
 3. **Tune price thresholds**: If the strategy discharges/charges too aggressively, adjust `price_discharge` and `price_charge`. Remember these are raw prices.
 
-4. **Extend pre-peak window for large batteries**: If you have a >5 kWh battery and start the pre-peak window below 50% SOC, consider increasing `prepeak_window_h` or starting earlier with `prepeak_start`.
+4. **Extend afternoon window for large batteries**: If you have a >5 kWh battery and start the afternoon window below 50% SOC, consider increasing `afternoon_window_h` or starting earlier with `afternoon_start`.
 
 5. **Verify entity IDs**: Use Home Assistant's **Developer Tools → States** to confirm your Sessy entity IDs before configuring.
 

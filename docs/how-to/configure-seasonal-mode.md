@@ -35,7 +35,7 @@ last_updated: 2026-08-01
 
 SessyStrategy automatically adjusts its timing windows based on the season:
 
-| Season | Pre-peak Window | Behavior |
+| Season | Afternoon Window | Behavior |
 |--------|-----------------|----------|
 | **Summer** | Default: 15:00-17:00 | Later charging window for summer evening peaks |
 | **Winter** | Default: 14:00-18:00 | Earlier, wider charging window for winter evening peaks |
@@ -130,15 +130,15 @@ sessy_strategy:
   class: SessyStrategy
   # Base values (used in summer and when not overridden)
   soc_floor: 20
-  prepeak_start: 15
-  prepeak_end: 17
-  prepeak_window_h: 2.0
-  
+  afternoon_start: 15
+  afternoon_end: 17
+  afternoon_window_h: 2.0
+
   # Winter-specific overrides
   soc_floor_winter: 0           # Override soc_floor to 0% in winter
-  prepeak_start_winter: 14     # Start pre-peak charge at 14:00 in winter
-  prepeak_end_winter: 18       # End pre-peak charge at 18:00 in winter
-  prepeak_window_h_winter: 4.0 # Spread charge over 4 hours in winter
+  afternoon_start_winter: 14     # Start afternoon charge at 14:00 in winter
+  afternoon_end_winter: 18       # End afternoon charge at 18:00 in winter
+  afternoon_window_h_winter: 4.0 # Spread charge over 4 hours in winter
 ```
 
 **When these apply:** Only when `season_mode` (static or live) is set to `winter`.
@@ -185,8 +185,8 @@ To confirm your seasonal mode is configured correctly:
    ```
 
 3. **Test the behavior:**
-   - In **summer mode**: Pre-peak charging should occur around 15:00-17:00
-   - In **winter mode**: Pre-peak charging should start earlier (default 14:00)
+   - In **summer mode**: Afternoon charging should occur around 15:00-17:00
+   - In **winter mode**: Afternoon charging should start earlier (default 14:00)
    - Check that winter-specific overrides are applied when in winter mode
 
 4. **Test live switching (if using entity):**
@@ -202,7 +202,7 @@ To confirm your seasonal mode is configured correctly:
 
 **Symptom:** Status sensor always shows the same season regardless of configuration.
 
-**Cause:** 
+**Cause:**
 - The `season_mode_entity` is not set or the entity doesn't exist
 - The input_select entity has a typo in the entity ID
 - AppDaemon hasn't been restarted after configuration changes
@@ -245,11 +245,11 @@ To confirm your seasonal mode is configured correctly:
    ```yaml
    # Correct - numeric values
    soc_floor_winter: 0
-   prepeak_start_winter: 14
-   
+   afternoon_start_winter: 14
+
    # Incorrect - these will be treated as None
-   soc_floor_winter: 
-   prepeak_start_winter: 
+   soc_floor_winter:
+   afternoon_start_winter:
    ```
 2. Verify the strategy is actually in winter mode by checking the status sensor
 

@@ -45,4 +45,4 @@ MODE_OPTIONS = [
 ]
 DEFAULT_MODE = "Optimized"
 
-PLATFORMS = ["sensor", "select", "number"]
+PLATFORMS = ["sensor", "select", "number", "switch"]

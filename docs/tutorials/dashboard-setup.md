@@ -432,7 +432,7 @@ For more advanced visualization, you can use templates to color the setpoint bas
          const status = entity('sensor.sessy_strategy_status');
          if (status === 'discharge') return {color: '#E63946'};
          if (status === 'cheap_charge') return {color: '#009E73'};
-         if (status.includes('prepeak')) return {color: '#0072B2'};
+         if (status.includes('afternoon')) return {color: '#0072B2'};
          return {color: '#7BCAB4'};
    ```
 
@@ -679,7 +679,7 @@ Create a chart that changes color based on the active strategy branch:
          const branch = state_attr('sensor.sessy_strategy_status', 'active_branch');
          if (branch === 'discharge') return {y: 1, color: '#E63946'};
          if (branch === 'cheap_charge') return {y: 1, color: '#009E73'};
-         if (branch.includes('prepeak')) return {y: 1, color: '#0072B2'};
+         if (branch.includes('afternoon')) return {y: 1, color: '#0072B2'};
          if (branch === 'evening_peak_excess') return {y: 1, color: '#D55E00'};
          return {y: 1, color: '#7BCAB4'};
 

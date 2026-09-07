@@ -59,7 +59,7 @@ def _infer_season_from_price_minimum(self) -> str | None:
     min_hour, _ = self._daily_min_price_hour_and_value()
     if min_hour is None:
         return None
-    
+
     if self.season_day_start <= min_hour < self.season_day_end:
         return "summer"
     return "winter"
@@ -118,9 +118,9 @@ When the active season is `winter`, certain parameters can be overridden with wi
 | Parameter | Default (All Seasons) | Winter Override | Purpose |
 |-----------|---------------------|-----------------|---------|
 | `soc_floor` | 0% | `soc_floor_winter` | Higher floor in winter for heating reserve |
-| `prepeak_start` | 16:00 | `prepeak_start_winter` | Earlier pre-peak window in winter |
-| `prepeak_end` | 18:00 | `prepeak_end_winter` | Later pre-peak window in winter |
-| `prepeak_window_h` | 2.0h | `prepeak_window_h_winter` | Wider charge window in winter |
+| `afternoon_start` | 16:00 | `afternoon_start_winter` | Earlier afternoon window in winter |
+| `afternoon_end` | 18:00 | `afternoon_end_winter` | Later afternoon window in winter |
+| `afternoon_window_h` | 2.0h | `afternoon_window_h_winter` | Wider charge window in winter |
 
 ### Configuration Example
 
@@ -128,15 +128,15 @@ When the active season is `winter`, certain parameters can be overridden with wi
 sessy_strategy:
   # Base values (used in summer and when winter overrides are not set)
   soc_floor: 0
-  prepeak_start: 16
-  prepeak_end: 18
-  prepeak_window_h: 2.0
-  
+  afternoon_start: 16
+  afternoon_end: 18
+  afternoon_window_h: 2.0
+
   # Winter-specific overrides
   soc_floor_winter: 30        # Keep 30% reserve in winter
-  prepeak_start_winter: 14   # Start pre-peak charge earlier
-  prepeak_end_winter: 18      # End at same time
-  prepeak_window_h_winter: 4.0  # Spread charge over 4 hours
+  afternoon_start_winter: 14   # Start afternoon charge earlier
+  afternoon_end_winter: 18      # End at same time
+  afternoon_window_h_winter: 4.0  # Spread charge over 4 hours
 ```
 
 ### How Overrides Are Applied
@@ -153,9 +153,9 @@ def _seasonal_value(self, base_value, active_season: str, winter_override):
 **Usage in code:**
 ```python
 soc_floor = self._seasonal_value(soc_floor, active_season, self.soc_floor_winter)
-prepeak_start = self._seasonal_value(self.prepeak_start, active_season, self.prepeak_start_winter)
-prepeak_end = self._seasonal_value(self.prepeak_end, active_season, self.prepeak_end_winter)
-prepeak_window_h = self._seasonal_value(self.prepeak_window_h, active_season, self.prepeak_window_h_winter)
+afternoon_start = self._seasonal_value(self.afternoon_start, active_season, self.afternoon_start_winter)
+afternoon_end = self._seasonal_value(self.afternoon_end, active_season, self.afternoon_end_winter)
+afternoon_window_h = self._seasonal_value(self.afternoon_window_h, active_season, self.afternoon_window_h_winter)
 ```
 
 ---
@@ -176,22 +176,22 @@ The strategy resolves the active season in the following priority:
 ```python
 def _active_season_mode(self) -> str:
     mode = self.season_mode
-    
+
     # Check live entity override
     if self.season_mode_entity:
         mode_state = self.get_state(self.season_mode_entity)
         if isinstance(mode_state, str):
             mode = mode_state.strip().lower()
-    
+
     # If explicitly set, use it
     if mode in ("summer", "winter"):
         return mode
-    
+
     # Otherwise, infer from price pattern
     inferred = self._infer_season_from_price_minimum()
     if inferred:
         return inferred
-    
+
     # Final fallback
     return "summer" if self.season_auto_fallback == "summer" else "winter"
 ```
@@ -245,7 +245,7 @@ In these cases, the strategy falls back to `season_auto_fallback`.
 
 **Rationale:** Winter is the more conservative fallback:
 - Higher `soc_floor` (if configured) provides energy reserve
-- Earlier pre-peak window ensures battery is charged for evening
+- Earlier afternoon window ensures battery is charged for evening
 - More robust for handling edge cases
 
 **Configuration:**
@@ -267,7 +267,7 @@ sessy_strategy:
 - Price minimum usually during midday (high PV)
 
 **Strategy behavior:**
-- Pre-peak window: 16:00-18:00 (2 hours)
+- Afternoon window: 16:00-18:00 (2 hours)
 - SOC floor: Typically 0-20%
 - Battery fills naturally from PV during the day
 - Discharge during evening peak (18:00-22:00)
@@ -287,7 +287,7 @@ sessy_strategy:
 - Must actively charge battery from grid
 
 **Strategy behavior:**
-- Pre-peak window: 14:00-18:00 (4 hours, if configured)
+- Afternoon window: 14:00-18:00 (4 hours, if configured)
 - SOC floor: Typically 30% (heating reserve)
 - Battery must be charged from grid overnight or during cheap hours
 - Discharge during morning and evening peaks
@@ -295,7 +295,7 @@ sessy_strategy:
 
 **Typical SOC trajectory:**
 - Early morning: ~40-60% (after overnight charging if cheap)
-- Afternoon: 70-90% (topped up during pre-peak)
+- Afternoon: 70-90% (topped up during afternoon window)
 - Evening: 30-50% (discharged during peak)
 - Late night: 30-40% (conserved for morning heating)
 
@@ -318,7 +318,7 @@ Inference:
 - Active season: SUMMER
 
 Behavior:
-- Pre-peak window: 16:00-18:00
+- Afternoon window: 16:00-18:00
 - soc_floor: 0% (base value)
 - Battery fills naturally from PV to ~90-100%
 - Discharge during evening peak (18:00-22:00) if price > €0.39
@@ -339,10 +339,10 @@ Inference:
 - Active season: WINTER
 
 Behavior:
-- Pre-peak window: 14:00-18:00 (winter override)
+- Afternoon window: 14:00-18:00 (winter override)
 - soc_floor: 30% (winter override)
 - Battery charges from grid during cheap overnight hours
-- Pre-peak charge to reach 70% before evening
+- Afternoon charge to reach 70% before evening
 - Discharge during evening peak (18:00-22:00)
 ```
 
@@ -376,15 +376,15 @@ Behavior:
 - Summer: 0-20%
 - Winter: 20-30% (or higher for cold climates)
 
-### Earlier Pre-Peak Window
+### Earlier Afternoon Window
 
-**Why:** In winter, the evening peak often starts earlier (17:00-18:00) as people return home and heating demand increases. The earlier pre-peak window ensures the battery is charged before this demand surge.
+**Why:** In winter, the evening peak often starts earlier (17:00-18:00) as people return home and heating demand increases. The earlier afternoon window ensures the battery is charged before this demand surge.
 
 **Recommendation:**
 - Summer: 16:00-18:00 (2 hours)
 - Winter: 14:00-18:00 (4 hours)
 
-### Wider Pre-Peak Window
+### Wider Afternoon Window
 
 **Why:** With lower PV generation in winter, charging must happen over a longer period to reach the target SOC. The wider window also allows for gentler charging, improving efficiency.
 
@@ -392,16 +392,16 @@ Behavior:
 - Summer: 2.0 hours
 - Winter: 4.0 hours
 
-### Arbitrage Margin Considerations
+### Afternoon Margin Considerations
 
-**Winter challenge:** In winter, you might find yourself:
-- Charging at €0.46/kWh (import = €0.57)
-- Discharging at €0.47/kWh (import equivalent = €0.58)
-- Margin: Only €0.01/kWh after surcharge
+**Winter challenge:** In winter, price spreads compress, so the afternoon top-up can become marginal:
+- Charging now at import €0.57/kWh
+- Evening peak import only €0.58/kWh
+- Reduction: only €0.01/kWh
 
-**Solution:** The `min_arbitrage_margin` (€0.05) prevents this uneconomic churning by requiring a minimum raw price spread of €0.05 before pre-peak charging is allowed.
+**Solution:** The `afternoon_margin` (€0.05) prevents this uneconomic charging by requiring the evening peak **import** price to beat the current **import** price by at least €0.05 before afternoon charging is allowed.
 
-**Note:** The surcharge cancels out in the arbitrage calculation, so raw prices are compared directly.
+**Note:** Priority 3 compares two import (buy) prices — it is peak-shaving of self-consumed energy, not trading. The separate `min_arbitrage_margin` governs the Priority 4 evening peak hold-vs-sell decision.
 
 ---
 
@@ -432,7 +432,7 @@ INFO sessy_strategy: Season mode active: winter
 
 - [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — How seasons affect priority behavior
 - [Price Basis: Raw vs Import](../explanation/price-basis-raw-vs-import.md) — Understanding price calculations used in inference
-- [Adaptive Spread Windows](../explanation/adaptive-spread-windows.md) — How pre-peak window affects charging
+- [Adaptive Spread Windows](../explanation/adaptive-spread-windows.md) — How the afternoon window affects charging
 - [Configure Seasonal Mode](../how-to/configure-seasonal-mode.md) — Step-by-step guide to setting up seasons
 - [apps.yaml Configuration](../reference/configuration/apps-yaml.md) — All season-related parameters
 - [Status Sensor Attributes](../reference/status-sensor-attributes.md) — Season information in status

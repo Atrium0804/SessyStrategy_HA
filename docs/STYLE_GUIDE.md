@@ -46,11 +46,10 @@ This is a condensed reference for human contributors. For AI agent-specific rule
 
 ---
 
-## Rendering (MkDocs Material)
+## Rendering
 
-The published site is built with `mkdocs` + the Material theme (see `mkdocs.yml`). Admonitions
-require the `!!! type` block syntax from the `admonition` extension — the older `[!note]`-style
-call-out does not render and shows up as literal text.
+Admonitions use the `!!! type` block syntax from the `admonition` extension — the older
+`[!note]`-style call-out does not render and shows up as literal text.
 
 ### Admonition Types Used
 

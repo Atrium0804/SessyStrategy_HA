@@ -67,8 +67,8 @@ def update_strategy(self, kwargs):
         return self._apply_discharge(soc)
     if price < self.price_charge:
         return self._apply_cheap_charge(soc)
-    if self._in_prepeak_window() and self._prepeak_worthwhile(soc, price):
-        return self._apply_prepeak_charge(soc)
+    if self._in_afternoon_window() and self._afternoon_worthwhile(soc, price):
+        return self._apply_afternoon_charge(soc)
     self._apply_grid_zero()
 
 # Bad: Deeply nested conditionals mixing concerns
@@ -192,7 +192,7 @@ if price > 0.39:
 - Log with `self.log()`, not `print()` or the stdlib `logging` module
 
 **Follow PEP 8 for Python style**
-- Private helpers use the `_` prefix: `_calc_setpoint`, `_in_prepeak_window`
+- Private helpers use the `_` prefix: `_calc_setpoint`, `_in_afternoon_window`
 - Use `float()` / `int()` casts when reading sensor states; sensors return strings
 
 **`apps.yaml` stays human-readable**

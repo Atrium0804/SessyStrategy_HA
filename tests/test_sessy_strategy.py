@@ -78,13 +78,14 @@ _DEFAULTS = dict(
     surcharge=0.11,
     price_discharge=0.39,
     price_charge=-0.10,
-    prepeak_start=16,
-    prepeak_end=18,
-    prepeak_window_h=2.0,
+    afternoon_start=16,
+    afternoon_end=18,
+    afternoon_window_h=2.0,
     discharge_window_h=2.0,
     evening_peak_start=18,
     evening_peak_end=23,
     min_arbitrage_margin=0.05,
+    afternoon_margin=0.05,
     season_mode="summer",
     season_day_start=8,
     season_day_end=18,
@@ -112,35 +113,6 @@ def make_app(**overrides):
 # Setpoint calculators (pure math — no HA calls)
 # ===========================================================================
 
-class TestChargeSetpoint:
-    def test_basic_gap(self):
-        app = make_app()
-        # gap = (90-50)/100 * 5000 = 2000 Wh; over 2h → 1000 W
-        # spread_w = 2000/2 = 1000 W, power_w = 1000 * 1.5 = 1500 W
-        # capped by max_power_w (2200), min_power_w = 2200 * 0.66 = 1452 W
-        # result = max(1452, 1500) = 1500 W
-        result = app._charge_setpoint(soc=50, soc_target=90, prepeak_window_h=2.0)
-        assert result == pytest.approx(1500.0)
-
-    def test_capped_by_max_power_66_percent(self):
-        app = make_app()
-        # gap = (90-10)/100 * 5000 = 4000 Wh; over 1h → 4000 W
-        # spread_w = 4000/1 = 4000 W, power_w = 4000 * 1.5 = 6000 W
-        # capped by max_power_w (2200), min_power_w = 2200 * 0.66 = 1452 W
-        # result = max(1452, 2200) = 2200 W
-        result = app._charge_setpoint(soc=10, soc_target=90, prepeak_window_h=1.0)
-        assert result == pytest.approx(2200.0)
-
-    def test_minimum_50w(self):
-        app = make_app()
-        # Tiny gap: (90-89)/100 * 5000 = 50 Wh / 2h → 25 W
-        # spread_w = 50/2 = 25 W, power_w = 25 * 1.5 = 37.5 W
-        # capped by max_power_w (2200), min_power_w = 2200 * 0.66 = 1452 W
-        # result = max(1452, 37.5) = 1452 W (minimum power threshold)
-        result = app._charge_setpoint(soc=89, soc_target=90, prepeak_window_h=2.0)
-        assert result == pytest.approx(1452.0)
-
-
 class TestDischargeSetpoint:
     def test_basic(self):
         app = make_app()
@@ -164,21 +136,25 @@ class TestDischargeSetpoint:
         assert result == pytest.approx(500.0)
 
 
-class TestPostPeakDischargeSetpoint:
+class TestExcessSetpoint:
     def test_basic(self):
-        # gap = (95-90)/100 * 5000 = 250 Wh / 4h → 62.5 W (above 50W floor)
-        result = make_app()._evening_peak_excess_setpoint(soc=95, soc_target=90, hours_remaining=4)
-        assert result == pytest.approx(62.5)
+        # gap = (95-90)/100 * 5000 = 250 Wh / 4h → 62.5 W → floored at 500W
+        result = make_app()._excess_setpoint(soc=95, target=90, hours_remaining=4)
+        assert result == pytest.approx(500.0)
 
-    def test_capped_by_c_rate(self):
+    def test_capped_by_max_power(self):
         # gap = (100-20)/100 * 5000 = 4000 Wh / 1h → 4000 W; cap = max_power_w = 2200 W
-        result = make_app()._evening_peak_excess_setpoint(soc=100, soc_target=20, hours_remaining=1)
+        result = make_app()._excess_setpoint(soc=100, target=20, hours_remaining=1)
         assert result == pytest.approx(2200.0)
 
-    def test_minimum_50w(self):
-        # tiny gap: (91-90)/100 * 5000 = 50 Wh / 4h → 12.5 W → floor at 50
-        result = make_app()._evening_peak_excess_setpoint(soc=91, soc_target=90, hours_remaining=4)
-        assert result == pytest.approx(50.0)
+    def test_minimum_500w(self):
+        # tiny gap: (91-90)/100 * 5000 = 50 Wh / 4h → 12.5 W → floor at 500
+        result = make_app()._excess_setpoint(soc=91, target=90, hours_remaining=4)
+        assert result == pytest.approx(500.0)
+
+    def test_at_or_below_target_returns_zero(self):
+        result = make_app()._excess_setpoint(soc=90, target=90, hours_remaining=4)
+        assert result == 0
 
 
 class TestCheapChargeSetpoint:
@@ -241,12 +217,13 @@ class TestUpdateStrategyBranches:
             app.grid_target: "0",
             app.battery_setpoint: "0",
         }.get(entity_id, None))
-        
+
         app._get_soc = MagicMock(return_value=soc)
-        app._get_current_price = MagicMock(return_value=price)
+        app._current_price = MagicMock(return_value=price)
         app.datetime = MagicMock(return_value=datetime(2024, 6, 15, now_hour, 0, 0))
         app._count_cheap_hours = MagicMock(return_value=2)
         app._max_price_in_window = MagicMock(return_value=0.50)
+        app._max_price_in_hour_range_tomorrow = MagicMock(return_value=None)
         app._get_prices_dict = MagicMock(return_value=None)
         app._publish_status = MagicMock()
         app._set_battery_setpoint = MagicMock()
@@ -275,16 +252,16 @@ class TestUpdateStrategyBranches:
         app._set_grid_setpoint.assert_called_once_with(0)
         app._set_battery_setpoint.assert_not_called()
 
-    def test_priority3_prepeak_window_charges(self):
+    def test_priority3_afternoon_window_charges(self):
         # 17:00, SOC below target, spread > margin
         app = self._make_app_with_sensors(soc=60, price=0.10, now_hour=17)
         app.update_strategy({})
         app._set_battery_setpoint.assert_called_once()
         assert app._set_battery_setpoint.call_args[0][0] < 0
 
-    def test_priority3_prepeak_skipped_when_spread_too_small(self):
+    def test_priority3_afternoon_skipped_when_spread_too_small(self):
         app = self._make_app_with_sensors(soc=60, price=0.20, now_hour=17)
-        # price = 0.20; expected_peak = 0.22 → spread 0.02 < margin 0.05
+        # buy = 0.20; evening peak buy = 0.22 → spread 0.02 < margin 0.05
         app._max_price_in_window = MagicMock(return_value=0.22)
         app.update_strategy({})
         app._set_grid_setpoint.assert_called_once_with(0)
@@ -304,7 +281,7 @@ class TestUpdateStrategyBranches:
         app._set_battery_setpoint.assert_not_called()
 
     def test_priority35_post_peak_discharges_to_target(self):
-        # 19:00, after prepeak_end (18), soc above target, no spike coming
+        # 19:00, after afternoon_end (18), soc above target, no spike coming
         app = self._make_app_with_sensors(soc=95, price=0.20, now_hour=19)
         app._max_price_in_window = MagicMock(return_value=0.30)  # below price_discharge (0.39)
         app.update_strategy({})
@@ -338,12 +315,86 @@ class TestUpdateStrategyBranches:
         app._set_grid_setpoint.assert_called_once_with(0)
         app._set_battery_setpoint.assert_not_called()
 
-    def test_priority3_prepeak_at_target_holds_grid_zero(self):
-        # SOC already at soc_target during prepeak window → no charge needed
+    def test_priority3_afternoon_at_target_holds_grid_zero(self):
+        # SOC already at soc_target during afternoon window → no charge needed
         app = self._make_app_with_sensors(soc=90, price=0.10, now_hour=17)
         app.update_strategy({})
         app._set_grid_setpoint.assert_called_once_with(0)
         app._set_battery_setpoint.assert_not_called()
+
+    def test_rule_disabled_skips_price_spike(self):
+        # Price-spike rule off → high price no longer discharges, falls through
+        app = self._make_app_with_sensors(soc=80, price=0.45)
+        app.rule_price_spike_entity = "switch.home_battery_rule_price_spike"
+        app._rule_enabled = MagicMock(
+            side_effect=lambda e: e != "switch.home_battery_rule_price_spike"
+        )
+        app.update_strategy({})
+        app._set_battery_setpoint.assert_not_called()
+        app._set_grid_setpoint.assert_called_once_with(0)
+
+    def test_priority5_morning_selloff_discharges(self):
+        # 08:00 within morning window [7,9); SOC 80 > target_morning_soc 30
+        app = self._make_app_with_sensors(soc=80, price=0.10, now_hour=8)
+        app.update_strategy({})
+        app._set_grid_setpoint.assert_called_once()
+        assert app._set_grid_setpoint.call_args[0][0] < 0  # export → negative watts
+        app._set_battery_setpoint.assert_not_called()
+
+    def test_priority4_holds_for_better_morning(self):
+        # No evening spike, but tomorrow's morning peak is clearly better → hold
+        app = self._make_app_with_sensors(soc=95, price=0.20, now_hour=19)
+        app._max_price_in_window = MagicMock(return_value=0.30)
+        app._max_price_in_hour_range_tomorrow = MagicMock(return_value=0.40)
+        app.update_strategy({})
+        app._set_grid_setpoint.assert_called_once_with(0)
+        app._set_battery_setpoint.assert_not_called()
+
+
+# ===========================================================================
+# Per-rule enable switches
+# ===========================================================================
+
+class TestRuleEnabled:
+    def test_no_entity_is_enabled(self):
+        assert make_app()._rule_enabled(None) is True
+
+    def test_on_is_enabled(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value="on")
+        assert app._rule_enabled("switch.x") is True
+
+    def test_off_is_disabled(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value="off")
+        assert app._rule_enabled("switch.x") is False
+
+    def test_unreadable_defaults_enabled(self):
+        app = make_app()
+        app.get_state = MagicMock(return_value=None)
+        assert app._rule_enabled("switch.x") is True
+
+
+# ===========================================================================
+# Grid-connection guard clamp
+# ===========================================================================
+
+class TestGridGuard:
+    def test_grid_export_clamped_to_limit(self):
+        app = make_app(max_grid_w=8000, grid_utilization=0.9)
+        assert app._clamp_to_grid_limit(-9000, "grid") == pytest.approx(-7200)
+
+    def test_grid_import_clamped_to_limit(self):
+        app = make_app(max_grid_w=8000, grid_utilization=0.9)
+        assert app._clamp_to_grid_limit(9000, "grid") == pytest.approx(7200)
+
+    def test_within_limit_unchanged(self):
+        app = make_app(max_grid_w=8000, grid_utilization=0.9)
+        assert app._clamp_to_grid_limit(-2000, "grid") == pytest.approx(-2000)
+
+    def test_battery_clamped_to_max_power(self):
+        app = make_app(max_power_w=2200, max_grid_w=8000, grid_utilization=0.9)
+        assert app._clamp_to_grid_limit(-5000, "battery") == pytest.approx(-2200)
 
 
 # ===========================================================================
@@ -381,11 +432,13 @@ class TestModeSelector:
         app._set_battery_setpoint = MagicMock()
         app._publish_branch = MagicMock()
         app._apply_standby = MagicMock()
-        # _get_soc/_get_current_price only needed by the optimized chain.
+        app._entity_exists = MagicMock(return_value=True)
+        # _get_soc/_current_price only needed by the optimized chain.
         app._get_soc = MagicMock(return_value=80)
-        app._get_current_price = MagicMock(return_value=0.15)
+        app._current_price = MagicMock(return_value=0.15)
         app._get_prices_dict = MagicMock(return_value=None)
         app._max_price_in_window = MagicMock(return_value=0.50)
+        app._max_price_in_hour_range_tomorrow = MagicMock(return_value=None)
         app._publish_status = MagicMock()
         # get_state resolves both the selector and any input_number reads.
         def _get_state(entity_id=None, *a, **kw):
@@ -478,6 +531,7 @@ class TestApplyStandby:
 class TestPublishBranch:
     def test_writes_branch_state_and_extra(self):
         app = make_app()
+        app._entity_exists = MagicMock(return_value=True)
         app.set_state = MagicMock()
         app._publish_branch("manual_grid", setpoint=-500.0)
         kwargs = app.set_state.call_args.kwargs
@@ -570,23 +624,23 @@ class TestSensorReaders:
         app.get_state = MagicMock(return_value="unavailable")
         assert app._get_soc() is None
 
-    # _get_current_price
+    # _current_price
     def test_get_price_from_attribute_dict(self):
         # Attribute dict contains the current hour key → read from there
         app = make_app()
         app.get_state = MagicMock(return_value={"2024-06-15T14:00:00": 0.25})
-        assert app._get_current_price() == pytest.approx(0.25)
+        assert app._current_price("sell") == pytest.approx(0.25)
 
     def test_get_price_fallback_to_sensor_state(self):
         # No attribute dict → fall through to the sensor state value
         app = make_app()
         app.get_state = MagicMock(side_effect=[None, "0.30"])
-        assert app._get_current_price() == pytest.approx(0.30)
+        assert app._current_price("sell") == pytest.approx(0.30)
 
     def test_get_price_unavailable_returns_none(self):
         app = make_app()
         app.get_state = MagicMock(return_value=None)
-        assert app._get_current_price() is None
+        assert app._current_price("sell") is None
 
     # _contiguous_price_hours (renamed from _count_cheap_hours)
     def test_count_cheap_hours_consecutive(self):
@@ -667,13 +721,15 @@ class TestPublishStatus:
             price_discharge=0.39,
             price_charge=-0.10,
             min_arbitrage_margin=0.05,
-            prepeak_start=16,
-            prepeak_end=18,
-            prepeak_window_h=2.0,
+            afternoon_margin=0.05,
+            afternoon_start=16,
+            afternoon_end=18,
+            afternoon_window_h=2.0,
         )
 
     def test_writes_state_and_attributes(self):
         app = make_app()
+        app._entity_exists = MagicMock(return_value=True)
         self._call_publish(app)
         app.set_state.assert_called_once()
         kwargs = app.set_state.call_args.kwargs

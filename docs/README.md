@@ -98,23 +98,23 @@ Step 1: Tutorial: Getting Started
     ├─ Copy strategy files
     ├─ Configure apps.yaml
     └─ Verify installation
-    
+
 Step 2: Tutorial: First Day Operation
     ├─ Understand morning behavior
-    ├─ Learn pre-peak charging
+    ├─ Learn afternoon charging
     ├─ See evening peak discharge
     └─ Monitor night charging
-    
+
 Step 3: Explanation: Strategy Priority Chain
     ├─ Learn P1-P5 priorities
     ├─ Understand decision flow
     └─ See why this order works
-    
+
 Step 4: Reference: apps.yaml Configuration
     ├─ Review all tunables
     ├─ Set optimal values
     └─ Configure for your system
-    
+
 Step 5: Tutorial: Dashboard Setup
     ├─ Create visual monitoring
     └─ Add charts and gauges
@@ -141,7 +141,6 @@ docs/
 ├── README.md                          # This file - documentation overview
 ├── index.md                           # Main documentation landing page
 ├── .gitignore                         # Documentation ignore rules
-├── _sidebar.yml                       # Sidebar configuration for static sites
 │
 ├── tutorials/
 │   ├── getting-started.md          # Step-by-step installation guide
