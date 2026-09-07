@@ -74,7 +74,7 @@ sessy_strategy:
 
   # ── Operating-mode selector (master control) ────────────────────────
   # Provided by the Home Battery custom integration (custom_components/home_battery).
-  # Supersedes enable_switch when set. Options normalise to:
+  # The single master control the app obeys. Options normalise to:
   # optimized | grid_setpoint | battery_setpoint | sessy_dynamic | eco | idle.
   mode_select: select.home_battery_mode
   # Single manual setpoint. The mode decides where it lands: grid_setpoint mode
@@ -110,10 +110,6 @@ sessy_strategy:
   rule_afternoon_charge_entity: switch.home_battery_rule_afternoon_charge
   rule_evening_peak_entity: switch.home_battery_rule_evening_peak
   rule_morning_selloff_entity: switch.home_battery_rule_morning_selloff
-
-  # Optional live season mode selector (input_select with auto/summer/winter).
-  # If set, this overrides season_mode from the UI.
-  season_mode_entity: input_select.sessy_season_mode
 
 boiler_strategy:
   module: boiler_strategy

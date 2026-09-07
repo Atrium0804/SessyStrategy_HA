@@ -125,8 +125,6 @@ class SessyStrategy(hass.Hass):
         self.rule_afternoon_charge_entity = self.args.get("rule_afternoon_charge_entity")
         self.rule_evening_peak_entity    = self.args.get("rule_evening_peak_entity")
         self.rule_morning_selloff_entity = self.args.get("rule_morning_selloff_entity")
-        # Optional live season mode selector (input_select with auto/summer/winter)
-        self.season_mode_entity          = self.args.get("season_mode_entity")
 
         self._last_active_season = None
         self._rerun_timer = None
@@ -159,7 +157,6 @@ class SessyStrategy(hass.Hass):
             self.rule_afternoon_charge_entity,
             self.rule_evening_peak_entity,
             self.rule_morning_selloff_entity,
-            self.season_mode_entity,
         ]
         for entity in live_inputs:
             if entity:
@@ -615,10 +612,6 @@ class SessyStrategy(hass.Hass):
 
     def _active_season_mode(self) -> str:
         mode = self.season_mode
-        if self.season_mode_entity:
-            mode_state = self.get_state(self.season_mode_entity)
-            if isinstance(mode_state, str):
-                mode = mode_state.strip().lower()
 
         if mode in ("summer", "winter"):
             return mode
@@ -687,11 +680,6 @@ class SessyStrategy(hass.Hass):
             return
 
         mode_source = self.season_mode
-        if self.season_mode_entity:
-            mode_state = self.get_state(self.season_mode_entity)
-            if isinstance(mode_state, str):
-                mode_source = mode_state.strip().lower()
-
         if mode_source not in ("auto", "summer", "winter"):
             mode_source = "auto"
 

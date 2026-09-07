@@ -398,27 +398,12 @@ class TestGridGuard:
 
 
 # ===========================================================================
-# Enable switch
-# ===========================================================================
-
-class TestEnableSwitch:
-    def test_switch_off_skips_cycle(self):
-        app = make_app(enable_switch="input_boolean.sessy_strategy_enabled")
-        app.get_state = MagicMock(return_value="off")
-        app._set_grid_setpoint = MagicMock()
-        app._set_battery_setpoint = MagicMock()
-        app.update_strategy({})
-        app._set_grid_setpoint.assert_not_called()
-        app._set_battery_setpoint.assert_not_called()
-
-
-# ===========================================================================
 # Operating-mode selector (master control)
 # ===========================================================================
 
 class TestModeSelector:
     """
-    The mode selector supersedes the enable switch and gates the whole cycle.
+    The mode selector gates the whole cycle.
     Each test stubs the actuators and asserts the app honours the selected mode.
     """
 
@@ -492,12 +477,6 @@ class TestModeSelector:
         app._apply_standby.assert_called_once_with(app.idle_option, "idle")
         app._set_grid_setpoint.assert_not_called()
         app._set_battery_setpoint.assert_not_called()
-
-    def test_selector_supersedes_enable_switch(self):
-        # Selector set to Optimized even though enable switch would say off.
-        app = self._make("Optimized", enable_switch="input_boolean.sessy_strategy_enabled")
-        app.update_strategy({})
-        app._set_grid_setpoint.assert_called_once_with(0)
 
     def test_unknown_label_falls_back_to_optimized(self):
         app = self._make("Bogus")
@@ -590,11 +569,6 @@ class TestActiveSeasonMode:
         # Minimum price at 02:00 (outside daytime window) → winter
         app = make_app(season_mode="auto")
         app._get_prices_dict = MagicMock(return_value=self._prices_with_min_at(2))
-        assert app._active_season_mode() == "winter"
-
-    def test_entity_overrides_config_mode(self):
-        app = make_app(season_mode="auto", season_mode_entity="input_select.sessy_season_mode")
-        app.get_state = MagicMock(return_value="winter")
         assert app._active_season_mode() == "winter"
 
     def test_auto_falls_back_when_no_prices(self):

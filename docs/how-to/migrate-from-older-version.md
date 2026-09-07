@@ -371,16 +371,6 @@ number:
     unit: "€/kWh"
     initial: -0.10
     mode: box
-
-# Season mode
-  - platform: input_select
-    name: "Season Mode"
-    entity_id: input_select.sessy_season_mode
-    options:
-      - auto
-      - summer
-      - winter
-    initial: auto
 ```
 
 Then link them in your apps.yaml:
@@ -393,7 +383,6 @@ sessy_strategy:
   cheap_soc_target_entity: number.home_battery_soc_ceiling
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
-  season_mode_entity: input_select.sessy_season_mode
 ```
 
 ### Step 7: Test the Migration

@@ -277,21 +277,7 @@ Set up optional components for enhanced functionality: Home Battery integration 
 
 If you prefer not to use the Home Battery integration, you can create the helpers manually:
 
-1. **Create mode selector:**
-   Add to your `configuration.yaml`:
-   ```yaml
-   input_select:
-     sessy_season_mode:
-       name: "Sessy Season Mode"
-       options:
-         - auto
-         - summer
-         - winter
-       initial: auto
-       icon: mdi:calendar-season
-   ```
-
-2. **Create tuning helpers:**
+1. **Create tuning helpers:**
    ```yaml
    input_number:
      home_battery_soc_target:
@@ -327,12 +313,11 @@ If you prefer not to use the Home Battery integration, you can create the helper
        icon: mdi:currency-eur
    ```
 
-3. **Update apps.yaml:**
+2. **Update apps.yaml:**
    Add references to your helpers:
    ```yaml
    mode_select: select.home_battery_mode
    setpoint_entity: number.home_battery_setpoint
-   season_mode_entity: input_select.sessy_season_mode
    soc_target_entity: number.home_battery_soc_target
    soc_floor_entity: number.home_battery_soc_floor
    price_discharge_entity: number.home_battery_price_discharge

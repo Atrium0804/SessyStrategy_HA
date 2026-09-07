@@ -111,11 +111,8 @@ Some HA entity state reads are direct `self.get_state()` calls in main/actuator 
   > **All HA entity reads/writes go through clearly named helper calls**
 
 - **Actual direct calls:**
-  - [files/sessy_strategy.py](files/sessy_strategy.py#L84): `if self.enable_switch and self.get_state(self.enable_switch) == "off":`
   - [files/sessy_strategy.py](files/sessy_strategy.py#L244): `current_strategy = self.get_state(self.strategy_select)`
   - [files/sessy_strategy.py](files/sessy_strategy.py#L263): `current_strategy = self.get_state(self.strategy_select)`
-  - [files/sessy_strategy.py](files/sessy_strategy.py#L317): `mode_state = self.get_state(self.season_mode_entity)`
-  - [files/sessy_strategy.py](files/sessy_strategy.py#L388): `mode_state = self.get_state(self.season_mode_entity)`
 
 ### Why This Matters (Style/Maintainability)
 - **Readability:** A method like `_is_strategy_disabled()` or `_read_current_strategy()` is more self-documenting
@@ -126,39 +123,19 @@ Some HA entity state reads are direct `self.get_state()` calls in main/actuator 
 ### Recommendation
 ✅ **Low priority; implement if refactoring**
 
-Extract three small helpers:
+Extract a small helper:
 
 ```python
-def _is_enabled(self) -> bool:
-    """Return True if strategy is enabled (or no enable switch is configured)."""
-    if not self.enable_switch:
-        return True
-    return self.get_state(self.enable_switch) != "off"
-
 def _read_current_strategy(self) -> str | None:
     """Return the current strategy mode (api, nom, etc.)."""
     return self.get_state(self.strategy_select)
-
-def _read_season_mode_override(self) -> str | None:
-    """Return live season mode from input_select, or None if not configured."""
-    if not self.season_mode_entity:
-        return None
-    return self.get_state(self.season_mode_entity)
 ```
 
-Then use them in main/actuator paths:
+Then use it in main/actuator paths:
 
 ```python
-# In update_strategy()
-if not self._is_enabled():
-    self.log("Strategy disabled via enable switch — skipping this cycle")
-    return
-
 # In _set_grid_setpoint() and _set_battery_setpoint()
 current_strategy = self._read_current_strategy()
-
-# In _active_season_mode()
-mode_state = self._read_season_mode_override()
 ```
 
 ---
@@ -168,7 +145,7 @@ mode_state = self._read_season_mode_override()
 ### 1. **Clear Structure & Separation** ([Principle 1](CODING_PRINCIPLES.md#1-structure))
 - Strategy logic cleanly separated into [files/sessy_strategy.py](files/sessy_strategy.py)
 - Configuration cleanly separated into [files/apps.yaml](files/apps.yaml)
-- Helper modules (e.g., `sessy_helpers.yaml`) kept separate
+- Add-on modules (e.g., [files/boiler_strategy.py](files/boiler_strategy.py)) kept separate
 
 ### 2. **Linear Priority Flow** ([Principle 3](CODING_PRINCIPLES.md#3-functions-and-methods))
 - Main decision function follows explicit if/elif chain: [files/sessy_strategy.py](files/sessy_strategy.py#L83–L199)

@@ -56,13 +56,11 @@ The strategy uses the hour of the day's minimum energy price to automatically in
 
 ## Solution Steps
 
-### Step 1: Choose Your Configuration Method
+### Step 1: Configure the Season Mode
 
-You have two ways to configure seasonal mode:
+Season is configured statically in `apps.yaml` via the `season_mode` key.
 
-#### Option A: Static Configuration in apps.yaml
-
-Best for: Users who want consistent seasonal behavior without manual changes.
+Best for: consistent, predictable seasonal behavior.
 
 **What to do:** Set the `season_mode` parameter in your `apps.yaml`.
 
@@ -85,41 +83,6 @@ sessy_strategy:
 
 **Expected result:** The strategy will use the specified mode for all decisions.
 
-#### Option B: Live Season Mode Entity
-
-Best for: Users who want to switch seasons from their Home Assistant dashboard without restarting AppDaemon.
-
-**What to do:** Set up an input_select entity and link it to the strategy.
-
-**How to do it:**
-
-1. **Create an input_select helper in Home Assistant:**
-   - Go to **Settings > Devices & Services > Helpers**
-   - Click **Add Helper** and select **Input Select**
-   - Configure as follows:
-     ```yaml
-     # This is created via UI, but equivalent YAML would be:
-     input_select:
-       sessy_season_mode:
-         name: "Sessy Season Mode"
-         options:
-           - auto
-           - summer
-           - winter
-         initial: auto
-     ```
-
-2. **Link the entity to your strategy in apps.yaml:**
-   ```yaml
-   sessy_strategy:
-     module: sessy_strategy
-     class: SessyStrategy
-     season_mode: auto  # Static fallback if entity unavailable
-     season_mode_entity: input_select.sessy_season_mode  # Live override
-   ```
-
-**Expected result:** Changing the input_select in Home Assistant will immediately switch the strategy's season mode.
-
 ### Step 2: Configure Winter-Specific Overrides (Optional)
 
 If you need different behavior in winter vs. summer, you can set winter-specific overrides:
@@ -141,7 +104,7 @@ sessy_strategy:
   afternoon_window_h_winter: 4.0 # Spread charge over 4 hours in winter
 ```
 
-**When these apply:** Only when `season_mode` (static or live) is set to `winter`.
+**When these apply:** Only when `season_mode` is set to `winter` (explicitly or via auto inference).
 
 **Fallback behavior:** If a winter override is not set (or is `None`), the base value is used.
 
@@ -189,11 +152,6 @@ To confirm your seasonal mode is configured correctly:
    - In **winter mode**: Afternoon charging should start earlier (default 14:00)
    - Check that winter-specific overrides are applied when in winter mode
 
-4. **Test live switching (if using entity):**
-   - Change your `input_select.sessy_season_mode` value
-   - Wait for the `rerun_debounce_s` delay (default 2 seconds)
-   - Verify the status sensor updates to reflect the new season
-
 ---
 
 ## Common Issues
@@ -203,15 +161,13 @@ To confirm your seasonal mode is configured correctly:
 **Symptom:** Status sensor always shows the same season regardless of configuration.
 
 **Cause:**
-- The `season_mode_entity` is not set or the entity doesn't exist
-- The input_select entity has a typo in the entity ID
+- `season_mode` has a typo or an unexpected value in `apps.yaml`
 - AppDaemon hasn't been restarted after configuration changes
 
 **Fix:**
-1. Verify the entity ID is correct in `apps.yaml`
-2. Check that the entity exists in Home Assistant
-3. Restart AppDaemon: `appdaemon restart`
-4. If using static mode, ensure `season_mode_entity` is not set (or set to `None`)
+1. Verify `season_mode` is one of `auto`, `summer`, or `winter` in `apps.yaml`
+2. Restart AppDaemon: `appdaemon restart`
+3. Check the `active_season` attribute on the status sensor to confirm the resolved mode
 
 ### Issue 2: Auto Detection Always Returns Winter
 
@@ -257,7 +213,7 @@ To confirm your seasonal mode is configured correctly:
 
 ## Alternative Approaches
 
-### Approach 1: Static Season Mode Only
+### Static Season Mode
 
 **Pros:**
 - Simple, reliable configuration
@@ -266,52 +222,19 @@ To confirm your seasonal mode is configured correctly:
 
 **Cons:**
 - Manual changes require editing `apps.yaml` and restarting AppDaemon
-- Cannot switch seasons dynamically based on weather or personal preference
 
 **Steps:**
-1. Set `season_mode` to your desired season
+1. Set `season_mode` to your desired season (`auto`, `summer`, or `winter`)
 2. Optionally set winter overrides if needed
 3. Restart AppDaemon
-
-### Approach 2: Live Entity with Automation
-
-**Pros:**
-- Dynamic switching from dashboard or automations
-- No AppDaemon restart required for changes
-- Can integrate with weather sensors or calendar events
-
-**Cons:**
-- Requires creating and maintaining additional entities
-- Slightly more complex setup
-
-**Steps:**
-1. Create input_select entity as shown above
-2. Configure `season_mode_entity` in apps.yaml
-3. Create automations to switch season based on conditions:
-   ```yaml
-   # Example automation to switch to winter on November 1st
-   alias: "Switch to Winter Mode"
-   trigger:
-     - platform: time
-       at: "00:00:00"
-       date: "2026-11-01"
-   action:
-     - service: input_select.select_option
-       target:
-         entity_id: input_select.sessy_season_mode
-       data:
-         option: winter
-   ```
 
 ---
 
 ## Best Practices
 
 - [x] **Do:** Start with `season_mode: auto` to let the strategy adapt automatically
-- [x] **Do:** Use live entities if you want to experiment with different modes
 - [x] **Do:** Set winter overrides only if you need different winter behavior
 - [x] **Do:** Monitor the `active_season` attribute in your status sensor
-- ❌ **Don't:** Mix static and live configuration without a clear purpose
 - ❌ **Don't:** Set winter overrides to the same values as base values (redundant)
 
 ---
@@ -327,11 +250,9 @@ To confirm your seasonal mode is configured correctly:
 
 ## Quick Checklist
 
-- [ ] Decided between static (`season_mode`) or live (`season_mode_entity`) configuration
-- [ ] Set up input_select entity if using live mode
+- [ ] Set `season_mode` (`auto`, `summer`, or `winter`) in apps.yaml
 - [ ] Configured winter overrides if needed
 - [ ] Verified status sensor shows correct `active_season`
-- [ ] Tested switching between modes (if using live entity)
 - [ ] Confirmed winter overrides are applied when in winter mode
 
 ---

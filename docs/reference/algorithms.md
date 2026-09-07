@@ -316,18 +316,15 @@ result = max(run_h, min_window_h)
 **Algorithm:**
 ```
 1. Start with configured season_mode from apps.yaml
-2. If season_mode_entity is set:
-      a. Get entity state
-      b. If valid string: override season_mode with entity value
-3. If mode is "auto":
+2. If mode is "auto":
       a. Try to infer from _infer_season_from_price_minimum()
       b. If inference succeeds: return inferred season
       c. Else: return season_auto_fallback
-4. Else (mode is "summer" or "winter"):
+3. Else (mode is "summer" or "winter"):
       return mode
 ```
 
-**Priority:** Entity > Auto-inference > Fallback
+**Priority:** Explicit mode > Auto-inference > Fallback
 
 ---
 

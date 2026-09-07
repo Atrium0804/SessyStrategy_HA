@@ -12,20 +12,17 @@ if (Test-Path .env) {
 
 if (-not $env:HA_HOST)            { throw "Set HA_HOST in .env or environment" }
 if (-not $env:APPDAEMON_APPS_DIR) { throw "Set APPDAEMON_APPS_DIR in .env or environment" }
-if (-not $env:PKG_DIR)            { throw "Set PKG_DIR in .env or environment" }
 
 $HA_HOST            = $env:HA_HOST
 $HA_USER            = if ($env:HA_USER) { $env:HA_USER } else { "root" }
 $HA_CONFIG          = if ($env:HA_CONFIG) { $env:HA_CONFIG } else { "/config" }
 $APPDAEMON_APPS_DIR = $env:APPDAEMON_APPS_DIR
-$PKG_DIR            = $env:PKG_DIR
 
 Write-Host "Deploying to ${HA_USER}@${HA_HOST} ..."
 
 # -O forces the legacy SCP protocol; the NAS SFTP subsystem is chrooted elsewhere.
 scp -O files/sessy_strategy.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/sessy_strategy.py"
 scp -O files/apps.yaml          "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/apps.yaml"
-scp -O files/sessy_helpers.yaml "${HA_USER}@${HA_HOST}:${PKG_DIR}/sessy_helpers.yaml"
 
 # Home Battery custom integration (creates the device + entities).
 ssh "${HA_USER}@${HA_HOST}" "mkdir -p ${HA_CONFIG}/custom_components/home_battery"

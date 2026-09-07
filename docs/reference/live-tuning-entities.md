@@ -42,12 +42,6 @@ The app runs every 5 minutes, and **immediately whenever a live input changes** 
 | `number.home_battery_target_afternoon_charging` | `target_afternoon_charging_entity` | Target SOC to reach before the evening peak (P3) | 0-100 | `target_afternoon_charging` from apps.yaml | % |
 | `number.home_battery_afternoon_margin` | `afternoon_margin_entity` | Minimum import-price reduction (evening peak vs now) to justify afternoon charge (P3) | 0-0.5 | `afternoon_margin` from apps.yaml | €/kWh |
 
-### Mode Selector (input_select)
-
-| Entity ID | apps.yaml Key | Description | Options | Default Fallback |
-|---|---|---|---|---|
-| `input_select.sessy_season_mode` | `season_mode_entity` | Live season mode override | `auto`, `summer`, `winter` | `season_mode` from apps.yaml |
-
 ---
 
 ## Setup Instructions
@@ -57,7 +51,7 @@ The app runs every 5 minutes, and **immediately whenever a live input changes** 
 Use Home Assistant's UI to create the helpers:
 
 1. Go to **Settings → Devices & Services → Helpers**
-2. Click **Add Helper** → **Number** (for numeric values) or **Select** (for season mode)
+2. Click **Add Helper** → **Number**
 3. Configure each helper:
 
 **Numeric Helpers (input_number):**
@@ -72,12 +66,6 @@ Use Home Assistant's UI to create the helpers:
 | Min Arbitrage Margin | `number.home_battery_min_arbitrage_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:swap-horizontal |
 | Afternoon Charge Target | `number.home_battery_target_afternoon_charging` | 0 | 100 | 5 | % | mdi:battery-charging-90 |
 | Afternoon Margin | `number.home_battery_afternoon_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:scale-balance |
-
-**Mode Selector (input_select):**
-
-| Name | Entity ID | Options | Icon |
-|------|-----------|---------|------|
-| Season Mode | `input_select.sessy_season_mode` | auto, summer, winter | mdi:weather-sunny |
 
 ### Step 2: Link to apps.yaml
 
@@ -104,7 +92,6 @@ sessy_strategy:
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
-  season_mode_entity: input_select.sessy_season_mode
 ```
 
 ### Step 3: Create a Dashboard
@@ -118,8 +105,6 @@ card:
   title: SessyStrategy Live Tuning
   show_header_toggle: false
   entities:
-    - entity: input_select.sessy_season_mode
-      name: Season Mode
     - entity: number.home_battery_soc_target
       name: SOC Target
     - entity: number.home_battery_soc_floor
@@ -227,16 +212,6 @@ input_number:
     unit_of_measurement: "€/kWh"
     icon: mdi:swap-horizontal
     initial: 0.05
-
-input_select:
-  sessy_season_mode:
-    name: Season Mode
-    options:
-      - auto
-      - summer
-      - winter
-    initial: auto
-    icon: mdi:weather-sunny
 ```
 
 ---
@@ -251,7 +226,6 @@ The [Home Battery custom integration](https://github.com/PimDoos/ha-sessy/tree/m
 - `number.home_battery_price_discharge`
 - `number.home_battery_price_charge`
 - `number.home_battery_min_arbitrage_margin`
-- `input_select.sessy_season_mode`
 
 These are pre-configured to work with SessyStrategy. Simply reference them in your `apps.yaml` as shown above.
 

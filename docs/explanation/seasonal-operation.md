@@ -30,12 +30,6 @@ sessy_strategy:
   season_auto_fallback: winter  # Fallback if inference fails
 ```
 
-Additionally, the mode can be controlled live via an `input_select` entity:
-
-```yaml
-season_mode_entity: input_select.sessy_season_mode
-```
-
 ---
 
 ## Season Inference Logic
@@ -166,22 +160,15 @@ afternoon_window_h = self._seasonal_value(self.afternoon_window_h, active_season
 
 The strategy resolves the active season in the following priority:
 
-1. **Live entity override** (if `season_mode_entity` is configured)
-2. **Explicit mode** (if `season_mode` is `summer` or `winter`)
-3. **Inferred from price minimum** (if `season_mode` is `auto`)
-4. **Fallback** (if inference fails, uses `season_auto_fallback`)
+1. **Explicit mode** (if `season_mode` is `summer` or `winter`)
+2. **Inferred from price minimum** (if `season_mode` is `auto`)
+3. **Fallback** (if inference fails, uses `season_auto_fallback`)
 
 ### Implementation: `_active_season_mode`
 
 ```python
 def _active_season_mode(self) -> str:
     mode = self.season_mode
-
-    # Check live entity override
-    if self.season_mode_entity:
-        mode_state = self.get_state(self.season_mode_entity)
-        if isinstance(mode_state, str):
-            mode = mode_state.strip().lower()
 
     # If explicitly set, use it
     if mode in ("summer", "winter"):
@@ -350,18 +337,16 @@ Behavior:
 
 ```
 Date: Any
-season_mode: winter (explicit)
-season_mode_entity: input_select.sessy_season_mode
-
-User sets input_select to "summer"
+season_mode: summer (explicit)
 
 Resolution:
-- mode from entity: "summer"
-- Active season: SUMMER (entity override takes priority)
+- mode from apps.yaml: "summer"
+- Active season: SUMMER (explicit mode takes priority over inference)
 
 Behavior:
 - Uses summer parameters regardless of price pattern
 - Useful for testing or overriding automatic inference
+- Requires an AppDaemon restart to change
 ```
 
 ---

@@ -451,11 +451,6 @@ soc_floor: 10      # Keep minimum 10%
   - Evaluation: If `daily_min_price_hour` is between 8-18, it's summer; otherwise winter
   - Fix: Adjust `season_day_start` and `season_day_end` or set explicit season
 
-- [ ] Is live season entity overriding?
-  - Check: `season_mode_entity` configuration
-  - Check: Live entity value
-  - Fix: Remove entity or adjust its value
-
 **Example fix:**
 ```yaml
 # Option A: Explicit season
@@ -464,9 +459,6 @@ season_mode: winter  # Force winter mode
 # Option B: Adjust auto detection hours
 season_day_start: 7   # Earlier daylight start
 season_day_end: 19    # Later daylight end
-
-# Option C: Remove live entity override
-season_mode_entity:   # Remove this line to disable live override
 ```
 
 ### Issue 6: "Strategy not running at all"

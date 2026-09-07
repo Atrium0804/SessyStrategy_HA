@@ -62,7 +62,6 @@ SessyStrategy supports live tuning for these parameters:
 | `price_charge_entity` | input_number | Raw price threshold for charging | `price_charge: -0.10` |
 | `min_arbitrage_margin_entity` | input_number | Minimum price spread for the evening peak hold-vs-sell decision (P4) | `min_arbitrage_margin: 0.05` |
 | `afternoon_margin_entity` | input_number | Minimum import-price reduction to justify afternoon charge (P3) | `afternoon_margin: 0.05` |
-| `season_mode_entity` | input_select | Live season mode override | `season_mode: auto` |
 
 **Note:** The `mode_select` entity is also live-tuned and controls the operating mode.
 
@@ -92,9 +91,6 @@ Decide which parameters you want to make adjustable:
 - `cheap_soc_target_entity` — Adjust cheap charge ceiling
 - `min_arbitrage_margin_entity` — Adjust evening peak hold-vs-sell spread requirement (P4)
 - `afternoon_margin_entity` — Adjust afternoon charge import-price reduction requirement (P3)
-
-**Seasonal control:**
-- `season_mode_entity` — Switch between summer/winter/auto
 
 ### Step 2: Create Input Number Entities
 
@@ -193,22 +189,7 @@ initial: 0.05  # Match your static value
 mode: box
 ```
 
-### Step 3: Create Season Mode Entity (Optional)
-
-If you want live control over season mode:
-
-```yaml
-# Input Select Helper Configuration
-name: "Sessy Season Mode"
-entity_id: input_select.sessy_season_mode
-options:
-  - auto
-  - summer
-  - winter
-initial: auto
-```
-
-### Step 4: Link Entities to Strategy
+### Step 3: Link Entities to Strategy
 
 **What to do:** Configure the entity links in your `apps.yaml`.
 
@@ -237,7 +218,6 @@ sessy_strategy:
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
   afternoon_margin_entity: number.home_battery_afternoon_margin
-  season_mode_entity: input_select.sessy_season_mode
 ```
 
 **Expected result:** Restart AppDaemon, and the strategy will now read from your entities each cycle.
@@ -317,15 +297,6 @@ Set up a dedicated dashboard for tuning your strategy.
           entity: number.home_battery_soc_ceiling
           name: Cheap Charge Ceiling
           icon: mdi:ceiling
-
-    # Season Mode Section
-    - type: markdown
-      content: "### Season Mode"
-
-    - type: entity
-      entity: input_select.sessy_season_mode
-      name: Season Mode
-      icon: mdi:weather-seasons
 
     # Current Status Section
     - type: markdown
@@ -492,33 +463,6 @@ To confirm your live tuning setup is working:
 ### Automated Tuning Based on Conditions
 
 Use Home Assistant automations to adjust parameters based on external conditions.
-
-**Example: Increase SOC floor during winter**
-```yaml
-alias: "Winter SOC Floor Adjustment"
-trigger:
-  - platform: state
-    entity_id: input_select.sessy_season_mode
-    to: winter
-action:
-  - service: number.set_value
-    target:
-      entity_id: number.home_battery_soc_floor
-    data:
-      value: 10  # Higher floor in winter
-
-alias: "Summer SOC Floor Adjustment"
-trigger:
-  - platform: state
-    entity_id: input_select.sessy_season_mode
-    to: summer
-action:
-  - service: number.set_value
-    target:
-      entity_id: number.home_battery_soc_floor
-    data:
-      value: 0  # Lower floor in summer
-```
 
 **Example: Adjust thresholds based on time of day**
 ```yaml

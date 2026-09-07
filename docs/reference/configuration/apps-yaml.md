@@ -75,7 +75,7 @@ The configuration is organized into logical sections:
 | `price_sensor` | str | "sensor.sessy_dnhh_energy_price" | **Yes** | Current energy price sensor entity | valid entity ID | `sensor.sessy_<id>_energy_price` |
 | `status_sensor` | str | "sensor.sessy_strategy_status" | **Yes** | Status sensor published by the app | valid entity ID | `sensor.sessy_strategy_status` |
 | **Operating Mode** |||||||
-| `mode_select` | str | null | No | Master mode selector (supersedes enable_switch) | valid entity ID | `select.home_battery_mode` |
+| `mode_select` | str | null | No | Master mode selector | valid entity ID | `select.home_battery_mode` |
 | `setpoint_entity` | str | null | No | Manual setpoint entity for grid/battery modes | valid entity ID | `number.home_battery_setpoint` |
 | `sessy_dynamic_option` | str | "roi" | No | Sessy power_strategy option for "Sessy dynamic" mode | valid option string | `roi` |
 | `eco_option` | str | "eco" | No | Sessy power_strategy option for "Eco" mode | valid option string | `eco` |
@@ -89,7 +89,6 @@ The configuration is organized into logical sections:
 | `min_arbitrage_margin_entity` | str | null | No | Live arbitrage margin override, P4 (input_number) | valid entity ID | `number.home_battery_min_arbitrage_margin` |
 | `target_afternoon_charging_entity` | str | null | No | Live afternoon SOC target override (input_number) | valid entity ID | `number.home_battery_target_afternoon_charging` |
 | `afternoon_margin_entity` | str | null | No | Live afternoon margin override (input_number) | valid entity ID | `number.home_battery_afternoon_margin` |
-| `season_mode_entity` | str | null | No | Live season mode selector (input_select) | valid entity ID | `input_select.sessy_season_mode` |
 
 ---
 
@@ -239,7 +238,6 @@ sessy_strategy:
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
   target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
   afternoon_margin_entity: number.home_battery_afternoon_margin
-  season_mode_entity: input_select.sessy_season_mode
 ```
 
 ### Seasonal Override Example

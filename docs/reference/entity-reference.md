@@ -69,7 +69,6 @@ These entities are optional but enable additional functionality when configured.
 |---|---|---|---|---|---|
 | `select.home_battery_mode` | `mode_select` | select | Master mode selector | `Optimized`, `Grid setpoint`, `Battery setpoint`, `Sessy dynamic`, `Eco`, `Idle` | Uses `optimized` mode only |
 | `number.home_battery_setpoint` | `setpoint_entity` | number | Manual setpoint for grid/battery modes | W | Manual modes unavailable |
-| `input_boolean.sessy_strategy_enabled` | `enable_switch` | input_boolean | Legacy master enable switch | `on`/`off` | Always enabled (if `mode_select` is set) |
 
 ### Live Tuning Helpers
 
@@ -83,7 +82,6 @@ These allow runtime adjustment without restarting AppDaemon. The app reads these
 | `number.home_battery_price_discharge` | `price_discharge_entity` | number | Live discharge threshold | any €/kWh | Overrides `price_discharge` |
 | `number.home_battery_price_charge` | `price_charge_entity` | number | Live charge threshold | any €/kWh | Overrides `price_charge` |
 | `number.home_battery_min_arbitrage_margin` | `min_arbitrage_margin_entity` | number | Live arbitrage margin | ≥ 0 €/kWh | Overrides `min_arbitrage_margin` |
-| `input_select.sessy_season_mode` | `season_mode_entity` | input_select | Live season mode | `auto`, `summer`, `winter` | Overrides `season_mode` |
 
 **Configuration example:**
 
@@ -100,7 +98,6 @@ sessy_strategy:
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
-  season_mode_entity: input_select.sessy_season_mode
 
   # Sessy strategy option strings (for standby modes)
   sessy_dynamic_option: roi
@@ -145,9 +142,8 @@ This is the primary entity for monitoring the strategy's decisions and current s
 ### Input Entities (App Reads)
 
 1. **Sensors**: SOC, price data
-2. **Selects**: Mode selection, season mode
+2. **Selects**: Mode selection
 3. **Numbers**: Manual setpoint, live tuning values
-4. **Input Boolean**: Legacy enable switch
 
 ### Output Entities (App Writes)
 
@@ -173,7 +169,6 @@ The optional Home Battery custom integration (`custom_components/home_battery`) 
 | `number.home_battery_price_discharge` | `price_discharge_entity` | Live discharge threshold |
 | `number.home_battery_price_charge` | `price_charge_entity` | Live charge threshold |
 | `number.home_battery_min_arbitrage_margin` | `min_arbitrage_margin_entity` | Live arbitrage margin |
-| `input_select.sessy_season_mode` | `season_mode_entity` | Live season mode |
 
 ### Sensors
 

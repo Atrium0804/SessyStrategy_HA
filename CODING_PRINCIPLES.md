@@ -14,7 +14,7 @@ These principles guide all development on this AppDaemon Home Assistant applicat
 **Use a consistent, predictable project layout**
 - New contributors should immediately understand where to find things
 - Strategy logic lives in `files/sessy_strategy.py`; configuration lives in `files/apps.yaml`
-- Helper modules (e.g. `sessy_helpers.yaml`) stay separate from core strategy logic
+- Add-on modules (e.g. `files/boiler_strategy.py`) stay separate from core strategy logic
 
 **Keep the strategy class lean**
 - `initialize()` reads config and schedules the callback; nothing more

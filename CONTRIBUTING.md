@@ -20,7 +20,6 @@ SessyStrategy_HA/
 ├── files/
 │   ├── sessy_strategy.py     # AppDaemon app — all strategy logic
 │   ├── apps.yaml             # All tunables and entity IDs
-│   ├── sessy_helpers.yaml    # Optional HA helper entities
 │   └── appdaemon.example.yaml
 ├── tests/                    # pytest unit tests
 │   └── test_sessy_strategy.py

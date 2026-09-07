@@ -639,7 +639,6 @@ views:
         entities:
           - select.home_battery_mode
           - number.home_battery_setpoint
-          - input_select.sessy_season_mode
 ```
 
 ### Dashboard Layout Tips

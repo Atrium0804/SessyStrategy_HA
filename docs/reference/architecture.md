@@ -343,7 +343,6 @@ SessyStrategy_HA/
 ├── files/
 │   └── sessy_strategy.py      # Main application
 │   └── apps.yaml              # Example configuration
-│   └── sessy_helpers.yaml     # Helper entity definitions
 │
 ├── custom_components/
 │   └── home_battery/           # Optional integration

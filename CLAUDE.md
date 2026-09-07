@@ -15,7 +15,6 @@ Install by copying files to the HA instance:
 ```
 files/sessy_strategy.py                   →  /config/appdaemon/apps/sessy_strategy.py
 files/apps.yaml                           →  /config/appdaemon/apps/apps.yaml  (merge with existing)
-files/sessy_helpers.yaml                  →  /config/packages/sessy_helpers.yaml  (season + price sliders)
 files/custom_components/home_battery/     →  /config/custom_components/home_battery/  (Home Battery device)
 ```
 
@@ -67,7 +66,7 @@ All tunables live in `files/apps.yaml`. **No magic numbers in Python** — if a 
 - Time windows: `afternoon_start/end`, `evening_peak_start/end`, winter variants
 - Season auto-detect: `season_day_start/end` (8–18h)
 
-Optional `sessy_helpers.yaml` adds `input_number` / `input_select` HA helpers for live runtime tuning without restarting AppDaemon.
+SOC controls, price thresholds, and the mode selector live on the **Home Battery** custom integration device (`number.home_battery_*`, `select.home_battery_mode`) for live runtime tuning without restarting AppDaemon.
 
 ## Boiler strategy (add-on)
 
