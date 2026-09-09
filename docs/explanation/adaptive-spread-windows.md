@@ -345,21 +345,6 @@ Note: Even though the window is 24 hours, P2 prioritizes fast charging
 
 ---
 
-## Integration with Seasonal Operation
-
-The `min_window_h` parameter can be seasonally adjusted, though this is not currently implemented as a separate winter/summer parameter. The winter-specific overrides include:
-
-- `afternoon_window_h_winter`: Different spread window for afternoon charging
-- But not `min_window_h_winter` (uses base value)
-
-**Recommendation:** If you experience different price patterns in summer vs winter, consider:
-- Lower `min_window_h` in winter (more brief spikes, need faster response)
-- Higher `min_window_h` in summer (longer, gentler price variations)
-
-Or create separate seasonal overrides if this becomes important for your use case.
-
----
-
 ## See Also
 
 - [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — Where adaptive windows are used

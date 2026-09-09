@@ -109,7 +109,7 @@ discharge_w = max(50, min(spread_w, max_power_w))
 ```
 
 **Parameters:**
-- `soc_floor`: Minimum SOC level (default: 0%, winter: configurable)
+- `soc_floor`: Minimum SOC level (default: 0%)
 - `min_window_h`: Minimum spread window in hours (default: 2.0)
 - `max_power_w`: Maximum inverter power (default: 2200W)
 
@@ -161,7 +161,7 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 1. **Cheap in:** Energy is purchased at very low (or negative) cost
 2. **Expensive out:** That stored energy can later replace expensive grid imports
 
-**Lean design:** This primarily benefits **winter operation**, when ordinary cheap prices occur overnight (exactly when PV is unavailable) and the battery needs filling for the day ahead.
+**Lean design:** This is most valuable when ordinary cheap prices occur overnight (exactly when PV is unavailable) and the battery needs filling for the day ahead.
 
 **Design choice:** We deliberately **do not** optimize for rare extreme-negative events, because maximizing them would require pre-emptively dumping stored energy and curtailing PV — a complex strategy for a rare payoff.
 
@@ -172,7 +172,7 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 ### When It Triggers
 
 **Conditions (all must be true):**
-1. Current hour is within `afternoon_start` to `afternoon_end` (default: 16:00-18:00, winter: 14:00-18:00)
+1. Current hour is within `afternoon_start` to `afternoon_end` (default: 16:00-18:00)
 2. SOC < `target_afternoon_charging` (default: 70%)
 3. **Peak-shaving guard passes:** `evening_peak_buy_price - current_buy_price >= afternoon_margin`
 
@@ -199,7 +199,7 @@ else:                                                        charge_w = max_powe
 ```
 
 **Parameters:**
-- `afternoon_start` / `afternoon_end`: Afternoon window (hours; winter values available)
+- `afternoon_start` / `afternoon_end`: Afternoon window (hours)
 - `target_afternoon_charging`: Target SOC to reach before the peak (default: 70%)
 - `afternoon_margin`: Minimum import-price reduction to justify charging (default: €0.05/kWh)
 - `max_power_w`: Charge power once the guard passes (default: 2200W)
@@ -211,8 +211,6 @@ else:                                                        charge_w = max_powe
 **Peak-shaving, not trading:** Both prices compared are **buy/import** prices (raw + surcharge). The rule tops up self-consumed energy at a low afternoon import price to avoid a more expensive grid import during the evening peak. It is explicitly **not** grid trading — when trading, export taxes and fees paid are a loss, so this rule only manages energy you will consume yourself. The separate `min_arbitrage_margin` governs the Priority 4 evening peak hold-vs-sell (trading) decision.
 
 **The peak-shaving guard is critical:** charging now only pays off if the avoided evening import is meaningfully more expensive than the current import. The `afternoon_margin` prevents topping up for a negligible import-price reduction after round-trip losses.
-
-**Seasonal note:** In winter this branch is more active (lower PV, higher loads) and the window opens earlier.
 
 ---
 
@@ -352,5 +350,4 @@ New parameters: `max_grid_w`, `grid_utilization` (P0), `morning_selloff_start`, 
 - [Adaptive Spread Windows](../explanation/adaptive-spread-windows.md) — How window sizes are calculated
 - [Setpoint Types Explained](../explanation/setpoint-types-explained.md) — api vs nom modes
 - [Arbitrage Margin](../explanation/arbitrage-margin.md) — The P3 break-even logic
-- [Seasonal Operation](../explanation/seasonal-operation.md) — How seasons affect priorities
 - [apps.yaml Configuration](../reference/configuration/apps-yaml.md) — All tunable parameters

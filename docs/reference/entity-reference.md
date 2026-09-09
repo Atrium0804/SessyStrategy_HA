@@ -34,7 +34,7 @@ These entities **must** be configured in `apps.yaml` and must exist in your Home
 | `select.sessy_battery_alt9_power_strategy` | select | Sessy power strategy selector | `nom`, `api`, `roi`, `eco`, `idle` | Strategy mode switching |
 | `number.sessy_pwkn_grid_target` | number | Grid power target | -2200 to +2200 W | Grid setpoint mode (Priority 4, 5) |
 | `number.sessy_battery_alt9_power_setpoint` | number | Battery power setpoint | -2200 to +2200 W | Battery setpoint mode (Priority 1-3) |
-| `sensor.sessy_strategy_status` | sensor | App status sensor (created by app) | `summer` or `winter` (state), multiple attributes | Status monitoring |
+| `sensor.sessy_strategy_status` | sensor | App status sensor (created by app) | active branch name (state), multiple attributes | Status monitoring |
 
 ### Configuration in apps.yaml
 
@@ -76,7 +76,9 @@ These allow runtime adjustment without restarting AppDaemon. The app reads these
 
 | Entity ID | apps.yaml Key | Type | Purpose | Range | Example |
 |---|---|---|---|---|---|
-| `number.home_battery_soc_target` | `soc_target_entity` | number | Live SOC target override | 0-100 % | Overrides `soc_target` |
+| `number.home_battery_target_afternoon_charging` | `target_afternoon_charging_entity` | number | Live afternoon charge target override (P3) | 0-100 % | Overrides `target_afternoon_charging` |
+| `number.home_battery_target_peak_discharge` | `target_peak_discharge_entity` | number | Live evening peak sell-off target override (P4) | 0-100 % | Overrides `target_peak_discharge` |
+| `number.home_battery_target_morning_soc` | `target_morning_soc_entity` | number | Live morning sell-off target override (P5) | 0-100 % | Overrides `target_morning_soc` |
 | `number.home_battery_soc_floor` | `soc_floor_entity` | number | Live SOC floor override | 0-100 % | Overrides `soc_floor` |
 | `number.home_battery_soc_ceiling` | `cheap_soc_target_entity` | number | Live cheap SOC target override | 0-100 % | Overrides `cheap_soc_target` |
 | `number.home_battery_price_discharge` | `price_discharge_entity` | number | Live discharge threshold | any €/kWh | Overrides `price_discharge` |
@@ -92,7 +94,9 @@ sessy_strategy:
   # Live tuning entities
   mode_select: select.home_battery_mode
   setpoint_entity: number.home_battery_setpoint
-  soc_target_entity: number.home_battery_soc_target
+  target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
+  target_peak_discharge_entity: number.home_battery_target_peak_discharge
+  target_morning_soc_entity: number.home_battery_target_morning_soc
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling
   price_discharge_entity: number.home_battery_price_discharge
@@ -129,9 +133,9 @@ The app creates and maintains these entities:
 
 | Entity ID | Type | State | Attributes | Purpose |
 |---|---|---|---|---|
-| `sensor.sessy_strategy_status` | sensor | `summer` or `winter` (active season) | See [Status Sensor Attributes](status-sensor-attributes.md) | Strategy state and decision context |
+| `sensor.sessy_strategy_status` | sensor | active branch name | See [Status Sensor Attributes](status-sensor-attributes.md) | Strategy state and decision context |
 
-This is the primary entity for monitoring the strategy's decisions and current state. The state shows the active season, and the attributes contain all the context used in the latest decision.
+This is the primary entity for monitoring the strategy's decisions and current state. The state shows the active branch, and the attributes contain all the context used in the latest decision.
 
 **Note**: You can customize the entity ID by setting `status_sensor` in `apps.yaml`.
 
@@ -163,7 +167,9 @@ The optional Home Battery custom integration (`custom_components/home_battery`) 
 |---|---|---|
 | `select.home_battery_mode` | `mode_select` | Master mode: Optimized, Grid setpoint, Battery setpoint, Sessy dynamic, Eco, Idle |
 | `number.home_battery_setpoint` | `setpoint_entity` | Manual setpoint (interpretation depends on mode) |
-| `number.home_battery_soc_target` | `soc_target_entity` | Live SOC target |
+| `number.home_battery_target_afternoon_charging` | `target_afternoon_charging_entity` | Live afternoon charge target (P3) |
+| `number.home_battery_target_peak_discharge` | `target_peak_discharge_entity` | Live evening peak sell-off target (P4) |
+| `number.home_battery_target_morning_soc` | `target_morning_soc_entity` | Live morning sell-off target (P5) |
 | `number.home_battery_soc_floor` | `soc_floor_entity` | Live SOC floor |
 | `number.home_battery_soc_ceiling` | `cheap_soc_target_entity` | Live cheap SOC ceiling |
 | `number.home_battery_price_discharge` | `price_discharge_entity` | Live discharge threshold |
@@ -227,7 +233,7 @@ After configuration, verify entities are working:
 - [ ] `strategy_select` can be manually set to `nom` and `api`
 - [ ] `grid_target` accepts numeric values
 - [ ] `battery_setpoint` accepts numeric values
-- [ ] `status_sensor` is created and shows season state after app startup
+- [ ] `status_sensor` is created and shows branch state after app startup
 
 ---
 

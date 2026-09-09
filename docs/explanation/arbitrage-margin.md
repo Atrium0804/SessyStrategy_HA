@@ -242,7 +242,7 @@ xychart-beta
 Time: 16:30
 Current raw price: €0.15/kWh
 Expected peak (19:00): €0.55/kWh
-SOC: 60%, soc_target: 70%
+SOC: 60%, target_afternoon_charging: 70%
 min_arbitrage_margin: €0.05
 
 Arbitrage check:
@@ -266,7 +266,7 @@ Economic analysis:
 Time: 15:00
 Current raw price: €0.45/kWh
 Expected peak (18:00): €0.50/kWh
-SOC: 65%, soc_target: 70%
+SOC: 65%, target_afternoon_charging: 70%
 min_arbitrage_margin: €0.05
 
 Arbitrage check:
@@ -292,7 +292,7 @@ Note: Very marginal, but technically profitable
 Time: 17:00
 Current raw price: €0.48/kWh
 Expected peak (19:00): €0.51/kWh
-SOC: 68%, soc_target: 70%
+SOC: 68%, target_afternoon_charging: 70%
 min_arbitrage_margin: €0.05
 
 Arbitrage check:
@@ -305,13 +305,13 @@ Action: Hold at grid 0W
 Rationale: The €0.03 spread is insufficient to justify battery cycling
 ```
 
-### Scenario 4: Winter Challenge Case
+### Scenario 4: Narrow Spread Case
 
 ```
-Time: 14:00 (winter)
+Time: 14:00
 Current raw price: €0.46/kWh
 Expected peak (17:00): €0.48/kWh
-SOC: 55%, soc_target: 70%
+SOC: 55%, target_peak_discharge: 70%
 min_arbitrage_margin: €0.05
 
 Arbitrage check:
@@ -319,7 +319,7 @@ Arbitrage check:
 - Margin requirement: €0.05
 - Result: €0.02 < €0.05 → SKIP
 
-Rationale: In winter, price spreads can be narrow. The margin
+Rationale: When price spreads are narrow, the margin
 prevents uneconomic churning where you'd lose money on each cycle.
 ```
 
@@ -336,7 +336,7 @@ Consider adjusting `min_arbitrage_margin` if you observe:
 | Too much charging at marginal prices | Low (e.g., 0.02) | Increase to 0.05-0.10 | Avoid uneconomic cycles |
 | Missing good arbitrage opportunities | High (e.g., 0.15) | Decrease to 0.03-0.05 | Capture more value |
 | Battery cycles too often | Any | Increase by 0.02-0.05 | Reduce wear and tear |
-| Winter performance poor | Any | Increase to 0.10+ | Wider spreads needed |
+| Narrow spreads / poor returns | Any | Increase to 0.10+ | Wider spreads needed |
 
 ### Recommended Values
 
@@ -345,7 +345,6 @@ Consider adjusting `min_arbitrage_margin` if you observe:
 | Conservative (default) | €0.05/kWh | Safe for most users |
 | Aggressive | €0.03/kWh | Capture more opportunities, higher risk |
 | Very conservative | €0.10/kWh | Only clear arbitrage, miss some opportunities |
-| Winter-specific | €0.08-0.12/kWh | Account for lower spreads in winter |
 | High-loss systems | €0.07-0.10/kWh | If your system has >10% round-trip losses |
 
 ### Regional Considerations
@@ -364,12 +363,12 @@ The optimal margin depends on your **local price volatility**:
 
 ## Integration with Other Parameters
 
-### Relationship with `soc_target`
+### Relationship with `target_afternoon_charging`
 
-The arbitrage margin works together with `soc_target` to determine when to charge:
+The arbitrage margin works together with `target_afternoon_charging` to determine when to charge:
 
-- **High `soc_target`** (e.g., 80%) + **Low margin** (e.g., 0.03): More aggressive charging, higher SOC
-- **Low `soc_target`** (e.g., 60%) + **High margin** (e.g., 0.10): More conservative, only clear opportunities
+- **High `target_afternoon_charging`** (e.g., 80%) + **Low margin** (e.g., 0.03): More aggressive charging, higher SOC
+- **Low `target_afternoon_charging`** (e.g., 60%) + **High margin** (e.g., 0.10): More conservative, only clear opportunities
 
 ### Relationship with the evening peak window
 
@@ -377,13 +376,6 @@ The evening peak window affects how the hold-vs-sell decision plays out:
 
 - **Wider window** + **Low margin**: Trade gently across a long peak, capture small spreads
 - **Narrow window** + **High margin**: Only trade for clear, high-value spreads
-
-### Relationship with Seasonal Overrides
-
-In winter, consider:
-- **Higher margin** (e.g., 0.08-0.10): Account for narrower spreads
-- **Wider evening peak window**: More time to capture opportunities
-- **Higher `soc_target`** (e.g., 80%): More energy for heating demand
 
 ---
 
@@ -432,16 +424,6 @@ For most home batteries (5-15 kWh), this means:
 - **The economic margin is sufficient** to justify the wear
 - **Only very marginal opportunities** (€0.01-0.02 spreads) might not be worth the long-term degradation cost
 
-### Q: Can I have different margins for different seasons?
-
-A: Currently, the strategy only supports a single `min_arbitrage_margin` value. However, you can:
-
-1. **Use the live entity** (`min_arbitrage_margin_entity`) and manually adjust it per season
-2. **Create automation** in Home Assistant to adjust the margin based on season
-3. **Adjust other parameters** seasonally (afternoon window, soc_target) to compensate
-
-**Future enhancement:** You could extend the code to support `min_arbitrage_margin_winter` similar to other seasonal overrides.
-
 ### Q: What's the relationship between arbitrage margin and the price thresholds?
 
 A: They serve different purposes:
@@ -460,7 +442,6 @@ A: They serve different purposes:
 
 - [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — Where arbitrage margin is used (P4)
 - [Price Basis: Raw vs Import](../explanation/price-basis-raw-vs-import.md) — Understanding the price calculations
-- [Seasonal Operation](../explanation/seasonal-operation.md) — How winter affects arbitrage opportunities
 - [Tune Price Thresholds](../how-to/tune-price-thresholds.md) — Adjusting all price-related parameters
 - [apps.yaml Configuration](../reference/configuration/apps-yaml.md) — All arbitrage-related parameters
 - [Algorithms Reference](../reference/algorithms.md) — Mathematical details of arbitrage calculations

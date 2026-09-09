@@ -108,8 +108,6 @@ All tests live in [`tests/test_sessy_strategy.py`](tests/test_sessy_strategy.py)
 | `TestDischargeSetpoint` | Watt calculation for price-spike discharge |
 | `TestCheapChargeSetpoint` | Watt calculation during cheap / negative prices |
 | `TestPostPeakDischargeSetpoint` | Watt calculation for post-peak excess drain |
-| `TestSeasonalValue` | Winter override selection |
-| `TestActiveSeasonMode` | Season auto-detection from the daily price minimum |
 | `TestTunable` | Live `input_number` helper resolution |
 | `TestEnableSwitch` | Master on/off switch behaviour |
 | `TestSensorReaders` | Reading SOC, price, and price-window data from HA |

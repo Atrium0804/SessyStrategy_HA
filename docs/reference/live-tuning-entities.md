@@ -33,13 +33,14 @@ The app runs every 5 minutes, and **immediately whenever a live input changes** 
 
 | Entity ID | apps.yaml Key | Description | Range | Default Fallback | Unit |
 |---|---|---|---|---|---|
-| `number.home_battery_soc_target` | `soc_target_entity` | Target SOC for afternoon charge | 0-100 | `soc_target` from apps.yaml | % |
+| `number.home_battery_target_afternoon_charging` | `target_afternoon_charging_entity` | Target SOC to reach before the evening peak (P3) | 0-100 | `target_afternoon_charging` from apps.yaml | % |
+| `number.home_battery_target_peak_discharge` | `target_peak_discharge_entity` | SOC above which evening excess is sold (P4) | 0-100 | `target_peak_discharge` from apps.yaml | % |
+| `number.home_battery_target_morning_soc` | `target_morning_soc_entity` | SOC to unload down to in the morning window (P5) | 0-100 | `target_morning_soc` from apps.yaml | % |
 | `number.home_battery_soc_floor` | `soc_floor_entity` | Minimum SOC floor | 0-100 | `soc_floor` from apps.yaml | % |
 | `number.home_battery_soc_ceiling` | `cheap_soc_target_entity` | Target SOC for cheap-price charging | 0-100 | `cheap_soc_target` from apps.yaml | % |
 | `number.home_battery_price_discharge` | `price_discharge_entity` | Price threshold for discharge | any | `price_discharge` from apps.yaml | €/kWh |
 | `number.home_battery_price_charge` | `price_charge_entity` | Price threshold for charging | any | `price_charge` from apps.yaml | €/kWh |
 | `number.home_battery_min_arbitrage_margin` | `min_arbitrage_margin_entity` | Minimum spread for the evening peak hold-vs-sell decision (P4) | ≥ 0 | `min_arbitrage_margin` from apps.yaml | €/kWh |
-| `number.home_battery_target_afternoon_charging` | `target_afternoon_charging_entity` | Target SOC to reach before the evening peak (P3) | 0-100 | `target_afternoon_charging` from apps.yaml | % |
 | `number.home_battery_afternoon_margin` | `afternoon_margin_entity` | Minimum import-price reduction (evening peak vs now) to justify afternoon charge (P3) | 0-0.5 | `afternoon_margin` from apps.yaml | €/kWh |
 
 ---
@@ -58,13 +59,14 @@ Use Home Assistant's UI to create the helpers:
 
 | Name | Entity ID | Min | Max | Step | Unit | Icon |
 |------|-----------|-----|-----|------|------|------|
-| SOC Target | `number.home_battery_soc_target` | 0 | 100 | 1 | % | mdi:battery-60 |
+| Afternoon Charge Target | `number.home_battery_target_afternoon_charging` | 0 | 100 | 1 | % | mdi:battery-charging-90 |
+| Peak Discharge Target | `number.home_battery_target_peak_discharge` | 0 | 100 | 1 | % | mdi:battery-60 |
+| Morning SOC Target | `number.home_battery_target_morning_soc` | 0 | 100 | 1 | % | mdi:battery-30 |
 | SOC Floor | `number.home_battery_soc_floor` | 0 | 100 | 1 | % | mdi:battery-outline |
 | SOC Ceiling | `number.home_battery_soc_ceiling` | 0 | 100 | 1 | % | mdi:battery |
 | Price Discharge | `number.home_battery_price_discharge` | -1 | 1 | 0.01 | €/kWh | mdi:lightning-bolt |
 | Price Charge | `number.home_battery_price_charge` | -1 | 1 | 0.01 | €/kWh | mdi:lightning-bolt |
 | Min Arbitrage Margin | `number.home_battery_min_arbitrage_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:swap-horizontal |
-| Afternoon Charge Target | `number.home_battery_target_afternoon_charging` | 0 | 100 | 5 | % | mdi:battery-charging-90 |
 | Afternoon Margin | `number.home_battery_afternoon_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:scale-balance |
 
 ### Step 2: Link to apps.yaml
@@ -77,16 +79,19 @@ sessy_strategy:
   class: SessyStrategy
 
   # Static defaults (used when live entities are unavailable)
-  soc_target: 70
+  target_afternoon_charging: 70
+  target_peak_discharge: 70
+  target_morning_soc: 30
   soc_floor: 20
   cheap_soc_target: 100
   price_discharge: 0.39
   price_charge: -0.10
   min_arbitrage_margin: 0.05
-  season_mode: auto
 
   # Live tuning entity links
-  soc_target_entity: number.home_battery_soc_target
+  target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
+  target_peak_discharge_entity: number.home_battery_target_peak_discharge
+  target_morning_soc_entity: number.home_battery_target_morning_soc
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling
   price_discharge_entity: number.home_battery_price_discharge
@@ -105,8 +110,8 @@ card:
   title: SessyStrategy Live Tuning
   show_header_toggle: false
   entities:
-    - entity: number.home_battery_soc_target
-      name: SOC Target
+    - entity: number.home_battery_target_afternoon_charging
+      name: Afternoon Charge Target
     - entity: number.home_battery_soc_floor
       name: SOC Floor
     - entity: number.home_battery_soc_ceiling
@@ -159,14 +164,32 @@ Here's a complete YAML for creating the helpers via YAML (alternative to UI):
 # Add to your configuration.yaml or a package file
 
 input_number:
-  home_battery_soc_target:
-    name: SOC Target
+  home_battery_target_afternoon_charging:
+    name: Afternoon Charge Target
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    icon: mdi:battery-charging-90
+    initial: 70
+
+  home_battery_target_peak_discharge:
+    name: Peak Discharge Target
     min: 0
     max: 100
     step: 1
     unit_of_measurement: "%"
     icon: mdi:battery-60
     initial: 70
+
+  home_battery_target_morning_soc:
+    name: Morning SOC Target
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    icon: mdi:battery-30
+    initial: 30
 
   home_battery_soc_floor:
     name: SOC Floor
@@ -220,7 +243,9 @@ input_number:
 
 The [Home Battery custom integration](https://github.com/PimDoos/ha-sessy/tree/main/custom_components/home_battery) provides these live tuning entities automatically when installed:
 
-- `number.home_battery_soc_target`
+- `number.home_battery_target_afternoon_charging`
+- `number.home_battery_target_peak_discharge`
+- `number.home_battery_target_morning_soc`
 - `number.home_battery_soc_floor`
 - `number.home_battery_soc_ceiling`
 - `number.home_battery_price_discharge`

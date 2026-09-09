@@ -631,7 +631,6 @@ views:
           **Battery:** {{ states('sensor.sessy_battery_alt9_state_of_charge') }}% SOC
           **Price:** €{{ states('sensor.sessy_dnhh_energy_price') }} /kWh
           **Strategy:** {{ state_attr('sensor.sessy_strategy_status', 'active_branch') }}
-          **Season:** {{ state_attr('sensor.sessy_strategy_status', 'active_season') }}
 
       # Quick Actions
       - type: entities
@@ -878,7 +877,6 @@ To confirm your dashboard is working correctly:
 ### Next Steps
 
 - **[Tune Price Thresholds](../how-to/tune-price-thresholds.md)** — Adjust thresholds based on your dashboard observations
-- **[Configure Seasonal Mode](../how-to/configure-seasonal-mode.md)** — Set up seasonal adjustments
 - **[Add Live Tuning Helpers](../how-to/add-live-tuning-helpers.md)** — Add dashboard controls for real-time tuning
 - **[Share Your Dashboard](https://github.com/your-repo/discussions)** — Share your creation with the community
 

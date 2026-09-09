@@ -35,7 +35,7 @@ SessyStrategy is an AppDaemon application that implements a price-optimized batt
 │     ├─ Setpoint calculators (_charge, _discharge, etc.)         │
 │     ├─ Sensor readers (_get_soc, _get_current_price)          │
 │     ├─ Actuator helpers (_set_grid, _set_battery)              │
-│     └─ Utility methods (_tunable, _seasonal_value, etc.)       │
+│     └─ Utility methods (_tunable, etc.)                         │
 │                                                                 │
 │  4. Callback Methods                                           │
 │     └─ _on_input_change() — Live input change handler           │
@@ -53,24 +53,20 @@ SessyStrategy is an AppDaemon application that implements a price-optimized batt
 ├─────────────────────────────────────────────────────────────┤
 │  Tunables (from args)                                           │
 │  ├── Battery/Hardware: capacity_wh, max_power_w               │
-│  ├── SOC Targets: soc_target, soc_floor, cheap_soc_target        │
+│  ├── SOC Targets: target_afternoon_charging, target_peak_discharge,│
+│  │              target_morning_soc, soc_floor, cheap_soc_target │
 │  ├── Pricing: surcharge, price_discharge, price_charge          │
 │  │       min_arbitrage_margin, afternoon_margin                │
 │  ├── Windows: afternoon_start, afternoon_end, afternoon_window_h│
 │  │           evening_peak_start, evening_peak_end               │
-│  ├── Season: season_mode, season_day_start, season_day_end     │
-│  │          season_auto_fallback                                │
-│  └── Winter overrides: soc_floor_winter, afternoon_start_winter│
-│                       afternoon_end_winter, afternoon_window_h_winter│
 │                                                                 │
 │  Entity IDs (from args)                                         │
 │  ├── Controls: strategy_select, grid_target, battery_setpoint  │
 │  ├── Sensors: soc_sensor, price_sensor, status_sensor          │
 │  ├── Mode: mode_select, setpoint_entity                         │
-│  └── Live: soc_target_entity, soc_floor_entity, ...            │
+│  └── Live: target_afternoon_charging_entity, soc_floor_entity, ...│
 │                                                                 │
 │  State                                                         │
-│  ├── _last_active_season: str                                  │
 │  └── _rerun_timer: timer object                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -106,7 +102,7 @@ The app listens for state changes on all configured live input entities:
 live_inputs = [
     self.mode_select,
     self.setpoint_entity,
-    self.soc_target_entity,
+    self.target_afternoon_charging_entity,
     self.soc_floor_entity,
     # ... all other *_entity configs
 ]
@@ -167,8 +163,6 @@ for entity in live_inputs:
 | Method | Purpose | Called |
 |---|---|---|
 | `initialize()` | Set up app, load config, schedule runs | On app start |
-| `_optional_float_arg(key)` | Parse optional float from args | During init |
-| `_optional_int_arg(key)` | Parse optional int from args | During init |
 
 ### Main Logic Methods
 
@@ -176,7 +170,6 @@ for entity in live_inputs:
 |---|---|---|
 | `update_strategy(kwargs)` | Main decision engine | Every 5 min + on input change |
 | `_active_mode()` | Resolve current mode from entity | Every cycle |
-| `_active_season_mode()` | Resolve current season | Every cycle |
 
 ### Mode Handler Methods
 
@@ -211,15 +204,6 @@ for entity in live_inputs:
 | `_contiguous_price_hours(threshold, above)` | Count consecutive hours past threshold | Iterate forward from current hour |
 | `_spread_window_h(threshold, above)` | Adaptive window with floor | `max(_contiguous..., min_window_h)` |
 | `_max_price_in_window(start, end)` | Max price in hour range | Iterate, collect, return max |
-| `_daily_min_price_hour_and_value()` | Find today's minimum | Iterate all 24 hours |
-
-### Season Methods
-
-| Method | Purpose | Logic |
-|---|---|---|
-| `_active_season_mode()` | Resolve current season | Check entity, then infer, then fallback |
-| `_infer_season_from_price_minimum()` | Infer from price data | Daytime min → summer, night min → winter |
-| `_seasonal_value(base, season, winter_override)` | Get seasonal value | Return winter override if season=winter, else base |
 
 ### Status Publishing Methods
 
@@ -312,7 +296,6 @@ if not self._entity_exists(self.strategy_select) or not self._entity_exists(self
 
 | Variable | Type | Purpose | Persistence |
 |---|---|---|---|
-| `self._last_active_season` | str \| None | Track season changes for logging | Session only |
 | `self._rerun_timer` | timer \| None | Debounce timer for live inputs | Session only |
 
 **Note:** No persistent state between app restarts. All decisions are recomputed from scratch each cycle.

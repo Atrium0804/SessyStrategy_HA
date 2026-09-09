@@ -36,7 +36,7 @@ last_updated: 2026-08-01
 
 | Version | File | Key Changes | Release Date |
 |---------|------|-------------|--------------|
-| **Current** | `sessy_strategy.py` v3.x | Full priority chain, live tuning, seasonal mode | 2026-07-01 |
+| **Current** | `sessy_strategy.py` v3.x | Full priority chain, live tuning | 2026-07-01 |
 | **v2.1** | `sessy_strategy.py` v2.1 | Basic priority chain, fixed thresholds | 2026-03-01 |
 | **v2.0** | `sessy_strategy.py` v2.0 | Initial AppDaemon implementation | 2026-01-01 |
 | **v1.x** | Legacy scripts | Manual setpoint management | Pre-2026 |
@@ -51,11 +51,12 @@ last_updated: 2026-08-01
 #### From v2.1 to v3.x (Current)
 
 **Major changes:**
-- [x] **New**: Seasonal mode support (`auto`, `summer`, `winter`)
 - [x] **New**: Live tuning entities for all major parameters
 - [x] **New**: Adaptive spread windows for charge/discharge
 - [x] **New**: Priority 4 — Evening peak sell-off discharge
 - [x] **New**: Afternoon top-up margin check (evening peak import vs current import)
+- [x] **Removed**: Seasonal mode (`season_mode`, winter overrides) — use live tuning instead
+- [x] **Removed**: Single `soc_target` fallback — replaced by per-rule targets
 
 !!! warning
     The following changes require attention:
@@ -87,7 +88,7 @@ sessy_strategy:
   class: SessyStrategy
   capacity_wh: 5000        # Renamed from battery_capacity
   max_power_w: 2200        # Renamed from max_power
-  soc_target: 70           # Changed default, now afternoon charge target
+  target_afternoon_charging: 70  # Changed default, now afternoon charge target
   soc_floor: 0            # Renamed from soc_min
   cheap_soc_target: 100    # Renamed from soc_max
   price_discharge: 0.39    # NOW RAW price (was 0.50 import)
@@ -132,7 +133,7 @@ sessy_strategy:
   class: SessyStrategy
   capacity_wh: 5000
   max_power_w: 2200
-  soc_target: 70           # Afternoon charge target
+  target_afternoon_charging: 70  # Afternoon charge target
   soc_floor: 10           # Minimum SOC
   cheap_soc_target: 90     # Cheap charge ceiling (was target_soc)
   price_discharge: 0.34    # high_price - surcharge
@@ -192,7 +193,7 @@ cp /config/configuration.yaml /config/configuration.yaml.backup
 
 2. **Look for version indicators:**
    - Comments like `# Version 2.1` or `# v3.0`
-   - Feature presence: seasonal mode, live tuning, adaptive windows
+   - Feature presence: live tuning, adaptive windows
    - Parameter names: `battery_capacity` vs `capacity_wh`
 
 3. **Check git history (if you have it):**
@@ -234,10 +235,6 @@ cp /config/configuration.yaml /config/configuration.yaml.backup
    afternoon_window_h: 2.0
    evening_peak_start: 18
    evening_peak_end: 23
-   season_mode: auto
-   season_day_start: 8
-   season_day_end: 18
-   season_auto_fallback: winter
    min_arbitrage_margin: 0.05
    target_afternoon_charging: 70
    afternoon_margin: 0.05
@@ -254,7 +251,7 @@ cp /config/configuration.yaml /config/configuration.yaml.backup
    # Start with these sensible defaults
    capacity_wh: 5000          # Your battery capacity
    max_power_w: 2200          # Your inverter max power
-   soc_target: 70             # Afternoon SOC target
+   target_afternoon_charging: 70  # Afternoon SOC target
    soc_floor: 0              # Minimum SOC
    cheap_soc_target: 100      # Cheap charge ceiling
    surcharge: 0.11            # Your import surcharge
@@ -322,8 +319,8 @@ v3.x supports live tuning — create entities for dynamic parameter adjustment:
 # SOC targets
 number:
   - platform: input_number
-    name: "SOC Target"
-    entity_id: number.home_battery_soc_target
+    name: "Afternoon Charge Target"
+    entity_id: number.home_battery_target_afternoon_charging
     min: 0
     max: 100
     step: 1
@@ -378,7 +375,7 @@ Then link them in your apps.yaml:
 ```yaml
 sessy_strategy:
   # ... other configuration ...
-  soc_target_entity: number.home_battery_soc_target
+  target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling
   price_discharge_entity: number.home_battery_price_discharge
@@ -548,38 +545,7 @@ sessy_strategy:
                {{ prices | tojson }}
    ```
 
-### Issue 4: Unexpected Season Behavior
-
-**Symptom:** Strategy uses winter timing when you expect summer, or vice versa.
-
-**Cause:**
-- Season mode set incorrectly
-- Auto detection not working as expected
-- Daylight hours don't match your location
-
-**Fix:**
-1. **Check current season:**
-   - Look at `sensor.sessy_strategy_status` state
-   - Check `season_mode_source` attribute
-
-2. **Adjust season configuration:**
-   ```yaml
-   # Option A: Force explicit season
-   season_mode: summer  # or winter
-
-   # Option B: Adjust auto detection
-   season_mode: auto
-   season_day_start: 7   # Earlier for your location
-   season_day_end: 19     # Later for your location
-   season_auto_fallback: summer  # Change fallback if needed
-   ```
-
-3. **Check price data for auto detection:**
-   - Auto detection uses `daily_min_price_hour` from `energy_prices`
-   - Verify this value is what you expect
-   - If `daily_min_price_hour` is between `season_day_start` and `season_day_end`, it's summer
-
-### Issue 5: Performance Issues
+### Issue 4: Performance Issues
 
 **Symptom:** AppDaemon is slow, strategy takes too long to respond.
 
@@ -663,7 +629,6 @@ If you encounter issues that you cannot resolve, you can roll back to your previ
 
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
 - [Entity Reference](../reference/entity-reference.md)
-- [How to Configure Seasonal Mode](../how-to/configure-seasonal-mode.md)
 - [How to Tune Price Thresholds](../how-to/tune-price-thresholds.md)
 - [How to Debug Strategy Decisions](../how-to/debug-strategy-decisions.md)
 

@@ -7,10 +7,10 @@ in initialize(); the literals below are only fallback defaults.
 
 Strategy (priority order, each rule individually switchable from the GUI):
   0. Grid-connection guard: every setpoint is clamped to max_grid_w * grid_utilization
-  1. Price-spike discharge (sell price > price_discharge): battery setpoint, discharge toward SOC floor
-  2. Cheap/negative buy price (buy price < price_charge): battery setpoint, charge toward ceiling
-  3. Afternoon charge, SOC < target_afternoon_charging, and the evening peak buy price
-     beats the current buy price by afternoon_margin: battery setpoint, charge at max power.
+  1. Price-spike discharge (price > price_discharge): battery setpoint, discharge toward SOC floor
+  2. Cheap/negative price (price < price_charge): battery setpoint, charge toward ceiling
+  3. Afternoon charge, SOC < target_afternoon_charging, and the evening peak price
+     beats the current price by afternoon_margin: battery setpoint, charge at max power.
      Peak-shaving (avoid net import at the evening peak), not grid trading.
   4. Evening peak sell-off, SOC > target_peak_discharge, no spike remaining and evening
      beats tomorrow's morning peak: grid setpoint export
@@ -28,14 +28,12 @@ class SessyStrategy(hass.Hass):
         # ── Tunables (overridable from apps.yaml) ───────────────────────────
         self.capacity_wh          = float(self.args.get("capacity_wh", 5000))
         self.max_power_w          = float(self.args.get("max_power_w", 2200))
-        self.soc_target           = float(self.args.get("soc_target", 90))
-        # Per-rule SOC targets (fall back to soc_target for backward compatibility).
-        self.target_afternoon_charging = float(self.args.get("target_afternoon_charging", self.soc_target))
-        self.target_peak_discharge   = float(self.args.get("target_peak_discharge", self.soc_target))
+        # Per-rule SOC targets.
+        self.target_afternoon_charging = float(self.args.get("target_afternoon_charging", 90))
+        self.target_peak_discharge   = float(self.args.get("target_peak_discharge", 90))
         self.target_morning_soc      = float(self.args.get("target_morning_soc", 30))
         self.soc_floor            = float(self.args.get("soc_floor", 20))
         self.cheap_soc_target     = float(self.args.get("cheap_soc_target", 100))
-        self.surcharge            = float(self.args.get("surcharge", 0.11))
         self.price_discharge      = float(self.args.get("price_discharge", 0.39))
         self.price_charge         = float(self.args.get("price_charge", -0.10))
         self.afternoon_start      = int(self.args.get("afternoon_start", 15))
@@ -62,29 +60,12 @@ class SessyStrategy(hass.Hass):
         self.grid_utilization     = float(self.args.get("grid_utilization", 0.9))
         self.grid_power_sensor    = self.args.get("grid_power_sensor")
 
-        # ── Seasonal operation mode ─────────────────────────────────────────
-        # season_mode: auto | summer | winter
-        self.season_mode          = str(self.args.get("season_mode", "auto")).strip().lower()
-        self.season_day_start     = int(self.args.get("season_day_start", 8))
-        self.season_day_end       = int(self.args.get("season_day_end", 18))
-        self.season_auto_fallback = str(self.args.get("season_auto_fallback", "winter")).strip().lower()
-        # Optional winter-specific overrides. If omitted, base values above are used.
-        self.soc_floor_winter       = self._optional_float_arg("soc_floor_winter")
-        self.afternoon_start_winter = self._optional_int_arg("afternoon_start_winter")
-        self.afternoon_end_winter   = self._optional_int_arg("afternoon_end_winter")
-        self.afternoon_window_h_winter = self._optional_float_arg("afternoon_window_h_winter")
-
         # ── Entity IDs (overridable from apps.yaml) ─────────────────────────
         self.strategy_select  = self.args.get("strategy_select",  "select.sessy_battery_alt9_power_strategy")
         self.grid_target      = self.args.get("grid_target",      "number.sessy_pwkn_grid_target")
         self.battery_setpoint = self.args.get("battery_setpoint", "number.sessy_battery_alt9_power_setpoint")
         self.soc_sensor       = self.args.get("soc_sensor",       "sensor.sessy_battery_alt9_state_of_charge")
         self.price_sensor     = self.args.get("price_sensor",     "sensor.sessy_dnhh_energy_price")
-        # Explicit buy/sell price sensors. Fall back to the legacy single price
-        # sensor; when doing so the buy price is derived as raw + surcharge.
-        self.buy_price_sensor  = self.args.get("buy_price_sensor",  self.price_sensor)
-        self.sell_price_sensor = self.args.get("sell_price_sensor", self.price_sensor)
-        self._buy_is_legacy    = "buy_price_sensor" not in self.args
         self.status_sensor    = self.args.get("status_sensor",    "sensor.sessy_strategy_status")
 
         # ── Operating-mode selector (input_select) ──────────────────────────
@@ -109,9 +90,8 @@ class SessyStrategy(hass.Hass):
         # Optional live-tuning helpers (input_number). If set, these override the
         # corresponding static default each cycle, so the value can be changed
         # from the HA UI without restarting AppDaemon.
-        self.soc_target_entity           = self.args.get("soc_target_entity")
-        self.target_afternoon_charging_entity = self.args.get("target_afternoon_charging_entity", self.soc_target_entity)
-        self.target_peak_discharge_entity   = self.args.get("target_peak_discharge_entity", self.soc_target_entity)
+        self.target_afternoon_charging_entity = self.args.get("target_afternoon_charging_entity")
+        self.target_peak_discharge_entity   = self.args.get("target_peak_discharge_entity")
         self.target_morning_soc_entity      = self.args.get("target_morning_soc_entity")
         self.soc_floor_entity            = self.args.get("soc_floor_entity")
         self.price_discharge_entity      = self.args.get("price_discharge_entity")
@@ -126,7 +106,6 @@ class SessyStrategy(hass.Hass):
         self.rule_evening_peak_entity    = self.args.get("rule_evening_peak_entity")
         self.rule_morning_selloff_entity = self.args.get("rule_morning_selloff_entity")
 
-        self._last_active_season = None
         self._rerun_timer = None
 
         self.log("Sessy strategy starting up")
@@ -142,7 +121,6 @@ class SessyStrategy(hass.Hass):
         live_inputs = [
             self.mode_select,
             self.setpoint_entity,
-            self.soc_target_entity,
             self.target_afternoon_charging_entity,
             self.target_peak_discharge_entity,
             self.target_morning_soc_entity,
@@ -167,8 +145,7 @@ class SessyStrategy(hass.Hass):
     def update_strategy(self, kwargs):
         # Check if critical entities are available
         if not self._entity_exists(self.soc_sensor) or \
-                not self._entity_exists(self.sell_price_sensor) or \
-                not self._entity_exists(self.buy_price_sensor):
+                not self._entity_exists(self.price_sensor):
             self.log("Critical entities (SOC or price sensor) not available — skipping this cycle", level="WARNING")
             return
 
@@ -210,16 +187,14 @@ class SessyStrategy(hass.Hass):
         # ── mode == "optimized": price-optimisation priority chain ──────────
         now_hour   = self.datetime().hour
         soc        = self._get_soc()
-        buy_price  = self._current_price("buy")
-        sell_price = self._current_price("sell")
+        price      = self._current_price()
 
-        if soc is None or buy_price is None or sell_price is None:
+        if soc is None or price is None:
             self.log("Could not read SOC or price — skipping this cycle", level="WARNING")
             return
 
         self.log(
-            f"Hour={now_hour:02d}  SOC={soc:.0f}%  "
-            f"Buy price={buy_price:.5f}  Sell price={sell_price:.5f}"
+            f"Hour={now_hour:02d}  SOC={soc:.0f}%  Price={price:.5f}"
         )
 
         # Resolve live-tunable values (helper overrides, else apps.yaml default)
@@ -232,24 +207,13 @@ class SessyStrategy(hass.Hass):
         price_charge         = self._tunable(self.price_charge, self.price_charge_entity)
         min_arbitrage_margin = self._tunable(self.min_arbitrage_margin, self.min_arbitrage_margin_entity)
         afternoon_margin     = self._tunable(self.afternoon_margin, self.afternoon_margin_entity)
-        active_season        = self._active_season_mode()
-        min_price_hour, min_price_value = self._daily_min_price_hour_and_value()
-        if active_season != self._last_active_season:
-            self.log(f"Season mode active: {active_season}")
-            self._last_active_season = active_season
-
-        soc_floor     = self._seasonal_value(soc_floor, active_season, self.soc_floor_winter)
-        afternoon_start = self._seasonal_value(self.afternoon_start, active_season, self.afternoon_start_winter)
-        afternoon_end   = self._seasonal_value(self.afternoon_end, active_season, self.afternoon_end_winter)
+        afternoon_start = self.afternoon_start
+        afternoon_end   = self.afternoon_end
 
         # Common status fields; the decided branch is attached at each return.
         status_fields = dict(
-            active_season=active_season,
-            min_price_hour=min_price_hour,
-            min_price_value=min_price_value,
             soc=soc,
-            buy_price=buy_price,
-            sell_price=sell_price,
+            price=price,
             target_afternoon_charging=target_afternoon_charging,
             target_peak_discharge=target_peak_discharge,
             target_morning_soc=target_morning_soc,
@@ -264,11 +228,11 @@ class SessyStrategy(hass.Hass):
         )
 
         # ── Priority 1: price-spike discharge (sell price) ──────────────────
-        if self._rule_enabled(self.rule_price_spike_entity) and sell_price > price_discharge:
-            window_h    = self._spread_window_h(price_discharge, above=True, kind="sell")
+        if self._rule_enabled(self.rule_price_spike_entity) and price > price_discharge:
+            window_h    = self._spread_window_h(price_discharge, above=True)
             discharge_w = self._discharge_setpoint(soc, soc_floor, window_h)
             self.log(
-                f"DISCHARGE: sell price {sell_price:.3f} > {price_discharge:.2f} — "
+                f"DISCHARGE: price {price:.3f} > {price_discharge:.2f} — "
                 f"battery setpoint {discharge_w:.0f}W (SOC {soc:.0f}% → floor {soc_floor:.0f}% "
                 f"over {window_h:.2f}h)"
             )
@@ -277,7 +241,7 @@ class SessyStrategy(hass.Hass):
             return
 
         # ── Priority 2: very cheap / negative buy price → charge to ceiling ──
-        if self._rule_enabled(self.rule_cheap_charge_entity) and buy_price < price_charge:
+        if self._rule_enabled(self.rule_cheap_charge_entity) and price < price_charge:
             if soc >= cheap_soc_target:
                 self.log(
                     f"CHEAP CHARGE: SOC {soc:.0f}% already at ceiling "
@@ -286,10 +250,10 @@ class SessyStrategy(hass.Hass):
                 self._publish_status("cheap_charge_full", **status_fields)
                 self._set_grid_setpoint(0)
                 return
-            window_h = self._spread_window_h(price_charge, above=False, kind="buy")
+            window_h = self._spread_window_h(price_charge, above=False)
             charge_w = self._cheap_charge_setpoint(soc, cheap_soc_target, window_h)
             self.log(
-                f"CHEAP CHARGE: buy price {buy_price:.5f} < {price_charge} — "
+                f"CHEAP CHARGE: price {price:.5f} < {price_charge} — "
                 f"battery setpoint -{charge_w:.0f}W (SOC {soc:.0f}% → {cheap_soc_target:.0f}%)"
             )
             self._publish_status("cheap_charge", **status_fields)
@@ -309,17 +273,15 @@ class SessyStrategy(hass.Hass):
                 self._set_grid_setpoint(0)
                 return
 
-            # Break-even guard: only top up if importing at the evening peak would
-            # cost at least afternoon_margin more per kWh than charging now. Both
-            # sides use the buy (import) price, since the stored energy replaces a
-            # peak import rather than a grid export.
-            evening_buy = self._max_price_in_window(
-                self.evening_peak_start, self.evening_peak_end, kind="buy")
-            if evening_buy is not None and \
-                    (evening_buy - buy_price) < afternoon_margin:
+            # Break-even guard: only top up if the evening peak price is at least
+            # afternoon_margin per kWh above the current price.
+            evening_peak_price = self._max_price_in_window(
+                self.evening_peak_start, self.evening_peak_end)
+            if evening_peak_price is not None and \
+                    (evening_peak_price - price) < afternoon_margin:
                 self.log(
-                    f"AFTERNOON SKIP: evening peak buy {evening_buy:.3f} vs current buy "
-                    f"{buy_price:.3f} (spread < margin {afternoon_margin}) — "
+                    f"AFTERNOON SKIP: evening peak {evening_peak_price:.3f} vs current "
+                    f"{price:.3f} (spread < margin {afternoon_margin}) — "
                     f"holding grid setpoint 0W"
                 )
                 self._publish_status("afternoon_skip", **status_fields)
@@ -338,14 +300,14 @@ class SessyStrategy(hass.Hass):
         # ── Priority 4: evening peak sell-off discharge ────────────────────────
         if self._rule_enabled(self.rule_evening_peak_entity) and \
                 self.evening_peak_start <= now_hour < self.evening_peak_end and soc > target_peak_discharge:
-            max_remaining_price = self._max_price_in_window(now_hour, 24, kind="sell")
+            max_remaining_price = self._max_price_in_window(now_hour, 24)
             no_spike_remaining = (max_remaining_price is None or max_remaining_price < price_discharge)
-            # Hold for the morning if tomorrow's morning peak sell price is clearly
+            # Hold for the morning if tomorrow's morning peak price is clearly
             # better than selling now; otherwise sell the excess this evening.
             morning_peak = self._max_price_in_hour_range_tomorrow(
-                self.morning_selloff_start, self.morning_selloff_end, kind="sell")
+                self.morning_selloff_start, self.morning_selloff_end)
             evening_beats_morning = (morning_peak is None) or \
-                (sell_price >= morning_peak - min_arbitrage_margin)
+                (price >= morning_peak - min_arbitrage_margin)
             if no_spike_remaining and evening_beats_morning:
                 now_dt = self.datetime()
                 peak_end_minutes = self.evening_peak_end * 60
@@ -587,77 +549,6 @@ class SessyStrategy(hass.Hass):
         except (TypeError, ValueError):
             return default
 
-    def _optional_float_arg(self, key: str) -> float | None:
-        value = self.args.get(key)
-        if value is None:
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
-    def _optional_int_arg(self, key: str) -> int | None:
-        value = self.args.get(key)
-        if value is None:
-            return None
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
-    def _seasonal_value(self, base_value, active_season: str, winter_override):
-        if active_season == "winter" and winter_override is not None:
-            return winter_override
-        return base_value
-
-    def _active_season_mode(self) -> str:
-        mode = self.season_mode
-
-        if mode in ("summer", "winter"):
-            return mode
-
-        inferred = self._infer_season_from_price_minimum()
-        if inferred:
-            return inferred
-
-        return "summer" if self.season_auto_fallback == "summer" else "winter"
-
-    def _infer_season_from_price_minimum(self) -> str | None:
-        """
-        Infer season from today's lowest raw price hour.
-        If the minimum is during daytime [season_day_start, season_day_end),
-        treat it as summer; otherwise winter.
-        """
-        min_hour, _ = self._daily_min_price_hour_and_value()
-        if min_hour is None:
-            return None
-
-        if self.season_day_start <= min_hour < self.season_day_end:
-            return "summer"
-        return "winter"
-
-    def _daily_min_price_hour_and_value(self):
-        prices = self._get_prices_dict()
-        if not prices:
-            return None, None
-
-        today = self.datetime().strftime("%Y-%m-%d")
-        min_price = None
-        min_hour = None
-        for hour in range(24):
-            key = f"{today}T{hour:02d}:00:00"
-            if key not in prices:
-                continue
-            try:
-                value = float(prices[key])
-            except (TypeError, ValueError):
-                continue
-            if min_price is None or value < min_price:
-                min_price = value
-                min_hour = hour
-
-        return min_hour, min_price
-
     def _entity_exists(self, entity_id: str) -> bool:
         """
         Check if an entity exists and is available in Home Assistant.
@@ -673,30 +564,19 @@ class SessyStrategy(hass.Hass):
 
     def _publish_status(self, active_branch: str, **fields):
         """
-        Publish the strategy status sensor: state = active season, attributes =
-        the active branch plus every field the decided branch passed in.
+        Publish the strategy status sensor: state = active branch, attributes =
+        every field the decided branch passed in.
         """
         if not self.status_sensor or not self._entity_exists(self.status_sensor):
             return
 
-        mode_source = self.season_mode
-        if mode_source not in ("auto", "summer", "winter"):
-            mode_source = "auto"
-
-        active_season = fields.pop("active_season", mode_source)
-        attributes = {
-            "active_branch": active_branch,
-            "season_mode_source": mode_source,
-            "season_day_start": self.season_day_start,
-            "season_day_end": self.season_day_end,
-            "season_auto_fallback": self.season_auto_fallback,
-        }
+        attributes = {"active_branch": active_branch}
         attributes.update(fields)
 
         try:
             self.set_state(
                 self.status_sensor,
-                state=active_season,
+                state=active_branch,
                 attributes=attributes,
             )
         except Exception as e:
@@ -705,8 +585,8 @@ class SessyStrategy(hass.Hass):
     def _publish_branch(self, active_branch: str, **extra):
         """
         Lightweight status publish for manual and stand-down modes, where the
-        full optimisation context (season, thresholds) does not apply. Sets the
-        status state to the active branch and records any extra fields.
+        full optimisation context (thresholds) does not apply. Sets the status
+        state to the active branch and records any extra fields.
         """
         if not self.status_sensor or not self._entity_exists(self.status_sensor):
             return
@@ -726,58 +606,41 @@ class SessyStrategy(hass.Hass):
         except (TypeError, ValueError):
             return None
 
-    def _price_sensor_for(self, kind: str):
-        """Return (sensor_id, add_surcharge) for the buy or sell price series."""
-        if kind == "buy":
-            return self.buy_price_sensor, self._buy_is_legacy
-        return self.sell_price_sensor, False
-
-    def _current_price(self, kind: str) -> float | None:
+    def _current_price(self) -> float | None:
         """
-        Read the current hour's price for the given series ("buy" or "sell") from
-        the energy_prices attribute, falling back to the sensor state. When the
-        buy series falls back to the legacy sensor, the surcharge is added.
+        Read the current hour's price from the energy_prices attribute, falling
+        back to the sensor state.
         """
-        sensor, add_surcharge = self._price_sensor_for(kind)
         try:
-            prices = self.get_state(sensor, attribute="energy_prices")
+            prices = self.get_state(self.price_sensor, attribute="energy_prices")
             value = None
             if prices:
                 now_key = self.datetime().strftime("%Y-%m-%dT%H:00:00")
                 if now_key in prices:
                     value = float(prices[now_key])
             if value is None:
-                value = float(self.get_state(sensor))
-            return value + self.surcharge if add_surcharge else value
+                value = float(self.get_state(self.price_sensor))
+            return value
         except (TypeError, ValueError, KeyError):
             return None
 
-    def _get_prices_dict(self, kind: str = "sell"):
-        """Return the energy_prices dict for a series, or None if unavailable."""
-        sensor, add_surcharge = self._price_sensor_for(kind)
+    def _get_prices_dict(self):
+        """Return the energy_prices dict, or None if unavailable."""
         try:
-            prices = self.get_state(sensor, attribute="energy_prices")
+            prices = self.get_state(self.price_sensor, attribute="energy_prices")
         except (TypeError, ValueError):
             return None
         if not prices:
             return None
-        if not add_surcharge:
-            return prices
-        adjusted = {}
-        for key, value in prices.items():
-            try:
-                adjusted[key] = float(value) + self.surcharge
-            except (TypeError, ValueError):
-                continue
-        return adjusted
+        return prices
 
-    def _contiguous_price_hours(self, threshold: float, above: bool, kind: str = "sell") -> int:
+    def _contiguous_price_hours(self, threshold: float, above: bool) -> int:
         """
         Count consecutive upcoming hours (including the current one) whose price
         stays past threshold — above it when above=True, below it when above=False.
         The run stops at the first hour that crosses back. Returns at least 1.
         """
-        prices = self._get_prices_dict(kind)
+        prices = self._get_prices_dict()
         if not prices:
             return 1
         cursor = self.datetime().replace(minute=0, second=0, microsecond=0)
@@ -797,20 +660,20 @@ class SessyStrategy(hass.Hass):
             cursor += timedelta(hours=1)
         return max(count, 1)
 
-    def _spread_window_h(self, threshold: float, above: bool, kind: str = "sell") -> float:
+    def _spread_window_h(self, threshold: float, above: bool) -> float:
         """
         Adaptive spread window in hours: the contiguous run of upcoming hours the
         price stays past threshold, floored at min_window_h.
         """
-        run_h = self._contiguous_price_hours(threshold, above, kind)
+        run_h = self._contiguous_price_hours(threshold, above)
         return max(run_h, self.min_window_h)
 
-    def _max_price_in_window(self, start_hour: int, end_hour: int, kind: str = "sell") -> float | None:
+    def _max_price_in_window(self, start_hour: int, end_hour: int) -> float | None:
         """
-        Return the maximum price across today's [start_hour, end_hour) slots for
-        the given series, or None if no price data is available for that window.
+        Return the maximum price across today's [start_hour, end_hour) slots,
+        or None if no price data is available for that window.
         """
-        prices = self._get_prices_dict(kind)
+        prices = self._get_prices_dict()
         if not prices:
             return None
         today  = self.datetime().strftime("%Y-%m-%d")
@@ -824,12 +687,12 @@ class SessyStrategy(hass.Hass):
                     continue
         return max(values) if values else None
 
-    def _max_price_in_hour_range_tomorrow(self, start_hour: int, end_hour: int, kind: str = "sell") -> float | None:
+    def _max_price_in_hour_range_tomorrow(self, start_hour: int, end_hour: int) -> float | None:
         """
-        Return the maximum price across tomorrow's [start_hour, end_hour) slots for
-        the given series, or None if tomorrow's prices are not yet available.
+        Return the maximum price across tomorrow's [start_hour, end_hour) slots,
+        or None if tomorrow's prices are not yet available.
         """
-        prices = self._get_prices_dict(kind)
+        prices = self._get_prices_dict()
         if not prices:
             return None
         tomorrow = (self.datetime() + timedelta(days=1)).strftime("%Y-%m-%d")

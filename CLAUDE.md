@@ -49,10 +49,9 @@ Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
 |---|---|
 | Setpoint calculators | `_charge_setpoint()`, `_discharge_setpoint()`, `_cheap_charge_setpoint()`, `_evening_peak_selloff_setpoint()` |
 | Window sizing | `_contiguous_price_hours(threshold, above)`, `_spread_window_h(threshold, above)` |
-| Sensor readers | `_get_soc()`, `_get_current_price()`, `_max_price_in_window()`, `_daily_min_price_hour_and_value()` |
+| Sensor readers | `_get_soc()`, `_get_current_price()`, `_max_price_in_window()` |
 | Actuators | `_set_grid_setpoint(watts)`, `_set_battery_setpoint(watts)` |
 | Live-input re-run | `_on_input_change()` (listen_state callback), `_rerun_now()` |
-| Seasonal logic | `_active_season_mode()`, `_infer_season_from_price_minimum()`, `_seasonal_value()` |
 | Status | `_publish_status()` — writes all current state to `sensor.sessy_strategy_status` |
 
 ### Configuration
@@ -60,11 +59,10 @@ Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
 All tunables live in `files/apps.yaml`. **No magic numbers in Python** — if a value might need tuning, it belongs in `apps.yaml`. Key groups:
 
 - Hardware: `capacity_wh`, `max_power_w` (final setpoint clamp — no artificial C-rate cap; the Sessy enforces its own limit)
-- SOC targets: `soc_target` (70%), `soc_floor` (0%), `cheap_soc_target` (100%)
+- SOC targets: `target_afternoon_charging` (70%), `target_peak_discharge` (70%), `target_morning_soc` (30%), `soc_floor` (0%), `cheap_soc_target` (100%)
 - Price thresholds: `price_discharge` (0.39), `price_charge` (-0.10), `min_arbitrage_margin` (0.05)
 - Spread window: `min_window_h` (2.0)
-- Time windows: `afternoon_start/end`, `evening_peak_start/end`, winter variants
-- Season auto-detect: `season_day_start/end` (8–18h)
+- Time windows: `afternoon_start/end`, `evening_peak_start/end`
 
 SOC controls, price thresholds, and the mode selector live on the **Home Battery** custom integration device (`number.home_battery_*`, `select.home_battery_mode`) for live runtime tuning without restarting AppDaemon.
 

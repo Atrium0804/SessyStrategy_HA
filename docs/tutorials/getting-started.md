@@ -211,7 +211,7 @@ Configure the SessyStrategy application to match your specific battery system an
 4. **Configure SOC targets (optional):**
    ```yaml
    # State-of-charge targets
-   soc_target: 70             # % SOC to reach before evening peak
+   target_afternoon_charging: 70  # % SOC to reach before evening peak
    soc_floor: 0              # % SOC floor — never discharge below this
    cheap_soc_target: 100      # % SOC ceiling for cheap-price charging
    ```
@@ -280,8 +280,8 @@ If you prefer not to use the Home Battery integration, you can create the helper
 1. **Create tuning helpers:**
    ```yaml
    input_number:
-     home_battery_soc_target:
-       name: "SOC Target"
+     home_battery_target_afternoon_charging:
+       name: "Afternoon Charge Target"
        min: 0
        max: 100
        step: 1
@@ -318,7 +318,7 @@ If you prefer not to use the Home Battery integration, you can create the helper
    ```yaml
    mode_select: select.home_battery_mode
    setpoint_entity: number.home_battery_setpoint
-   soc_target_entity: number.home_battery_soc_target
+   target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
    soc_floor_entity: number.home_battery_soc_floor
    price_discharge_entity: number.home_battery_price_discharge
    price_charge_entity: number.home_battery_price_charge
@@ -506,7 +506,7 @@ Monitor SessyStrategy during its first few cycles to ensure it's working correct
      - `soc`: Current SOC
      - `raw_price`: Current raw price
      - `import_price`: Current import price
-     - `soc_target`: Target SOC
+     - `target_afternoon_charging`: Afternoon charge target SOC
      - `price_discharge`: Discharge threshold
      - `price_charge`: Charge threshold
 
@@ -557,7 +557,6 @@ Now that you're up and running, consider:
 - **[Tune Price Thresholds](../how-to/tune-price-thresholds.md)** — Adjust charge/discharge prices for your specific situation and energy costs
 - **[Set Up Live Tuning Helpers](../how-to/add-live-tuning-helpers.md)** — Add dashboard controls to adjust settings without restarting AppDaemon
 - **[Create a Dashboard](../tutorials/dashboard-setup.md)** — Set up visual monitoring for your battery strategy
-- **[Configure Seasonal Mode](../how-to/configure-seasonal-mode.md)** — Set up winter/summer behavior for optimal year-round performance
 - **[Understand the Priority Chain](../explanation/strategy-priority-chain.md)** — Learn how strategy decisions are made
 
 ### Learn More

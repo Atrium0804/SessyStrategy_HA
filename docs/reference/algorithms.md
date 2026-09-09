@@ -246,88 +246,6 @@ result = max(run_h, min_window_h)
 
 ---
 
-### Daily Minimum Price Hour and Value
-
-**Method:** `_daily_min_price_hour_and_value() -> (int | None, float | None)`
-
-**Purpose:** Find the hour and value of today's minimum raw price.
-
-**Algorithm:**
-```
-1. Get prices dict
-2. If no prices: return (None, None)
-3. today = current date in YYYY-MM-DD format
-4. For hour in 0..23:
-   a. key = f"{today}T{hour:02d}:00:00"
-   b. If key in prices: parse value
-   c. If value < min_price (or min_price is None): update min
-5. Return (min_hour, min_price)
-```
-
-**Use cases:**
-- Season inference: Determine if minimum is during day (summer) or night (winter)
-- Status sensor: Publish for visibility
-
-**Example:**
-- Today: 2026-08-01
-- Prices: 00=0.12, 01=0.08, 02=0.05, ..., 23=0.15
-- Result: (2, 0.05)
-
----
-
-## Season Inference Algorithm
-
-### Infer Season from Price Minimum
-
-**Method:** `_infer_season_from_price_minimum() -> str | None`
-
-**Purpose:** Automatically determine season based on when the cheapest price occurs.
-
-**Logic:**
-```
-1. Get (min_hour, min_price) from _daily_min_price_hour_and_value()
-2. If min_hour is None: return None
-3. If season_day_start <= min_hour < season_day_end:
-      return "summer"
-4. Else:
-      return "winter"
-```
-
-**Rationale:**
-- Summer: Cheapest prices typically during midday (solar surplus)
-- Winter: Cheapest prices typically overnight (low demand)
-- Daytime definition: `[season_day_start, season_day_end)` (default 8:00-18:00)
-
-**Example:**
-- `season_day_start = 8`, `season_day_end = 18`
-- `min_hour = 2` (02:00) → winter
-- `min_hour = 14` (14:00) → summer
-- `min_hour = 8` (08:00) → summer (start is inclusive)
-- `min_hour = 18` (18:00) → winter (end is exclusive)
-
----
-
-### Active Season Mode
-
-**Method:** `_active_season_mode() -> str`
-
-**Purpose:** Resolve the current season mode from all sources.
-
-**Algorithm:**
-```
-1. Start with configured season_mode from apps.yaml
-2. If mode is "auto":
-      a. Try to infer from _infer_season_from_price_minimum()
-      b. If inference succeeds: return inferred season
-      c. Else: return season_auto_fallback
-3. Else (mode is "summer" or "winter"):
-      return mode
-```
-
-**Priority:** Explicit mode > Auto-inference > Fallback
-
----
-
 ## Helper Methods
 
 ### Tunable Value Resolution
@@ -346,45 +264,6 @@ result = max(run_h, min_window_h)
 ```
 
 **Use:** All live-tuning values (SOC targets, prices, margins)
-
----
-
-### Optional Argument Parsing
-
-**Methods:**
-- `_optional_float_arg(key: str) -> float | None`
-- `_optional_int_arg(key: str) -> int | None`
-
-**Purpose:** Safely parse optional configuration values.
-
-**Algorithm:**
-```
-1. Get value from self.args.get(key)
-2. If value is None: return None
-3. Try to parse as float/int
-4. If success: return parsed value
-5. Else: return None
-```
-
-**Use:** Winter-specific overrides (may be null in config)
-
----
-
-### Seasonal Value
-
-**Method:** `_seasonal_value(base_value, active_season: str, winter_override) -> float | int`
-
-**Purpose:** Get the appropriate value for the current season.
-
-**Algorithm:**
-```
-1. If active_season == "winter" and winter_override is not None:
-      return winter_override
-2. Else:
-      return base_value
-```
-
-**Use:** SOC floor, afternoon window parameters
 
 ---
 
@@ -416,7 +295,6 @@ result = max(run_h, min_window_h)
 | Excess Discharge | `(soc-target)/100 * cap / hours` | Evening surplus export | Priority 4 |
 | Adaptive Window | `max(contiguous_hours, min_window)` | Spread window sizing | P1, P2 |
 | Max Price | `max(prices[start:end])` | Peak detection | P3, P4 |
-| Min Price Hour | `argmin(prices[0:24])` | Season inference | Auto mode |
 
 ---
 

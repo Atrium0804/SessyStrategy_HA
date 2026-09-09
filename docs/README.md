@@ -44,7 +44,6 @@ Start here if you're new to SessyStrategy HA.
 |-------|----------------|------|------------|
 | [Tune Price Thresholds](how-to/tune-price-thresholds.md) | Adjust charge/discharge price points for your situation | 10-15 min | Intermediate |
 | [Debug Strategy Decisions](how-to/debug-strategy-decisions.md) | Understand why the strategy made a specific decision | 10-20 min | Intermediate |
-| [Configure Seasonal Mode](how-to/configure-seasonal-mode.md) | Set up optimal winter/summer behavior | 10 min | Beginner |
 | [Override Manual Mode](how-to/override-manual-mode.md) | Force a specific setpoint when needed | 5-10 min | Beginner |
 | [Add Live Tuning Helpers](how-to/add-live-tuning-helpers.md) | Adjust settings from dashboard without restart | 15 min | Intermediate |
 | [Migrate from Older Version](how-to/migrate-from-older-version.md) | Upgrade from previous versions | 10-15 min | Beginner |
@@ -63,7 +62,6 @@ Use these when you have a specific problem to solve.
 | [Price Basis: Raw vs Import](explanation/price-basis-raw-vs-import.md) | Understanding price calculations and surcharges | Beginner | Essential |
 | [Adaptive Spread Windows](explanation/adaptive-spread-windows.md) | How power is distributed over time | Intermediate | Advanced users |
 | [Setpoint Types Explained](explanation/setpoint-types-explained.md) | Battery vs grid setpoints and their uses | Intermediate | All users |
-| [Seasonal Operation](explanation/seasonal-operation.md) | Winter vs summer modes and automatic detection | Beginner | All users |
 | [Arbitrage Margin](explanation/arbitrage-margin.md) | Profitability calculations and break-even analysis | Advanced | Power users |
 
 Read these to understand the "why" behind the "how".
@@ -148,7 +146,6 @@ docs/
 │   └── dashboard-setup.md          # Dashboard creation with ApexCharts
 │
 ├── how-to/
-│   ├── configure-seasonal-mode.md  # Seasonal mode setup guide
 │   ├── tune-price-thresholds.md    # Price threshold adjustment
 │   ├── override-manual-mode.md     # Manual control override
 │   ├── add-live-tuning-helpers.md  # Live parameter tuning
@@ -160,7 +157,6 @@ docs/
 │   ├── price-basis-raw-vs-import.md # Price calculation explanation
 │   ├── adaptive-spread-windows.md  # Spread algorithm details
 │   ├── setpoint-types-explained.md  # Setpoint type comparison
-│   ├── seasonal-operation.md       # Seasonal behavior logic
 │   └── arbitrage-margin.md          # Profitability analysis
 │
 └── reference/

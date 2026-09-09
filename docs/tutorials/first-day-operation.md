@@ -148,7 +148,7 @@ SessyStrategy has a specific window for topping up the battery before the evenin
 
 ### Typical Afternoon Behavior
 
-**Default: 4:00 - 6:00 PM (Summer: 4:00-6:00 PM, Winter: 2:00-6:00 PM)**
+**Default: 4:00 - 6:00 PM**
 
 The strategy checks two conditions:
 1. **Time window:** Current hour is within `afternoon_start` to `afternoon_end`
@@ -230,7 +230,7 @@ Avoiding expensive grid imports is the highest-value action. Even with round-tri
 
 **Trigger:**
 - Within `evening_peak_start` to `evening_peak_end` (default 8:00-10:00 PM)
-- SOC > `soc_target` (you have excess stored energy)
+- SOC > `target_peak_discharge` (you have excess stored energy)
 - No remaining hours today exceed `price_discharge` (no more spikes to save for)
 
 **What You Should See:**
@@ -293,15 +293,15 @@ INFO sessy_strategy: CHEAP CHARGE: SOC 100% already at ceiling 100% — holding 
 ### Why This Matters
 
 Charging during cheap/negative price periods:
-- **Winter:** Essential for filling the battery when solar is insufficient
-- **Summer:** Less common, but captures value when prices go negative
+- **Overnight:** Essential for filling the battery when solar is insufficient
+- **Negative prices:** Captures value when the grid pays you to consume
 - **Economics:** Every kWh charged at -€0.15 saves €0.15 + €0.11 (surcharge) = €0.26 per kWh used later
 
 ---
 
 ## Real-World First Day Example
 
-### Scenario: Sunny Summer Day
+### Scenario: Sunny Solar Day
 
 | Time | SOC | Raw Price | Strategy | What Happened |
 |------|-----|-----------|----------|---------------|
@@ -321,7 +321,7 @@ Charging during cheap/negative price periods:
 - Avoided importing ~1.4 kWh at €0.52/kWh = €0.73 saved
 - Battery ended at 68% SOC, ready for tomorrow
 
-### Scenario: Cloudy Winter Day
+### Scenario: Cloudy Low-Solar Day
 
 | Time | SOC | Raw Price | Strategy | What Happened |
 |------|-----|-----------|----------|---------------|
@@ -357,13 +357,11 @@ active_branch: "default"
 soc: 68.5
 raw_price: 0.23456
 import_price: 0.34456
-soc_target: 70
+target_afternoon_charging: 70
+target_peak_discharge: 70
 soc_floor: 20
 price_discharge: 0.39
 price_charge: -0.10
-active_season: "summer"
-min_price_hour: 3
-min_price_value: -0.123
 ```
 
 ### Method 2: AppDaemon Logs
@@ -458,7 +456,6 @@ You've successfully observed SessyStrategy through its first day of operation! Y
 
 - **[Create a Dashboard](../tutorials/dashboard-setup.md)** — Set up visual monitoring to easily track strategy behavior
 - **[Tune Price Thresholds](../how-to/tune-price-thresholds.md)** — Adjust thresholds for your specific energy costs
-- **[Configure Seasonal Mode](../how-to/configure-seasonal-mode.md)** — Set up optimal winter/summer behavior
 - **[Add Live Tuning Helpers](../how-to/add-live-tuning-helpers.md)** — Control thresholds from your dashboard
 - **[Understand the Priority Chain](../explanation/strategy-priority-chain.md)** — Deep dive into decision logic
 
@@ -467,7 +464,6 @@ You've successfully observed SessyStrategy through its first day of operation! Y
 1. **Start with defaults:** The default thresholds work well for most Netherlands users
 2. **Monitor for a week:** Observe patterns before making adjustments
 3. **Check price basis:** Remember thresholds use raw prices, not import prices
-4. **Seasonal adjustment:** Consider seasonal overrides for winter vs summer behavior
 
 ---
 

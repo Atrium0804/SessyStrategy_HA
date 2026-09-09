@@ -208,7 +208,7 @@ The surcharge is present on both sides, but it must stay because the decision is
 
 ## Practical Examples
 
-### Example 1: Winter Morning
+### Example 1: Overnight Cheap Charge
 
 ```
 Hour: 02:00
@@ -302,4 +302,3 @@ A: Negative raw prices mean the grid pays you to consume energy. The threshold o
 - [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — How prices trigger different strategies
 - [apps.yaml Configuration](../reference/configuration/apps-yaml.md) — All price-related parameters
 - [Tune Price Thresholds](../how-to/tune-price-thresholds.md) — How to adjust thresholds for your situation
-- [Seasonal Operation](../explanation/seasonal-operation.md) — How price patterns vary by season

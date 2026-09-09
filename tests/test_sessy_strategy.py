@@ -72,10 +72,8 @@ _DEFAULTS = dict(
     capacity_wh=5000,
     max_power_w=2200,
     c_rate_cap=0.40,
-    soc_target=90,
     soc_floor=20,
     cheap_soc_target=100,
-    surcharge=0.11,
     price_discharge=0.39,
     price_charge=-0.10,
     afternoon_start=16,
@@ -86,10 +84,6 @@ _DEFAULTS = dict(
     evening_peak_end=23,
     min_arbitrage_margin=0.05,
     afternoon_margin=0.05,
-    season_mode="summer",
-    season_day_start=8,
-    season_day_end=18,
-    season_auto_fallback="winter",
 )
 
 
@@ -177,24 +171,6 @@ class TestCheapChargeSetpoint:
         app = make_app()
         result = app._cheap_charge_setpoint(soc=60, cheap_soc_target=80, window_h=2)
         assert result == app.max_power_w
-
-
-# ===========================================================================
-# Seasonal helpers
-# ===========================================================================
-
-class TestSeasonalValue:
-    def test_summer_returns_base(self):
-        app = make_app()
-        assert app._seasonal_value(20, "summer", 30) == 20
-
-    def test_winter_with_override_returns_override(self):
-        app = make_app()
-        assert app._seasonal_value(20, "winter", 30) == 30
-
-    def test_winter_without_override_returns_base(self):
-        app = make_app()
-        assert app._seasonal_value(20, "winter", None) == 20
 
 
 # ===========================================================================
@@ -300,7 +276,7 @@ class TestUpdateStrategyBranches:
         app._set_battery_setpoint.assert_not_called()
 
     def test_priority35_skipped_when_soc_at_target(self):
-        # soc == soc_target → condition soc > soc_target is False → default
+        # soc == target_peak_discharge → condition soc > target is False → default
         app = self._make_app_with_sensors(soc=90, price=0.20, now_hour=19)
         app._max_price_in_window = MagicMock(return_value=0.30)
         app.update_strategy({})
@@ -316,7 +292,7 @@ class TestUpdateStrategyBranches:
         app._set_battery_setpoint.assert_not_called()
 
     def test_priority3_afternoon_at_target_holds_grid_zero(self):
-        # SOC already at soc_target during afternoon window → no charge needed
+        # SOC already at target_afternoon_charging during afternoon window → no charge needed
         app = self._make_app_with_sensors(soc=90, price=0.10, now_hour=17)
         app.update_strategy({})
         app._set_grid_setpoint.assert_called_once_with(0)
@@ -546,38 +522,6 @@ class TestTunable:
 
 
 # ===========================================================================
-# Season mode inference
-# ===========================================================================
-
-class TestActiveSeasonMode:
-    def _prices_with_min_at(self, hour: int):
-        return {f"2024-06-15T{h:02d}:00:00": (0.05 if h == hour else 0.30) for h in range(24)}
-
-    def test_explicit_summer(self):
-        assert make_app(season_mode="summer")._active_season_mode() == "summer"
-
-    def test_explicit_winter(self):
-        assert make_app(season_mode="winter")._active_season_mode() == "winter"
-
-    def test_auto_daytime_min_infers_summer(self):
-        # Minimum price at 12:00 (inside season_day_start=8 … season_day_end=18) → summer
-        app = make_app(season_mode="auto")
-        app._get_prices_dict = MagicMock(return_value=self._prices_with_min_at(12))
-        assert app._active_season_mode() == "summer"
-
-    def test_auto_nighttime_min_infers_winter(self):
-        # Minimum price at 02:00 (outside daytime window) → winter
-        app = make_app(season_mode="auto")
-        app._get_prices_dict = MagicMock(return_value=self._prices_with_min_at(2))
-        assert app._active_season_mode() == "winter"
-
-    def test_auto_falls_back_when_no_prices(self):
-        app = make_app(season_mode="auto", season_auto_fallback="winter")
-        app._get_prices_dict = MagicMock(return_value=None)
-        assert app._active_season_mode() == "winter"
-
-
-# ===========================================================================
 # Sensor readers
 # ===========================================================================
 
@@ -603,18 +547,18 @@ class TestSensorReaders:
         # Attribute dict contains the current hour key → read from there
         app = make_app()
         app.get_state = MagicMock(return_value={"2024-06-15T14:00:00": 0.25})
-        assert app._current_price("sell") == pytest.approx(0.25)
+        assert app._current_price() == pytest.approx(0.25)
 
     def test_get_price_fallback_to_sensor_state(self):
         # No attribute dict → fall through to the sensor state value
         app = make_app()
         app.get_state = MagicMock(side_effect=[None, "0.30"])
-        assert app._current_price("sell") == pytest.approx(0.30)
+        assert app._current_price() == pytest.approx(0.30)
 
     def test_get_price_unavailable_returns_none(self):
         app = make_app()
         app.get_state = MagicMock(return_value=None)
-        assert app._current_price("sell") is None
+        assert app._current_price() is None
 
     # _contiguous_price_hours (renamed from _count_cheap_hours)
     def test_count_cheap_hours_consecutive(self):
@@ -660,20 +604,6 @@ class TestSensorReaders:
         app._get_prices_dict = MagicMock(return_value={})
         assert app._max_price_in_window(18, 23) is None
 
-    # _daily_min_price_hour_and_value
-    def test_daily_min_price_finds_correct_hour(self):
-        app = make_app()
-        prices = {f"2024-06-15T{h:02d}:00:00": (0.05 if h == 12 else 0.30) for h in range(24)}
-        app._get_prices_dict = MagicMock(return_value=prices)
-        hour, value = app._daily_min_price_hour_and_value()
-        assert hour == 12
-        assert value == pytest.approx(0.05)
-
-    def test_daily_min_price_no_prices_returns_none_pair(self):
-        app = make_app()
-        app._get_prices_dict = MagicMock(return_value=None)
-        assert app._daily_min_price_hour_and_value() == (None, None)
-
 
 # ===========================================================================
 # Status publishing
@@ -683,13 +613,9 @@ class TestPublishStatus:
     def _call_publish(self, app):
         app._publish_status(
             "default",
-            active_season="summer",
-            min_price_hour=12,
-            min_price_value=0.05,
             soc=75.0,
             raw_price=0.20,
             import_price=0.31,
-            soc_target=90.0,
             soc_floor=20.0,
             cheap_soc_target=100.0,
             price_discharge=0.39,
@@ -707,7 +633,7 @@ class TestPublishStatus:
         self._call_publish(app)
         app.set_state.assert_called_once()
         kwargs = app.set_state.call_args.kwargs
-        assert kwargs["state"] == "summer"
+        assert kwargs["state"] == "default"
         assert kwargs["attributes"]["active_branch"] == "default"
         assert kwargs["attributes"]["soc"] == pytest.approx(75.0)
         assert kwargs["attributes"]["raw_price"] == pytest.approx(0.20)

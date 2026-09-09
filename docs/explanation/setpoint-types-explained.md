@@ -341,7 +341,6 @@ xychart-beta
 
 - [Strategy Priority Chain](../explanation/strategy-priority-chain.md) — Which priorities use which setpoint type
 - [Price Basis: Raw vs Import](../explanation/price-basis-raw-vs-import.md) — Understanding the price calculations that drive decisions
-- [Seasonal Operation](../explanation/seasonal-operation.md) — How seasons affect setpoint choices
 - [Override Manual Mode](../how-to/override-manual-mode.md) — Using manual modes for specific situations
 - [apps.yaml Configuration](../reference/configuration/apps-yaml.md) — All mode-related parameters
 - [Architecture Reference](../reference/architecture.md) — Technical details of mode switching

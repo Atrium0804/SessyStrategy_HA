@@ -55,7 +55,9 @@ SessyStrategy supports live tuning for these parameters:
 
 | Parameter | Entity Type | Purpose | Default Static Value |
 |-----------|-------------|---------|---------------------|
-| `soc_target_entity` | input_number | Target SOC for afternoon charging | `soc_target: 70` |
+| `target_afternoon_charging_entity` | input_number | Target SOC for afternoon charging (P3) | `target_afternoon_charging: 70` |
+| `target_peak_discharge_entity` | input_number | Target SOC for evening peak sell-off (P4) | `target_peak_discharge: 70` |
+| `target_morning_soc_entity` | input_number | Target SOC for morning sell-off (P5) | `target_morning_soc: 30` |
 | `soc_floor_entity` | input_number | Minimum SOC — never discharge below | `soc_floor: 0` |
 | `cheap_soc_target_entity` | input_number | Maximum SOC for cheap-price charging | `cheap_soc_target: 100` |
 | `price_discharge_entity` | input_number | Raw price threshold for discharging | `price_discharge: 0.39` |
@@ -84,7 +86,7 @@ Decide which parameters you want to make adjustable:
 **Essential (Recommended for all users):**
 - `price_discharge_entity` — Adjust when to sell energy
 - `price_charge_entity` — Adjust when to buy energy
-- `soc_target_entity` — Adjust target SOC for afternoon charge
+- `target_afternoon_charging_entity` — Adjust target SOC for afternoon charge
 
 **Useful for optimization:**
 - `soc_floor_entity` — Adjust minimum SOC
@@ -201,17 +203,20 @@ sessy_strategy:
   class: SessyStrategy
 
   # Static fallback values (used if entities unavailable)
-  soc_target: 70
+  target_afternoon_charging: 70
+  target_peak_discharge: 70
+  target_morning_soc: 30
   soc_floor: 0
   cheap_soc_target: 100
   price_discharge: 0.39
   price_charge: -0.10
   min_arbitrage_margin: 0.05
   afternoon_margin: 0.05
-  season_mode: auto
 
   # Live entity overrides
-  soc_target_entity: number.home_battery_soc_target
+  target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
+  target_peak_discharge_entity: number.home_battery_target_peak_discharge
+  target_morning_soc_entity: number.home_battery_target_morning_soc
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling
   price_discharge_entity: number.home_battery_price_discharge
@@ -337,7 +342,7 @@ To confirm your live tuning setup is working:
 1. **Check entity values in status sensor:**
    - Look at `sensor.sessy_strategy_status` attributes
    - Verify the values match your entity inputs:
-     - `soc_target` should match `number.home_battery_soc_target`
+     - `target_afternoon_charging` should match `number.home_battery_target_afternoon_charging`
      - `price_discharge` should match `number.home_battery_price_discharge`
      - `price_charge` should match `number.home_battery_price_charge`
      - etc.
@@ -572,7 +577,6 @@ action:
 - [Live Tuning Entities Reference](../reference/live-tuning-entities.md)
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
 - [How to Tune Price Thresholds](../how-to/tune-price-thresholds.md)
-- [How to Configure Seasonal Mode](../how-to/configure-seasonal-mode.md)
 - [How to Override Manual Mode](../how-to/override-manual-mode.md)
 
 ---
@@ -582,7 +586,6 @@ action:
 - [ ] Identified which parameters to make live-tunable
 - [ ] Created input_number entities for each parameter
 - [ ] Set appropriate min/max/step/initial values for each entity
-- [ ] Created input_select for season mode (if using)
 - [ ] Configured entity links in apps.yaml
 - [ ] Set appropriate rerun_debounce_s value
 - [ ] Restarted AppDaemon

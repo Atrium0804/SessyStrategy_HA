@@ -34,7 +34,7 @@ The project lacks a `tests/` directory and has no unit tests. This violates the 
 
 ### Risk
 - **Behavior changes are unguarded** — any new priority rule or tunable change has no automated regression checks
-- **Edge cases uncovered** — seasonal transitions, cheap-window boundaries, sensor failures, etc. are untested
+- **Edge cases uncovered** — cheap-window boundaries, sensor failures, etc. are untested
 - **Onboarding friction** — contributors cannot verify their changes work without manual testing on live Home Assistant
 
 ### Recommendation
@@ -47,9 +47,8 @@ The project lacks a `tests/` directory and has no unit tests. This violates the 
 4. `test_afternoon_charge_skipped_if_peak_spread_too_small()` — peak-shaving guard works
 5. `test_priority_1_overrides_priority_2()` — excessive price beats cheap window
 6. `test_priority_3_skipped_if_soc_above_target()` — no unnecessary charge
-7. `test_seasonal_override_applied_in_winter()` — winter tunables take effect
-8. `test_status_sensor_published_with_current_state()` — state tracking
-9. `test_sensor_failure_gracefully_skips_cycle()` — resilience
+7. `test_status_sensor_published_with_current_state()` — state tracking
+8. `test_sensor_failure_gracefully_skips_cycle()` — resilience
 10. `test_min_50w_enforced_in_all_setpoints()` — verify hardcoded minimum
 
 **Implementation notes:**

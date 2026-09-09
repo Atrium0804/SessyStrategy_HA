@@ -12,8 +12,8 @@
 | Category | Purpose | Documents |
 |----------|---------|-----------|
 | **Tutorials** | *Learning-oriented* — Follow along step-by-step | [Getting Started](docs/tutorials/getting-started.md) • [First Day](docs/tutorials/first-day-operation.md) • [Dashboard Setup](docs/tutorials/dashboard-setup.md) |
-| **How-to** | *Problem-oriented* — Solve specific problems | [Tune Thresholds](docs/how-to/tune-price-thresholds.md) • [Debug Decisions](docs/how-to/debug-strategy-decisions.md) • [Configure Seasons](docs/how-to/configure-seasonal-mode.md) • [Manual Override](docs/how-to/override-manual-mode.md) • [Live Tuning](docs/how-to/add-live-tuning-helpers.md) • [Migration Guide](docs/how-to/migrate-from-older-version.md) |
-| **Explanation** | *Understanding-oriented* — Learn the concepts | [Priority Chain](docs/explanation/strategy-priority-chain.md) • [Price Basis](docs/explanation/price-basis-raw-vs-import.md) • [Spread Windows](docs/explanation/adaptive-spread-windows.md) • [Setpoint Types](docs/explanation/setpoint-types-explained.md) • [Seasonal Op](docs/explanation/seasonal-operation.md) • [Arbitrage Margin](docs/explanation/arbitrage-margin.md) |
+| **How-to** | *Problem-oriented* — Solve specific problems | [Tune Thresholds](docs/how-to/tune-price-thresholds.md) • [Debug Decisions](docs/how-to/debug-strategy-decisions.md) • [Manual Override](docs/how-to/override-manual-mode.md) • [Live Tuning](docs/how-to/add-live-tuning-helpers.md) • [Migration Guide](docs/how-to/migrate-from-older-version.md) |
+| **Explanation** | *Understanding-oriented* — Learn the concepts | [Priority Chain](docs/explanation/strategy-priority-chain.md) • [Price Basis](docs/explanation/price-basis-raw-vs-import.md) • [Spread Windows](docs/explanation/adaptive-spread-windows.md) • [Setpoint Types](docs/explanation/setpoint-types-explained.md) • [Arbitrage Margin](docs/explanation/arbitrage-margin.md) |
 | **Reference** | *Information-oriented* — Look up technical details | [apps.yaml Config](docs/reference/configuration/apps-yaml.md) • [Entity Reference](docs/reference/entity-reference.md) • [Live Entities](docs/reference/live-tuning-entities.md) • [Status Attributes](docs/reference/status-sensor-attributes.md) • [Service Calls](docs/reference/service-calls.md) • [Architecture](docs/reference/architecture.md) • [Algorithms](docs/reference/algorithms.md) |
 
 ---
@@ -56,7 +56,6 @@ SessyStrategy HA runs as an AppDaemon application:
 
 **Key Features:**
 - ✅ **Adaptive spread windows** - Spreads charge/discharge over optimal time periods
-- ✅ **Seasonal operation** - Automatic winter/summer mode detection
 - ✅ **Live tuning** - Adjust thresholds without restarting AppDaemon
 - ✅ **Priority-based decisions** - Clear, logical decision making
 - ✅ **Comprehensive logging** - Detailed logs for debugging
@@ -99,7 +98,7 @@ sessy_strategy:
 **Key Tunables:**
 - `price_discharge`: Raw price above which to discharge (default: 0.39 €/kWh)
 - `price_charge`: Raw price below which to charge (default: -0.10 €/kWh)
-- `soc_target`: Target SOC before evening peak (default: 70%)
+- `target_afternoon_charging`: Target SOC before evening peak (default: 70%)
 - `soc_floor`: Minimum SOC floor (default: 20%)
 
 👉 [Full Configuration Reference](docs/reference/configuration/apps-yaml.md)
@@ -129,7 +128,6 @@ The last-reached timestamp is tracked in an `input_datetime` helper (`legionella
 | Create a dashboard | [Dashboard Setup](docs/tutorials/dashboard-setup.md) |
 | Tune price thresholds | [Tune Thresholds](docs/how-to/tune-price-thresholds.md) |
 | Debug strategy decisions | [Debug Decisions](docs/how-to/debug-strategy-decisions.md) |
-| Configure seasonal mode | [Configure Seasons](docs/how-to/configure-seasonal-mode.md) |
 
 ---
 
@@ -143,7 +141,6 @@ docs/
 │   ├── first-day-operation.md      # What to expect on day one
 │   └── dashboard-setup.md          # Dashboard creation guide
 ├── how-to/
-│   ├── configure-seasonal-mode.md  # Seasonal mode setup guide
 │   ├── tune-price-thresholds.md    # Price threshold adjustment
 │   ├── override-manual-mode.md     # Manual control override
 │   ├── add-live-tuning-helpers.md  # Live parameter tuning
@@ -154,7 +151,6 @@ docs/
 │   ├── price-basis-raw-vs-import.md # Price calculation explanation
 │   ├── adaptive-spread-windows.md  # Spread algorithm details
 │   ├── setpoint-types-explained.md  # Setpoint type comparison
-│   ├── seasonal-operation.md       # Seasonal behavior logic
 │   └── arbitrage-margin.md          # Profitability analysis
 └── reference/
     ├── configuration/

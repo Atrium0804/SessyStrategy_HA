@@ -23,10 +23,9 @@ The configuration is organized into logical sections:
 3. **Pricing** — Energy price thresholds and surcharges
 4. **Adaptive Spread Window** — Dynamic power distribution settings
 5. **Time Windows** — Operational time periods
-6. **Seasonal Operation** — Summer/winter mode configuration
-7. **Entity IDs** — Home Assistant entity mappings
-8. **Operating Mode** — Master control and mode selection
-9. **Live Tuning** — Optional runtime-adjustable helpers
+6. **Entity IDs** — Home Assistant entity mappings
+7. **Operating Mode** — Master control and mode selection
+8. **Live Tuning** — Optional runtime-adjustable helpers
 
 ---
 
@@ -38,7 +37,9 @@ The configuration is organized into logical sections:
 | `capacity_wh` | float | 5000 | Yes | Battery capacity in watt-hours | > 0 | `5000` |
 | `max_power_w` | float | 2200 | Yes | Maximum inverter/battery power in watts — final setpoint clamp | > 0 | `2200` |
 | **State-of-Charge Targets** |||||||
-| `soc_target` | float | 70 | No | Target SOC percentage to reach before evening peak | 0-100 | `70` |
+| `target_afternoon_charging` | float | 70 | No | Target SOC to reach before the evening peak (P3) | 0-100 | `70` |
+| `target_peak_discharge` | float | 70 | No | SOC above which evening excess is sold (P4) | 0-100 | `70` |
+| `target_morning_soc` | float | 30 | No | SOC to unload down to in the morning window (P5) | 0-100 | `30` |
 | `soc_floor` | float | 0 | No | SOC floor percentage — battery never discharges below this | 0-100 | `20` |
 | `cheap_soc_target` | float | 100 | No | SOC ceiling for cheap-price charging | 0-100 | `100` |
 | **Pricing** |||||||
@@ -46,7 +47,6 @@ The configuration is organized into logical sections:
 | `price_discharge` | float | 0.39 | No | Raw price threshold above which to force discharge | any | `0.39` |
 | `price_charge` | float | -0.10 | No | Raw price threshold below which to charge from grid | any | `-0.10` |
 | `min_arbitrage_margin` | float | 0.05 | No | Minimum €/kWh spread for the evening peak hold-vs-sell decision (P4) | ≥ 0 | `0.05` |
-| `target_afternoon_charging` | int | 70 | No | Target SOC to reach before the evening peak (P3) | 0-100 | `70` |
 | `afternoon_margin` | float | 0.05 | No | Minimum €/kWh by which the evening peak import price must beat the current import price to justify afternoon charge (P3) | ≥ 0 | `0.05` |
 | **Adaptive Spread Window** |||||||
 | `min_window_h` | float | 2.0 | No | Minimum adaptive spread window in hours | > 0 | `2.0` |
@@ -57,16 +57,6 @@ The configuration is organized into logical sections:
 | `afternoon_window_h` | float | 2.0 | No | Spread window for afternoon charge in hours | > 0 | `2.0` |
 | `evening_peak_start` | int | 20 | No | Start hour of evening peak window | 0-23 | `20` |
 | `evening_peak_end` | int | 22 | No | End hour of evening peak window | 0-23 | `22` |
-| **Seasonal Mode** |||||||
-| `season_mode` | str | "auto" | No | Season mode: auto, summer, or winter | auto\|summer\|winter | `auto` |
-| `season_day_start` | int | 8 | No | Start hour for daytime detection (season inference) | 0-23 | `8` |
-| `season_day_end` | int | 18 | No | End hour for daytime detection (season inference) | 0-23 | `18` |
-| `season_auto_fallback` | str | "winter" | No | Fallback season when auto-inference fails | summer\|winter | `winter` |
-| **Winter-specific Overrides** |||||||
-| `soc_floor_winter` | float | null | No | Winter SOC floor override (uses base if null) | 0-100 | `30` |
-| `afternoon_start_winter` | int | null | No | Winter afternoon start hour override | 0-23 | `14` |
-| `afternoon_end_winter` | int | null | No | Winter afternoon end hour override | 0-23 | `18` |
-| `afternoon_window_h_winter` | float | null | No | Winter afternoon window override | > 0 | `4.0` |
 | **Entity IDs** |||||||
 | `strategy_select` | str | "select.sessy_battery_alt9_power_strategy" | **Yes** | Sessy strategy selector entity | valid entity ID | `select.sessy_battery_<id>_power_strategy` |
 | `grid_target` | str | "number.sessy_pwkn_grid_target" | **Yes** | Grid power target entity | valid entity ID | `number.sessy_<id>_grid_target` |
@@ -81,13 +71,14 @@ The configuration is organized into logical sections:
 | `eco_option` | str | "eco" | No | Sessy power_strategy option for "Eco" mode | valid option string | `eco` |
 | `idle_option` | str | "idle" | No | Sessy power_strategy option for "Idle" mode | valid option string | `idle` |
 | **Live Tuning Helpers** |||||||
-| `soc_target_entity` | str | null | No | Live SOC target override (input_number) | valid entity ID | `number.home_battery_soc_target` |
+| `target_afternoon_charging_entity` | str | null | No | Live afternoon SOC target override, P3 (input_number) | valid entity ID | `number.home_battery_target_afternoon_charging` |
+| `target_peak_discharge_entity` | str | null | No | Live evening peak sell-off target override, P4 (input_number) | valid entity ID | `number.home_battery_target_peak_discharge` |
+| `target_morning_soc_entity` | str | null | No | Live morning sell-off target override, P5 (input_number) | valid entity ID | `number.home_battery_target_morning_soc` |
 | `soc_floor_entity` | str | null | No | Live SOC floor override (input_number) | valid entity ID | `number.home_battery_soc_floor` |
 | `cheap_soc_target_entity` | str | null | No | Live cheap SOC target override (input_number) | valid entity ID | `number.home_battery_soc_ceiling` |
 | `price_discharge_entity` | str | null | No | Live discharge threshold override (input_number) | valid entity ID | `number.home_battery_price_discharge` |
 | `price_charge_entity` | str | null | No | Live charge threshold override (input_number) | valid entity ID | `number.home_battery_price_charge` |
 | `min_arbitrage_margin_entity` | str | null | No | Live arbitrage margin override, P4 (input_number) | valid entity ID | `number.home_battery_min_arbitrage_margin` |
-| `target_afternoon_charging_entity` | str | null | No | Live afternoon SOC target override (input_number) | valid entity ID | `number.home_battery_target_afternoon_charging` |
 | `afternoon_margin_entity` | str | null | No | Live afternoon margin override (input_number) | valid entity ID | `number.home_battery_afternoon_margin` |
 
 ---
@@ -105,7 +96,9 @@ These define the physical capabilities of your battery system.
 
 These control how the battery is charged and discharged.
 
-- **`soc_target`**: The target SOC to reach before the evening peak. Used in Priority 3 (afternoon charge).
+- **`target_afternoon_charging`**: The target SOC to reach before the evening peak. Used in Priority 3 (afternoon charge).
+- **`target_peak_discharge`**: The SOC above which the evening peak sell-off (Priority 4) discharges surplus energy.
+- **`target_morning_soc`**: The SOC to unload down to during the morning sell-off window (Priority 5).
 - **`soc_floor`**: The minimum SOC level. The battery will never discharge below this percentage.
 - **`cheap_soc_target`**: The target SOC for cheap-price charging (Priority 2). Typically set to 100% to fully charge during cheap hours.
 
@@ -132,18 +125,6 @@ All times are in **local hours** (24-hour format).
 
 - **Afternoon window** (`afternoon_start` to `afternoon_end`): When to top up in preparation for the evening peak.
 - **Evening peak window** (`evening_peak_start` to `evening_peak_end`): Evening peak period for Priority 4 (excess discharge).
-
-### Seasonal Operation
-
-The strategy can operate differently in summer vs. winter.
-
-- **`season_mode`**: `auto` (default), `summer`, or `winter`
-  - `auto`: Automatically infers season from the hour of today's minimum raw price
-    - Minimum during `[season_day_start, season_day_end)` → summer
-    - Minimum outside that window → winter
-  - `summer`/`winter`: Forces the specified season
-- **`season_auto_fallback`**: Used when auto-inference fails (missing price data)
-- **Winter overrides**: When in winter mode, these override the base values. If null, base values are used.
 
 ---
 
@@ -179,7 +160,9 @@ sessy_strategy:
   max_power_w: 3500          # 3.5 kW inverter
 
   # SOC targets
-  soc_target: 80             # Target 80% before evening peak
+  target_afternoon_charging: 80   # Target 80% before evening peak
+  target_peak_discharge: 80       # Sell evening excess above 80%
+  target_morning_soc: 30          # Unload to 30% in the morning
   soc_floor: 10              # Never go below 10%
   cheap_soc_target: 100      # Fill to 100% during cheap hours
 
@@ -188,7 +171,6 @@ sessy_strategy:
   price_discharge: 0.45      # Discharge when raw > €0.45
   price_charge: -0.15        # Charge when raw < -€0.15
   min_arbitrage_margin: 0.07 # Need 7c spread for the evening hold-vs-sell (P4)
-  target_afternoon_charging: 70
   afternoon_margin: 0.05     # Evening peak import must beat now by 5c (P3)
 
   # Adaptive spread window
@@ -201,18 +183,6 @@ sessy_strategy:
   afternoon_window_h: 3.0
   evening_peak_start: 19
   evening_peak_end: 23
-
-  # Seasonal mode
-  season_mode: auto
-  season_day_start: 7
-  season_day_end: 19
-  season_auto_fallback: summer
-
-  # Winter-specific overrides
-  soc_floor_winter: 20
-  afternoon_start_winter: 14
-  afternoon_end_winter: 18
-  afternoon_window_h_winter: 4.0
 
   # Entity IDs
   strategy_select: select.sessy_battery_alt9_power_strategy
@@ -230,55 +200,15 @@ sessy_strategy:
   idle_option: idle
 
   # Live tuning helpers
-  soc_target_entity: number.home_battery_soc_target
+  target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
+  target_peak_discharge_entity: number.home_battery_target_peak_discharge
+  target_morning_soc_entity: number.home_battery_target_morning_soc
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
-  target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
   afternoon_margin_entity: number.home_battery_afternoon_margin
-```
-
-### Seasonal Override Example
-
-Winter configuration for cold climate with higher heating loads:
-
-```yaml
-sessy_strategy:
-  module: sessy_strategy
-  class: SessyStrategy
-
-  # Base values (used in summer)
-  capacity_wh: 5000
-  max_power_w: 2200
-  soc_target: 70
-  soc_floor: 20
-  price_discharge: 0.39
-  price_charge: -0.10
-  afternoon_start: 16
-  afternoon_end: 18
-  afternoon_window_h: 2.0
-
-  # Winter overrides
-  soc_floor_winter: 30       # Keep more reserve for heating
-  afternoon_start_winter: 14   # Start charging earlier
-  afternoon_end_winter: 18
-  afternoon_window_h_winter: 4.0  # Longer window for lower power
-
-  # Season detection
-  season_mode: auto
-  season_day_start: 8
-  season_day_end: 17
-  season_auto_fallback: winter
-
-  # Entities (required)
-  strategy_select: select.sessy_battery_alt9_power_strategy
-  grid_target: number.sessy_pwkn_grid_target
-  battery_setpoint: number.sessy_battery_alt9_power_setpoint
-  soc_sensor: sensor.sessy_battery_alt9_state_of_charge
-  price_sensor: sensor.sessy_dnhh_energy_price
-  status_sensor: sensor.sessy_strategy_status
 ```
 
 ---
@@ -312,11 +242,9 @@ This means you're effectively avoiding import at €0.50+ and capturing export a
 
 2. **Positive values**: `capacity_wh`, `max_power_w`, `min_window_h`, `rerun_debounce_s` must be > 0.
 
-3. **Percentage ranges**: SOC values (`soc_target`, `soc_floor`, `cheap_soc_target`, and winter overrides) must be 0-100.
+3. **Percentage ranges**: SOC values (`target_afternoon_charging`, `target_peak_discharge`, `target_morning_soc`, `soc_floor`, `cheap_soc_target`) must be 0-100.
 
-4. **Time windows**: `afternoon_start` < `afternoon_end`, `evening_peak_start` < `evening_peak_end`, `season_day_start` < `season_day_end`.
-
-5. **Mode options**: `season_mode` must be one of: `auto`, `summer`, `winter`.
+4. **Time windows**: `afternoon_start` < `afternoon_end`, `evening_peak_start` < `evening_peak_end`.
 
 ---
 
@@ -324,7 +252,7 @@ This means you're effectively avoiding import at €0.50+ and capturing export a
 
 1. **Start with defaults**: The default values work well for most Dutch installations. Only adjust after observing behavior for a few days.
 
-2. **Adjust `soc_floor` first**: If you frequently run out of battery in the morning, increase `soc_floor` (and `soc_floor_winter` for winter).
+2. **Adjust `soc_floor` first**: If you frequently run out of battery in the morning, increase `soc_floor`.
 
 3. **Tune price thresholds**: If the strategy discharges/charges too aggressively, adjust `price_discharge` and `price_charge`. Remember these are raw prices.
 

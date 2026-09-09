@@ -536,7 +536,6 @@ sequence:
 - [Setpoint Types Explained](../explanation/setpoint-types-explained.md)
 - [Configuration Reference — apps.yaml](../reference/configuration/apps-yaml.md)
 - [How to Debug Strategy Decisions](../how-to/debug-strategy-decisions.md)
-- [How to Configure Seasonal Mode](../how-to/configure-seasonal-mode.md)
 
 ---
 

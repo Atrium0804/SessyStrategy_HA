@@ -44,7 +44,6 @@ Solve specific problems with practical, actionable solutions.
 |-------|----------------|------|
 | [Tune Price Thresholds](how-to/tune-price-thresholds.md) | Adjust charge/discharge price points | 10-15 min |
 | [Debug Strategy Decisions](how-to/debug-strategy-decisions.md) | Understand why the strategy made a decision | 10-20 min |
-| [Configure Seasonal Mode](how-to/configure-seasonal-mode.md) | Set up winter/summer behavior | 10 min |
 | [Override Manual Mode](how-to/override-manual-mode.md) | Force a specific setpoint | 5-10 min |
 | [Add Live Tuning Helpers](how-to/add-live-tuning-helpers.md) | Adjust settings without restarting | 15 min |
 | [Migrate from Older Version](how-to/migrate-from-older-version.md) | Upgrade from previous versions | 10-15 min |
@@ -62,7 +61,6 @@ Learn the concepts and theory behind how SessyStrategy HA works.
 | [Price Basis: Raw vs Import](explanation/price-basis-raw-vs-import.md) | Understanding price calculations | Beginner |
 | [Adaptive Spread Windows](explanation/adaptive-spread-windows.md) | Power distribution over time | Intermediate |
 | [Setpoint Types Explained](explanation/setpoint-types-explained.md) | Battery vs Grid setpoints | Intermediate |
-| [Seasonal Operation](explanation/seasonal-operation.md) | Winter vs summer modes | Beginner |
 | [Arbitrage Margin](explanation/arbitrage-margin.md) | Profitability calculations | Advanced |
 
 Read these to understand the "why" behind the "how".
@@ -139,7 +137,6 @@ docs/
 │   └── dashboard-setup.md
 │
 ├── how-to/
-│   ├── configure-seasonal-mode.md
 │   ├── tune-price-thresholds.md
 │   ├── override-manual-mode.md
 │   ├── add-live-tuning-helpers.md
@@ -151,7 +148,6 @@ docs/
 │   ├── price-basis-raw-vs-import.md
 │   ├── adaptive-spread-windows.md
 │   ├── setpoint-types-explained.md
-│   ├── seasonal-operation.md
 │   └── arbitrage-margin.md
 │
 └── reference/

@@ -10,7 +10,7 @@ The `sensor.sessy_strategy_status` entity is created and maintained by the Sessy
 
 **Entity type:** Sensor
 **Default ID:** `sensor.sessy_strategy_status` (configurable via `status_sensor` in apps.yaml)
-**State:** Current active season (`summer` or `winter`)
+**State:** Name of the currently active branch (e.g. `default`, `discharge`, `cheap_charge`, `afternoon_charge`, `evening_peak_selloff`, `morning_selloff`, plus manual/standby branches)
 **Attributes:** Comprehensive decision context (see tables below)
 
 ---
@@ -24,13 +24,11 @@ These attributes are updated on every strategy cycle, regardless of the active b
 | Attribute | Type | Description | Example | When Updated |
 |---|---|---|---|---|
 | `active_branch` | str | The currently active priority branch | `discharge`, `afternoon_charge`, `default` | Every cycle |
-| `season_mode_source` | str | Source of season mode (apps.yaml or entity) | `auto`, `summer`, `winter` | Every cycle |
-| `daily_min_price_hour` | int \| None | Hour of today's minimum raw price | `3` (03:00) | Every cycle |
-| `daily_min_price` | float \| None | Value of today's minimum raw price | `0.08500` | Every cycle |
 | `soc` | float | Current State of Charge | `65.5` | Every cycle |
-| `raw_price` | float | Current raw export price | `0.25450` | Every cycle |
-| `import_price` | float | Current import price (raw + surcharge) | `0.36450` | Every cycle |
-| `soc_target` | float | Active SOC target | `70.0` | Every cycle |
+| `price` | float | Current market price | `0.25450` | Every cycle |
+| `target_afternoon_charging` | float | Active afternoon charge target (P3) | `70.0` | Every cycle |
+| `target_peak_discharge` | float | Active evening peak sell-off target (P4) | `70.0` | Every cycle |
+| `target_morning_soc` | float | Active morning sell-off target (P5) | `30.0` | Every cycle |
 | `soc_floor` | float | Active SOC floor | `20.0` | Every cycle |
 | `cheap_soc_target` | float | Active cheap SOC target | `100.0` | Every cycle |
 | `price_discharge` | float | Active discharge price threshold | `0.39` | Every cycle |
@@ -40,16 +38,6 @@ These attributes are updated on every strategy cycle, regardless of the active b
 | `afternoon_start` | int | Active afternoon start hour | `16` | Every cycle |
 | `afternoon_end` | int | Active afternoon end hour | `18` | Every cycle |
 | `afternoon_window_h` | float | Active afternoon spread window | `2.0` | Every cycle |
-
-### Season-Specific Attributes
-
-These attributes provide configuration visibility for seasonal overrides.
-
-| Attribute | Type | Description | Example | When Updated |
-|---|---|---|---|---|
-| `season_day_start` | int | Daytime start hour for season inference | `8` | Every cycle |
-| `season_day_end` | int | Daytime end hour for season inference | `18` | Every cycle |
-| `season_auto_fallback` | str | Fallback season when auto-inference fails | `winter` | Every cycle |
 
 ---
 
@@ -152,25 +140,20 @@ When the strategy is in a manual or standby mode, the status sensor uses a simpl
 | Attribute | Data Type | Format | Notes |
 |---|---|---|---|
 | `active_branch` | string | lowercase_with_underscores | Always present |
-| `season_mode_source` | string | lowercase | auto, summer, or winter |
-| `daily_min_price_hour` | integer \| None | 0-23 | Null if price data unavailable |
-| `daily_min_price` | float \| None | any | Null if price data unavailable |
 | `soc` | float | 0-100 | Rounded to 2 decimal places |
-| `raw_price` | float | any | Rounded to 5 decimal places |
-| `import_price` | float | any | Rounded to 5 decimal places |
-| `soc_target` | float | 0-100 | From live entity or apps.yaml |
+| `price` | float | any | Rounded to 5 decimal places |
+| `target_afternoon_charging` | float | 0-100 | From live entity or apps.yaml |
+| `target_peak_discharge` | float | 0-100 | From live entity or apps.yaml |
+| `target_morning_soc` | float | 0-100 | From live entity or apps.yaml |
 | `soc_floor` | float | 0-100 | From live entity or apps.yaml |
 | `cheap_soc_target` | float | 0-100 | From live entity or apps.yaml |
 | `price_discharge` | float | any | From live entity or apps.yaml |
 | `price_charge` | float | any | From live entity or apps.yaml |
 | `min_arbitrage_margin` | float | ≥ 0 | From live entity or apps.yaml |
 | `afternoon_margin` | float | 0-0.5 | From live entity or apps.yaml |
-| `afternoon_start` | integer | 0-23 | From seasonal config |
-| `afternoon_end` | integer | 0-23 | From seasonal config |
-| `afternoon_window_h` | float | > 0 | From seasonal config |
-| `season_day_start` | integer | 0-23 | From apps.yaml |
-| `season_day_end` | integer | 0-23 | From apps.yaml |
-| `season_auto_fallback` | string | lowercase | From apps.yaml |
+| `afternoon_start` | integer | 0-23 | From apps.yaml |
+| `afternoon_end` | integer | 0-23 | From apps.yaml |
+| `afternoon_window_h` | float | > 0 | Derived spread window |
 
 ---
 
@@ -180,16 +163,14 @@ When the strategy is in a manual or standby mode, the status sensor uses a simpl
 
 ```yaml
 entity_id: sensor.sessy_strategy_status
-state: summer
+state: discharge
 attributes:
   active_branch: discharge
-  season_mode_source: auto
-  daily_min_price_hour: 3
-  daily_min_price: -0.085
   soc: 72.5
-  raw_price: 0.45200
-  import_price: 0.56200
-  soc_target: 70.0
+  price: 0.45200
+  target_afternoon_charging: 70.0
+  target_peak_discharge: 70.0
+  target_morning_soc: 30.0
   soc_floor: 20.0
   cheap_soc_target: 100.0
   price_discharge: 0.39
@@ -198,10 +179,6 @@ attributes:
   afternoon_margin: 0.05
   afternoon_start: 16
   afternoon_end: 18
-  afternoon_window_h: 2.0
-  season_day_start: 8
-  season_day_end: 18
-  season_auto_fallback: winter
 ```
 
 ### Manual Mode Status
@@ -221,7 +198,6 @@ attributes:
 
 - **Every 5 minutes**: Regular strategy cycle updates all attributes
 - **Immediately**: When any live-tuning entity changes (after debounce delay)
-- **On season change**: When the inferred or set season changes
 - **On startup**: Initial publish with all current values
 
 ---
@@ -233,15 +209,13 @@ attributes:
 The status sensor is the first place to look when debugging unexpected behavior:
 
 1. **Check `active_branch`**: Which priority matched?
-2. **Check price values**: Is `raw_price` above/below expected thresholds?
+2. **Check price values**: Is `price` above/below expected thresholds?
 3. **Check SOC**: Is the battery at expected levels?
-4. **Check season**: Is the correct season active?
 
 **Example diagnostic questions:**
 
 - "Why didn't it discharge at €0.45?" → Check if `price_discharge` was higher than 0.45
 - "Why didn't it charge during cheap hours?" → Check if `price_charge` was lower than the actual price, or if SOC was already at `cheap_soc_target`
-- "Why is it in summer mode in December?" → Check `season_mode_source` and `daily_min_price_hour`
 
 ### Monitoring in Dashboards
 
@@ -305,14 +279,14 @@ series:
 ```
 Home Assistant State
     ↓
-_price_sensor (energy_prices attribute) → daily_min_price_hour, daily_min_price
+price_sensor (energy_prices attribute) → price
     ↓
-_soc_sensor → soc
+soc_sensor → soc
     ↓
 Strategy Decision Engine
     ↓
 Publish to status_sensor:
-    - state = active_season
+    - state = active_branch
     - attributes = all context + active_branch
     ↓
 Home Assistant Updates Entity

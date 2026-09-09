@@ -27,7 +27,6 @@ last_updated: 2026-08-01
 - [Status Sensor Attributes Reference](../reference/status-sensor-attributes.md)
 - [Price Basis: Raw vs Import Explained](../explanation/price-basis-raw-vs-import.md)
 - [How to Tune Price Thresholds](../how-to/tune-price-thresholds.md)
-- [How to Configure Seasonal Mode](../how-to/configure-seasonal-mode.md)
 
 ---
 
@@ -57,7 +56,7 @@ SessyStrategy evaluates conditions in strict priority order. **The first matchin
 ├─────────────────────────────────────────────────────────────┤
 │  Priority 4: Evening Peak Sell-off Discharge                    │
 │  ├─ Condition: evening_peak_start <= hour < evening_peak_end   │
-│  ├─ Condition: soc > soc_target                                │
+│  ├─ Condition: soc > target_peak_discharge                     │
 │  └─ Action: Grid setpoint, export excess                       │
 ├─────────────────────────────────────────────────────────────┤
 │  Priority 5: Default                                           │
@@ -97,26 +96,24 @@ The `sensor.sessy_strategy_status` entity is your primary debugging tool. It con
 
 ```yaml
 # State
-state: "summer"  # Current active season
+state: "default"  # Current active branch
 
 # Attributes
 active_branch: "default"        # Which priority matched
-season_mode_source: "auto"    # Source of season mode
 soc: 65.3                    # Current SOC percentage
-raw_price: 0.25000           # Current raw (export) price
-import_price: 0.36000        # raw_price + surcharge
+price: 0.25000               # Current market price
 price_discharge: 0.39        # Current discharge threshold
 price_charge: -0.10          # Current charge threshold
-soc_target: 70               # Current SOC target
+target_afternoon_charging: 70 # Current afternoon charge target (P3)
+target_peak_discharge: 70    # Current evening peak sell-off target (P4)
+target_morning_soc: 30       # Current morning sell-off target (P5)
 soc_floor: 0                # Current SOC floor
 cheap_soc_target: 100        # Current cheap charge ceiling
 min_arbitrage_margin: 0.05   # Current arbitrage margin (P4)
 afternoon_margin: 0.05       # Current afternoon margin (P3)
-afternoon_start: 15         # Current afternoon window start
-afternoon_end: 17           # Current afternoon window end
+afternoon_start: 16         # Current afternoon window start
+afternoon_end: 18           # Current afternoon window end
 afternoon_window_h: 2.0     # Current afternoon charge window
-daily_min_price_hour: 3      # Hour of day's minimum price
-daily_min_price: 0.15000     # Value of day's minimum price
 ```
 
 **Expected result:** You now have a snapshot of all conditions at the time of the last strategy run.
@@ -143,21 +140,14 @@ The `active_branch` attribute tells you exactly which decision path was taken:
 
 **Debugging tip:** If `active_branch` is not what you expected, note the current conditions and proceed to Step 3.
 
-### Step 3: Verify Mode and Season
+### Step 3: Verify Mode
 
 **Check operating mode:**
 - If `active_branch` is `manual_grid`, `manual_battery`, `idle`, `sessy_dynamic`, or `eco`, the priority chain was **bypassed**
 - Check your `mode_select` entity — it might not be set to `optimized`
 
-**Check season mode:**
-- `state` shows the current active season (`auto`, `summer`, `winter`)
-- `season_mode_source` shows where this came from
-- Winter-specific overrides might be affecting your thresholds
-
 **Debugging questions:**
 - Is the mode set to `optimized`?
-- Is the season what you expect?
-- If using `auto` season, is `daily_min_price_hour` within the daytime range?
 
 ### Step 4: Analyze Priority Chain Conditions
 
@@ -199,8 +189,8 @@ If this condition is **NOT met**, check Priority 4.
 #### Priority 4: Evening Peak Sell-off Discharge
 ```
 Condition 1: evening_peak_start <= current_hour < evening_peak_end
-Condition 2: soc > soc_target
-Your values: evening_peak_start = 18, evening_peak_end = 23, hour = 14, soc = 65.3, soc_target = 70
+Condition 2: soc > target_peak_discharge
+Your values: evening_peak_start = 18, evening_peak_end = 23, hour = 14, soc = 65.3, target_peak_discharge = 70
 Evaluation: (18 <= 14 < 23)? NO → Priority 4 not triggered
 Evaluation: (18 <= 14 < 23) AND (65.3 > 70)? NO → Priority 4 not triggered
 ```
@@ -422,46 +412,19 @@ afternoon_margin: 0.02  # Lower margin requirement
   - Fix: Increase to `min_window_h = 2.0` or higher
 
 - [ ] Are SOC targets appropriate?
-  - Current: `soc_target = 95, soc_floor = 5`
+  - Current: `target_afternoon_charging = 95, soc_floor = 5`
   - Issue: Narrow SOC range causes frequent charging/discharging
-  - Fix: Widen range: `soc_target = 80, soc_floor = 20`
+  - Fix: Widen range: `target_afternoon_charging = 80, soc_floor = 20`
 
 **Example fix:**
 ```yaml
 # In apps.yaml
 min_window_h: 3.0  # Spread over at least 3 hours
-soc_target: 70     # Target 70% instead of higher
+target_afternoon_charging: 70  # Target 70% instead of higher
 soc_floor: 10      # Keep minimum 10%
 ```
 
-### Issue 5: "Strategy shows wrong season"
-
-**Symptoms:**
-- Wrong timing windows (winter vs summer)
-- Status sensor shows unexpected season
-
-**Checklist:**
-- [ ] Is season_mode set correctly?
-  - Current: `season_mode: auto`
-  - Check: `season_mode_source` in status sensor
-
-- [ ] Is auto detection working?
-  - Check: `daily_min_price_hour` in status sensor
-  - Check: `season_day_start = 8, season_day_end = 18`
-  - Evaluation: If `daily_min_price_hour` is between 8-18, it's summer; otherwise winter
-  - Fix: Adjust `season_day_start` and `season_day_end` or set explicit season
-
-**Example fix:**
-```yaml
-# Option A: Explicit season
-season_mode: winter  # Force winter mode
-
-# Option B: Adjust auto detection hours
-season_day_start: 7   # Earlier daylight start
-season_day_end: 19    # Later daylight end
-```
-
-### Issue 6: "Strategy not running at all"
+### Issue 5: "Strategy not running at all"
 
 **Symptoms:**
 - No log entries from strategy
@@ -509,7 +472,8 @@ raw_price = 0.28
 import_price = 0.39  # raw_price + surcharge
 price_discharge = 0.39
 price_charge = -0.10
-soc_target = 70
+target_afternoon_charging = 70
+target_peak_discharge = 70
 soc_floor = 0
 cheap_soc_target = 100
 current_hour = 14
@@ -540,8 +504,8 @@ else:
 
 # Priority 3
 if afternoon_start <= current_hour < afternoon_end:
-    if soc >= soc_target:
-        print("P3: AFTERNOON FULL - soc", soc, ">= target", soc_target)
+    if soc >= target_afternoon_charging:
+        print("P3: AFTERNOON FULL - soc", soc, ">= target", target_afternoon_charging)
         exit()
     else:
         # evening_peak_buy and current_buy are import prices (raw + surcharge)
@@ -549,7 +513,7 @@ if afternoon_start <= current_hour < afternoon_end:
         current_buy = import_price
         afternoon_margin = 0.05
         if (evening_peak_buy - current_buy) >= afternoon_margin:
-            print("P3: AFTERNOON CHARGE - soc", soc, "< target", soc_target, "AND spread", evening_peak_buy - current_buy, ">= margin", afternoon_margin)
+            print("P3: AFTERNOON CHARGE - soc", soc, "< target", target_afternoon_charging, "AND spread", evening_peak_buy - current_buy, ">= margin", afternoon_margin)
             exit()
         else:
             print("P3: AFTERNOON SKIP - spread", evening_peak_buy - current_buy, "< margin", afternoon_margin)
@@ -559,11 +523,11 @@ else:
 
 # Priority 4
 if evening_peak_start <= current_hour < evening_peak_end:
-    if soc > soc_target:
-        print("P4: EVENING PEAK SELL-OFF - soc", soc, "> soc_target", soc_target)
+    if soc > target_peak_discharge:
+        print("P4: EVENING PEAK SELL-OFF - soc", soc, "> target_peak_discharge", target_peak_discharge)
         exit()
     else:
-        print("P4: NOT MATCHED - soc", soc, "<= soc_target", soc_target)
+        print("P4: NOT MATCHED - soc", soc, "<= target_peak_discharge", target_peak_discharge)
 else:
     print("P4: NOT IN WINDOW - hour", current_hour, "not in", evening_peak_start, "-", evening_peak_end)
 
@@ -601,7 +565,6 @@ def log_debug_info(self):
         f"Raw={price:.5f}  "
         f"Import={import_price:.5f if import_price else 'N/A'}  "
         f"Mode={self._active_mode()}  "
-        f"Season={self._active_season_mode()}"
     )
 
     # Log all threshold values
@@ -609,7 +572,7 @@ def log_debug_info(self):
         f"DEBUG: Thresholds - "
         f"discharge={self._tunable(self.price_discharge, self.price_discharge_entity):.5f}  "
         f"charge={self._tunable(self.price_charge, self.price_charge_entity):.5f}  "
-        f"soc_target={self._tunable(self.soc_target, self.soc_target_entity):.1f}  "
+        f"target_afternoon_charging={self._tunable(self.target_afternoon_charging, self.target_afternoon_charging_entity):.1f}  "
         f"soc_floor={self._tunable(self.soc_floor, self.soc_floor_entity):.1f}"
     )
 ```
@@ -652,7 +615,7 @@ if prices:
 - [x] **Do:** Monitor for at least one full day after making changes
 - ❌ **Don't:** Assume the strategy should be doing something without checking the conditions
 - ❌ **Don't:** Change multiple parameters simultaneously — it makes debugging harder
-- ❌ **Don't:** Forget to check if you're in manual mode or a different season
+- ❌ **Don't:** Forget to check if you're in manual mode
 - ❌ **Don't:** Expect the strategy to predict future prices beyond what's in `energy_prices`
 
 ---
@@ -662,7 +625,6 @@ if prices:
 - [Strategy Priority Chain Explained](../explanation/strategy-priority-chain.md)
 - [Status Sensor Attributes Reference](../reference/status-sensor-attributes.md)
 - [How to Tune Price Thresholds](../how-to/tune-price-thresholds.md)
-- [How to Configure Seasonal Mode](../how-to/configure-seasonal-mode.md)
 - [How to Add Live Tuning Helpers](../how-to/add-live-tuning-helpers.md)
 
 ---
@@ -672,7 +634,6 @@ if prices:
 - [ ] Checked status sensor state and attributes
 - [ ] Identified the active_branch from status sensor
 - [ ] Verified operating mode is `optimized`
-- [ ] Verified current season and thresholds
 - [ ] Worked through priority chain conditions manually
 - [ ] Checked AppDaemon logs for strategy decisions
 - [ ] Verified all required entities exist and have valid data

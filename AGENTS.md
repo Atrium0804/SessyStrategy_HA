@@ -14,7 +14,7 @@ This file defines agent routing rules for complex, multi-step tasks.
 
 **Examples:**
 - "Where is `price_discharge` used in the strategy logic?"
-- "How does season detection work end-to-end?"
+- "How does the afternoon-charge break-even guard work end-to-end?"
 - "Which helper functions have no tests?"
 
 **Thoroughness hint:** `quick` for targeted lookups, `medium` for feature understanding, `thorough` for audits.

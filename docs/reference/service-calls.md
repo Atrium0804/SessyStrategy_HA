@@ -81,18 +81,18 @@ self.call_service(
 
 **Parameters:**
 - `entity_id` (str, required): The status sensor entity
-- `state` (str, required): The active season or branch name
+- `state` (str, required): The active branch name
 - `attributes` (dict, required): Dictionary of all context attributes
 
 **Example call:**
 ```python
 self.set_state(
     self.status_sensor,
-    state=active_season,
+    state=active_branch,
     attributes={
         "active_branch": active_branch,
         "soc": round(soc, 2),
-        "raw_price": round(raw_price, 5),
+        "price": round(price, 5),
         # ... all other attributes
     }
 )
@@ -118,7 +118,7 @@ These methods publish the strategy status:
 
 | Method | Service Called | State | Attributes |
 |---|---|---|---|
-| `_publish_status(branch, **fields)` | `set_state` | active_season | Full context |
+| `_publish_status(branch, **fields)` | `set_state` | active_branch | Full context |
 | `_publish_branch(branch, **extra)` | `set_state` | branch | Lightweight context |
 
 ---
@@ -133,7 +133,7 @@ self.call_service("select/select_option", entity_id=strategy_select, option="api
 # Set discharge power
 self.call_service("number/set_value", entity_id=battery_setpoint, value=1500)
 # Publish status
-self.set_state(status_sensor, state="summer", attributes={...})
+self.set_state(status_sensor, state="discharge", attributes={...})
 ```
 
 ### Priority 2: Cheap Charge
@@ -144,7 +144,7 @@ self.call_service("select/select_option", entity_id=strategy_select, option="api
 # Set charge power (negative = charge)
 self.call_service("number/set_value", entity_id=battery_setpoint, value=-2200)
 # Publish status
-self.set_state(status_sensor, state="winter", attributes={...})
+self.set_state(status_sensor, state="cheap_charge", attributes={...})
 ```
 
 ### Priority 3: Afternoon Charge
@@ -155,7 +155,7 @@ self.call_service("select/select_option", entity_id=strategy_select, option="api
 # Set charge power
 self.call_service("number/set_value", entity_id=battery_setpoint, value=-1200)
 # Publish status
-self.set_state(status_sensor, state="summer", attributes={...})
+self.set_state(status_sensor, state="afternoon_charge", attributes={...})
 ```
 
 ### Priority 4: Evening Peak Sell-off Discharge
@@ -166,7 +166,7 @@ self.call_service("select/select_option", entity_id=strategy_select, option="nom
 # Set grid export target (negative = export)
 self.call_service("number/set_value", entity_id=grid_target, value=-500)
 # Publish status
-self.set_state(status_sensor, state="winter", attributes={...})
+self.set_state(status_sensor, state="evening_peak_selloff", attributes={...})
 ```
 
 ### Priority 5: Default
@@ -177,7 +177,7 @@ self.call_service("select/select_option", entity_id=strategy_select, option="nom
 # Set grid target to 0 (absorb solar, block export)
 self.call_service("number/set_value", entity_id=grid_target, value=0)
 # Publish status
-self.set_state(status_sensor, state="summer", attributes={...})
+self.set_state(status_sensor, state="default", attributes={...})
 ```
 
 ### Manual Grid Setpoint Mode
