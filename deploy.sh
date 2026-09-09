@@ -17,6 +17,7 @@ APPDAEMON_APPS_DIR="${APPDAEMON_APPS_DIR:?Set APPDAEMON_APPS_DIR in .env or envi
 echo "Deploying to ${HA_USER}@${HA_HOST} ..."
 
 rsync -av files/sessy_strategy.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/sessy_strategy.py"
+rsync -av files/boiler_strategy.py "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/boiler_strategy.py"
 rsync -av files/apps.yaml          "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/apps.yaml"
 
 # Home Battery custom integration (creates the device + entities).

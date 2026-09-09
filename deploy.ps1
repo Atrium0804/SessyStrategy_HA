@@ -22,6 +22,7 @@ Write-Host "Deploying to ${HA_USER}@${HA_HOST} ..."
 
 # -O forces the legacy SCP protocol; the NAS SFTP subsystem is chrooted elsewhere.
 scp -O files/sessy_strategy.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/sessy_strategy.py"
+scp -O files/boiler_strategy.py "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/boiler_strategy.py"
 scp -O files/apps.yaml          "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/apps.yaml"
 
 # Home Battery custom integration (creates the device + entities).
