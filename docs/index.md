@@ -165,7 +165,7 @@ docs/
 
 ## Contributing to Documentation
 
-Found an error or want to improve the documentation? 
+Found an error or want to improve the documentation?
 
 1. **Report an issue:** [Open a GitHub issue](https://github.com/your-repo/issues)
 2. **Submit a PR:** Fork the repo, make your changes, and submit a pull request

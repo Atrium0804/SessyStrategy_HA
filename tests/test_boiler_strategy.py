@@ -63,14 +63,13 @@ from boiler_strategy import BoilerStrategy  # noqa: E402
 
 _DEFAULTS = dict(
     setpoint_c=60,
-    soc_full_threshold=95,
-    gas_price=1.50,
-    boiler_efficiency=95,
-    cop=2.0,
-    calorific_value=9.77,
     legionella_temp=65,
     legionella_hybrid_days=6,
     legionella_boost_days=7,
+    economic_window1_start=10,
+    economic_window1_end=16,
+    economic_window2_start=0,
+    economic_window2_end=6,
 )
 
 
@@ -129,34 +128,52 @@ class TestLegionellaTracking:
 # update_strategy priority chain
 # ===========================================================================
 
-def _entity_states(temp, buy_price, sell_price, soc, legionella_last_ok=None, mode="init", setpoint="55"):
+def _price_entry(hour, price):
+    return {
+        "from": f"2024-06-15T{hour:02d}:00:00+02:00",
+        "till": f"2024-06-15T{hour + 1:02d}:00:00+02:00",
+        "price": price,
+    }
+
+
+def _entity_states(temp, mode="economic", prices=None, legionella_last_ok=None,
+                   boiler_mode="init", setpoint="55"):
     states = {
-        "sensor.boiler_temperature": str(temp),
-        "sensor.energy_buy_price": str(buy_price),
-        "sensor.energy_sell_price": str(sell_price),
-        "sensor.sessy_battery_alt9_state_of_charge": str(soc),
+        "sensor.boiler_temperatuur": str(temp),
+        "input_select.boiler_strategy_mode": mode,
         "input_datetime.boiler_legionella_last_ok": legionella_last_ok,
-        "select.boiler_modus": mode,
+        "select.boiler_mode": boiler_mode,
         "number.boiler_setpoint": setpoint,
         "sensor.boiler_strategy_status": "ok",
     }
 
     def _get_state(entity_id=None, attribute=None):
+        if entity_id == "sensor.frankenergy_current_electricity_market_price" and attribute == "prices":
+            return prices
         return states.get(entity_id)
 
     return _get_state
 
 
+# Cheaper morning window (0-6) vs pricier midday window (10-16).
+_MORNING_CHEAP = [_price_entry(h, 0.05) for h in range(0, 6)] + \
+                 [_price_entry(h, 0.30) for h in range(10, 16)]
+# Cheaper midday window (10-16) vs pricier morning window (0-6).
+_MIDDAY_CHEAP = [_price_entry(h, 0.30) for h in range(0, 6)] + \
+                [_price_entry(h, 0.05) for h in range(10, 16)]
+
+
 class TestUpdateStrategyPriority:
+    # ── Legionella overrides (take precedence over any user mode) ────────────
     def test_legionella_boost_forces_boost_mode(self):
         app = make_app()
         app.get_state = _entity_states(
-            temp=50, buy_price=0.20, sell_price=0.15, soc=50,
+            temp=50, mode="economic",
             legionella_last_ok="2024-06-07 14:00:00",  # 8 days ago
         )
         app.update_strategy({})
         app.call_service.assert_any_call(
-            "select/select_option", entity_id="select.boiler_modus", option="boost"
+            "select/select_option", entity_id="select.boiler_mode", option="boost"
         )
         app.call_service.assert_any_call(
             "number/set_value", entity_id="number.boiler_setpoint", value=65.0
@@ -165,52 +182,141 @@ class TestUpdateStrategyPriority:
     def test_legionella_hybrid_warning_forces_hybrid_mode(self):
         app = make_app()
         app.get_state = _entity_states(
-            temp=50, buy_price=0.20, sell_price=0.15, soc=50,
+            temp=50, mode="economic",
             legionella_last_ok="2024-06-09 14:00:00",  # 6 days ago
         )
         app.update_strategy({})
         app.call_service.assert_any_call(
-            "select/select_option", entity_id="select.boiler_modus", option="hybrid"
+            "select/select_option", entity_id="select.boiler_mode", option="hybrid"
         )
         app.call_service.assert_any_call(
             "number/set_value", entity_id="number.boiler_setpoint", value=60.0
         )
 
-    def test_price_off_when_expensive_and_battery_not_full(self):
+    # ── Forced user modes ────────────────────────────────────────────────────
+    def test_force_heatpump_mode(self):
         app = make_app()
         app.get_state = _entity_states(
-            temp=50, buy_price=5.0, sell_price=5.0, soc=50,
-            legionella_last_ok="2024-06-14 14:00:00",  # 1 day ago
+            temp=50, mode="heatpump", legionella_last_ok="2024-06-14 14:00:00",
         )
         app.update_strategy({})
         app.call_service.assert_any_call(
-            "select/select_option", entity_id="select.boiler_modus", option="off"
+            "select/select_option", entity_id="select.boiler_mode", option="heatpump"
         )
 
-    def test_price_heatpump_when_cheap(self):
+    def test_force_hybrid_mode(self):
         app = make_app()
         app.get_state = _entity_states(
-            temp=50, buy_price=-0.5, sell_price=-0.5, soc=50,
+            temp=50, mode="hybrid", legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        app.call_service.assert_any_call(
+            "select/select_option", entity_id="select.boiler_mode", option="hybrid"
+        )
+
+    def test_force_boost_mode(self):
+        app = make_app()
+        app.get_state = _entity_states(
+            temp=50, mode="boost", legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        app.call_service.assert_any_call(
+            "select/select_option", entity_id="select.boiler_mode", option="boost"
+        )
+
+    # ── Economic mode (fixed clock = 14:00, i.e. inside the 10-16 window) ────
+    def test_economic_heatpump_when_now_in_cheapest_window(self):
+        app = make_app()
+        app.get_state = _entity_states(
+            temp=50, mode="economic", prices=_MIDDAY_CHEAP,
             legionella_last_ok="2024-06-14 14:00:00",
         )
         app.update_strategy({})
         app.call_service.assert_any_call(
-            "select/select_option", entity_id="select.boiler_modus", option="heatpump"
+            "select/select_option", entity_id="select.boiler_mode", option="heatpump"
         )
 
-    def test_price_hybrid_when_soc_full_and_cheap(self):
+    def test_economic_off_when_now_outside_cheapest_window(self):
         app = make_app()
         app.get_state = _entity_states(
-            temp=50, buy_price=5.0, sell_price=-0.5, soc=99,
+            temp=50, mode="economic", prices=_MORNING_CHEAP,
             legionella_last_ok="2024-06-14 14:00:00",
         )
         app.update_strategy({})
         app.call_service.assert_any_call(
-            "select/select_option", entity_id="select.boiler_modus", option="hybrid"
+            "select/select_option", entity_id="select.boiler_mode", option="off"
         )
 
-    def test_skips_cycle_when_sensor_unavailable(self):
+    def test_economic_off_when_no_forecast(self):
+        app = make_app()
+        app.get_state = _entity_states(
+            temp=50, mode="economic", prices=None,
+            legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        app.call_service.assert_any_call(
+            "select/select_option", entity_id="select.boiler_mode", option="off"
+        )
+
+    def test_unset_mode_defaults_to_economic(self):
+        app = make_app()
+        app.get_state = _entity_states(
+            temp=50, mode="unknown", prices=_MIDDAY_CHEAP,
+            legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        app.call_service.assert_any_call(
+            "select/select_option", entity_id="select.boiler_mode", option="heatpump"
+        )
+
+    def test_skips_cycle_when_temp_unavailable(self):
         app = make_app()
         app.get_state = MagicMock(return_value=None)
         app.update_strategy({})
         app.call_service.assert_not_called()
+
+
+# ===========================================================================
+# Economic window helpers
+# ===========================================================================
+
+class TestEconomicDecision:
+    def test_window_average_ignores_out_of_window_hours(self):
+        app = make_app()
+        avg = app._window_average(_MIDDAY_CHEAP, 10, 16)
+        assert avg == pytest.approx(0.05)
+
+    def test_window_average_none_when_no_entries(self):
+        app = make_app()
+        assert app._window_average([], 10, 16) is None
+
+    def test_entry_hour_parses_iso_timestamp(self):
+        assert BoilerStrategy._entry_hour({"from": "2024-06-15T10:00:00+02:00"}) == 10
+
+    def test_entry_hour_none_for_malformed(self):
+        assert BoilerStrategy._entry_hour({"from": "not-a-date"}) is None
+        assert BoilerStrategy._entry_hour({}) is None
+        assert BoilerStrategy._entry_hour("nope") is None
+
+    def test_decision_picks_cheaper_window(self):
+        app = make_app()
+        # now=8 is outside both windows; midday cheaper → mode off (not in window)
+        mode, avg1, avg2, chosen = app._economic_decision(8, _MIDDAY_CHEAP)
+        assert chosen == "window1"
+        assert avg1 == pytest.approx(0.05)
+        assert avg2 == pytest.approx(0.30)
+        assert mode == "off"
+
+    def test_decision_heatpump_inside_chosen_window(self):
+        app = make_app()
+        mode, _, _, chosen = app._economic_decision(3, _MORNING_CHEAP)
+        assert chosen == "window2"
+        assert mode == "heatpump"
+
+    def test_decision_off_without_forecast(self):
+        app = make_app()
+        mode, avg1, avg2, chosen = app._economic_decision(14, None)
+        assert mode == "off"
+        assert chosen is None
+        assert avg1 is None and avg2 is None
+

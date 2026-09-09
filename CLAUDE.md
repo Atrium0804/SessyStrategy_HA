@@ -68,11 +68,11 @@ SOC controls, price thresholds, and the mode selector live on the **Home Battery
 
 ## Boiler strategy (add-on)
 
-`files/boiler_strategy.py` (`BoilerStrategy`, config under `boiler_strategy` in `apps.yaml`) is a second, independent AppDaemon app that drives an electric boiler:
+`files/boiler_strategy.py` (`BoilerStrategy`, config under `boiler_strategy` in `apps.yaml`) is a second, independent AppDaemon app that drives an Ariston hybrid boiler:
 
 1. **Legionella boost** — boiler hasn't reached `legionella_temp` (65°C default) in `legionella_boost_days` (7) → force mode `boost`, temporarily raise setpoint to `legionella_temp`.
 2. **Legionella warning** — hasn't reached `legionella_temp` in `legionella_hybrid_days` (6) → force mode `hybrid` at the normal fixed setpoint.
-3. **Price/SOC optimisation** — compare the relevant price (import if SOC < `soc_full_threshold`, export if full) against a gas-equivalent price (`gas_price / (calorific_value * efficiency)`, scaled by `cop` for the heat-pump threshold) to choose `off` / `heatpump` / `hybrid`.
+3. **User mode dispatch** (`mode_select`, default `input_select.boiler_strategy_mode`) — `heatpump`/`hybrid`/`boost` force that boiler mode; `economic` (default) runs the heat pump only during whichever of the two configured windows (default 10:00–16:00 vs 00:00–06:00) has the lower average forecast price, else `off`. Forecast comes from `price_forecast_sensor` (a `prices` list of `{from, till, price}`). Decisions are written to the logical `select.boiler_mode` actuator.
 
 The last-reached-temperature timestamp lives in an `input_datetime` helper (`legionella_last_ok_entity`) that the app stamps itself each cycle — this avoids needing a separate `history_stats` sensor or second automation, which is why this was built as an AppDaemon app rather than a pure HA automation. Tests live in `tests/test_boiler_strategy.py`.
 

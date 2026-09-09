@@ -1,7 +1,7 @@
 """
 Boiler Charging Strategy — AppDaemon app
-Runs every 15 minutes and picks the optimal boiler mode based on dynamic
-energy prices, battery SOC, and weekly legionella prevention.
+Runs every 15 minutes and picks the boiler mode from a user-selected strategy
+mode plus weekly legionella prevention.
 
 All tunables and entity IDs are configured in apps.yaml (see README) and read
 in initialize(); the literals below are only fallback defaults.
@@ -12,9 +12,12 @@ Strategy (priority order):
   2. Legionella warning (temp hasn't reached legionella_temp in legionella_hybrid_days):
      force mode 'hybrid' at the normal setpoint, giving the resistance a head
      start before the hard boost deadline hits.
-  3. Price/SOC optimisation: compare the relevant price (buy price if the
-     battery isn't full, sell price if it is) against a gas-equivalent
-     price to decide 'off' / 'heatpump' / 'hybrid'.
+  3. User mode dispatch (mode_select):
+       heatpump / hybrid / boost -> force that boiler mode directly.
+       economic (default)        -> run the heat pump only during whichever of
+                                     the two configured windows (e.g. 10:00-16:00
+                                     vs 00:00-06:00) has the lower average price;
+                                     stay off outside that window.
 
 The setpoint is held fixed at setpoint_c except during a legionella boost.
 """
@@ -27,39 +30,34 @@ class BoilerStrategy(hass.Hass):
 
     def initialize(self):
         # ── Tunables (overridable from apps.yaml) ───────────────────────────
-        self.setpoint_c           = float(self.args.get("setpoint_c", 60))
-        self.soc_full_threshold   = float(self.args.get("soc_full_threshold", 95))
-        self.gas_price            = float(self.args.get("gas_price", 1.50))
-        self.boiler_efficiency    = float(self.args.get("boiler_efficiency", 95))
-        self.cop                  = float(self.args.get("cop", 2.0))
-        self.calorific_value      = float(self.args.get("calorific_value", 9.77))
+        self.setpoint_c = float(self.args.get("setpoint_c", 60))
 
         # ── Weekly legionella prevention ─────────────────────────────────────
         self.legionella_temp        = float(self.args.get("legionella_temp", 65))
         self.legionella_hybrid_days = float(self.args.get("legionella_hybrid_days", 6))
         self.legionella_boost_days  = float(self.args.get("legionella_boost_days", 7))
 
+        # ── Economic mode windows (local hours, [start, end)) ────────────────
+        # 'economic' compares the average forecast price of these two windows and
+        # runs the heat pump only during whichever window is cheaper.
+        self.eco_window1_start = int(self.args.get("economic_window1_start", 10))
+        self.eco_window1_end   = int(self.args.get("economic_window1_end", 16))
+        self.eco_window2_start = int(self.args.get("economic_window2_start", 0))
+        self.eco_window2_end   = int(self.args.get("economic_window2_end", 6))
+
         # Seconds to wait after a live input changes before re-running, so a
         # slider drag coalesces into a single run instead of one per intermediate value.
         self.rerun_debounce_s = float(self.args.get("rerun_debounce_s", 2.0))
 
         # ── Entity IDs (overridable from apps.yaml) ─────────────────────────
-        self.temp_sensor            = self.args.get("temp_sensor",            "sensor.boiler_temperature")
-        self.buy_price_sensor      = self.args.get("buy_price_sensor",      "sensor.energy_buy_price")
-        self.sell_price_sensor     = self.args.get("sell_price_sensor",     "sensor.energy_sell_price")
-        self.soc_sensor             = self.args.get("soc_sensor",             "sensor.sessy_battery_alt9_state_of_charge")
-        self.boiler_mode_select     = self.args.get("boiler_mode_select",     "select.boiler_modus")
-        self.boiler_setpoint_entity = self.args.get("boiler_setpoint_entity", "number.boiler_setpoint")
+        self.temp_sensor              = self.args.get("temp_sensor",              "sensor.boiler_temperatuur")
+        self.price_forecast_sensor    = self.args.get("price_forecast_sensor",    "sensor.frankenergy_current_electricity_market_price")
+        self.price_forecast_attribute = self.args.get("price_forecast_attribute", "prices")
+        self.mode_select              = self.args.get("mode_select",              "input_select.boiler_strategy_mode")
+        self.boiler_mode_select       = self.args.get("boiler_mode_select",       "select.boiler_mode")
+        self.boiler_setpoint_entity   = self.args.get("boiler_setpoint_entity",   "number.boiler_setpoint")
         self.legionella_last_ok_entity = self.args.get("legionella_last_ok_entity", "input_datetime.boiler_legionella_last_ok")
-        self.status_sensor          = self.args.get("status_sensor",          "sensor.boiler_strategy_status")
-
-        # Optional live-tuning helpers (input_number). If set, these override the
-        # corresponding static default each cycle, so the value can be changed
-        # from the HA UI without restarting AppDaemon.
-        self.soc_full_threshold_entity = self.args.get("soc_full_threshold_entity")
-        self.gas_price_entity          = self.args.get("gas_price_entity")
-        self.boiler_efficiency_entity  = self.args.get("boiler_efficiency_entity")
-        self.cop_entity                = self.args.get("cop_entity")
+        self.status_sensor            = self.args.get("status_sensor",            "sensor.boiler_strategy_status")
 
         self._rerun_timer = None
 
@@ -69,13 +67,8 @@ class BoilerStrategy(hass.Hass):
 
         live_inputs = [
             self.temp_sensor,
-            self.buy_price_sensor,
-            self.sell_price_sensor,
-            self.soc_sensor,
-            self.soc_full_threshold_entity,
-            self.gas_price_entity,
-            self.boiler_efficiency_entity,
-            self.cop_entity,
+            self.price_forecast_sensor,
+            self.mode_select,
         ]
         for entity in live_inputs:
             if entity:
@@ -84,29 +77,18 @@ class BoilerStrategy(hass.Hass):
     # ── Main logic ────────────────────────────────────────────────────────────
 
     def update_strategy(self, kwargs):
-        temp       = self._get_temp()
-        buy_price  = self._get_buy_price()
-        sell_price = self._get_sell_price()
-        soc        = self._get_soc()
-
-        if temp is None or buy_price is None or sell_price is None or soc is None:
-            self.log("Could not read temp, prices or SOC — skipping this cycle", level="WARNING")
+        temp = self._get_temp()
+        if temp is None:
+            self.log("Could not read boiler temperature — skipping this cycle", level="WARNING")
             return
 
         self._record_legionella_ok_if_reached(temp)
         days_since_ok = self._days_since_legionella_ok()
-
-        soc_full_threshold = self._tunable(self.soc_full_threshold, self.soc_full_threshold_entity)
-        gas_price           = self._tunable(self.gas_price, self.gas_price_entity)
-        boiler_efficiency   = self._tunable(self.boiler_efficiency, self.boiler_efficiency_entity)
-        cop                 = self._tunable(self.cop, self.cop_entity)
+        mode = self._get_mode()
 
         status_fields = dict(
             temp=temp,
-            buy_price=buy_price,
-            sell_price=sell_price,
-            soc=soc,
-            soc_full_threshold=soc_full_threshold,
+            mode=mode,
             days_since_legionella_ok=days_since_ok,
         )
 
@@ -132,26 +114,83 @@ class BoilerStrategy(hass.Hass):
             self._set_boiler_setpoint(self.setpoint_c)
             return
 
-        # ── Priority 3: price/SOC optimisation ───────────────────────────────
-        soc_full        = soc >= soc_full_threshold
-        relevant_price  = sell_price if soc_full else buy_price
-        gas_equiv_price = gas_price / (self.calorific_value * (boiler_efficiency / 100.0))
-        threshold_hp    = gas_equiv_price * cop
-        threshold_res   = gas_equiv_price
-        heatpump_worth_it  = relevant_price <= threshold_hp
-        resistance_worth_it = soc_full and relevant_price <= threshold_res
+        # ── Priority 3a: forced user mode ────────────────────────────────────
+        if mode in ("heatpump", "hybrid", "boost"):
+            self.log(f"FORCE MODE: user selected '{mode}'")
+            self._publish_status(f"force_{mode}", **status_fields)
+            self._set_boiler_mode(mode)
+            self._set_boiler_setpoint(self.setpoint_c)
+            return
 
-        mode = "hybrid" if resistance_worth_it else ("heatpump" if heatpump_worth_it else "off")
+        # ── Priority 3b: economic — heat pump during the cheaper window ───────
+        prices = self._get_prices()
+        now_hour = self.datetime().hour
+        boiler_mode, avg1, avg2, chosen = self._economic_decision(now_hour, prices)
         self.log(
-            f"PRICE MODE: soc_full={soc_full} relevant_price={relevant_price:.4f} "
-            f"threshold_hp={threshold_hp:.4f} threshold_res={threshold_res:.4f} — mode={mode}"
+            f"ECONOMIC: hour={now_hour} window1_avg={avg1} window2_avg={avg2} "
+            f"cheapest={chosen} — mode={boiler_mode}"
         )
         self._publish_status(
-            f"price_{mode}", gas_equiv_price=gas_equiv_price,
-            threshold_hp=threshold_hp, threshold_res=threshold_res, **status_fields,
+            f"economic_{boiler_mode}",
+            window1_avg=avg1, window2_avg=avg2, cheapest_window=chosen,
+            **status_fields,
         )
-        self._set_boiler_mode(mode)
+        self._set_boiler_mode(boiler_mode)
         self._set_boiler_setpoint(self.setpoint_c)
+
+    # ── Economic-mode decision ───────────────────────────────────────────────
+
+    def _economic_decision(self, now_hour, prices):
+        """
+        Pick the cheaper of the two configured windows by average forecast price
+        and return 'heatpump' if now falls inside it, else 'off'.
+        Returns (boiler_mode, window1_avg, window2_avg, cheapest_window_label).
+        """
+        w1 = (self.eco_window1_start, self.eco_window1_end)
+        w2 = (self.eco_window2_start, self.eco_window2_end)
+        avg1 = self._window_average(prices, *w1)
+        avg2 = self._window_average(prices, *w2)
+
+        candidates = []
+        if avg1 is not None:
+            candidates.append((avg1, w1, "window1"))
+        if avg2 is not None:
+            candidates.append((avg2, w2, "window2"))
+        if not candidates:
+            # No forecast available — stay off rather than heat blindly.
+            return "off", avg1, avg2, None
+
+        _, (start_h, end_h), label = min(candidates, key=lambda c: c[0])
+        in_window = start_h <= now_hour < end_h
+        return ("heatpump" if in_window else "off"), avg1, avg2, label
+
+    def _window_average(self, prices, start_h, end_h):
+        """Average forecast price over entries whose start hour is in [start_h, end_h)."""
+        values = []
+        for entry in prices or []:
+            hour = self._entry_hour(entry)
+            if hour is None or not (start_h <= hour < end_h):
+                continue
+            try:
+                values.append(float(entry.get("price")))
+            except (TypeError, ValueError, AttributeError):
+                continue
+        if not values:
+            return None
+        return sum(values) / len(values)
+
+    @staticmethod
+    def _entry_hour(entry):
+        if not isinstance(entry, dict):
+            return None
+        raw = entry.get("from")
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(str(raw)).hour
+        except ValueError:
+            return None
+
 
     # ── Legionella tracking ──────────────────────────────────────────────────
 
@@ -240,35 +279,27 @@ class BoilerStrategy(hass.Hass):
 
     # ── Sensor readers ────────────────────────────────────────────────────────
 
-    def _tunable(self, default: float, entity_id) -> float:
-        if not entity_id:
-            return default
+    def _get_mode(self) -> str:
+        """User-selected strategy mode; defaults to 'economic' when unset."""
+        if not self.mode_select:
+            return "economic"
+        raw = self.get_state(self.mode_select)
+        if raw in (None, "unknown", "unavailable", ""):
+            return "economic"
+        return str(raw).strip().lower()
+
+    def _get_prices(self):
+        """Hourly forecast list ([{from, till, price}, ...]) or None."""
+        if not self.price_forecast_sensor:
+            return None
         try:
-            return float(self.get_state(entity_id))
-        except (TypeError, ValueError):
-            return default
+            return self.get_state(self.price_forecast_sensor, attribute=self.price_forecast_attribute)
+        except Exception:
+            return None
 
     def _get_temp(self) -> float | None:
         try:
             return float(self.get_state(self.temp_sensor))
-        except (TypeError, ValueError):
-            return None
-
-    def _get_buy_price(self) -> float | None:
-        try:
-            return float(self.get_state(self.buy_price_sensor))
-        except (TypeError, ValueError):
-            return None
-
-    def _get_sell_price(self) -> float | None:
-        try:
-            return float(self.get_state(self.sell_price_sensor))
-        except (TypeError, ValueError):
-            return None
-
-    def _get_soc(self) -> float | None:
-        try:
-            return float(self.get_state(self.soc_sensor))
         except (TypeError, ValueError):
             return None
 

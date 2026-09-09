@@ -107,15 +107,16 @@ sessy_strategy:
 
 ## � Boiler Strategy (add-on)
 
-A companion AppDaemon app, `files/boiler_strategy.py` (config in `apps.yaml` under `boiler_strategy`), drives an electric boiler using the same price/SOC pattern as the battery strategy, plus weekly legionella prevention:
+A companion AppDaemon app, `files/boiler_strategy.py` (config in `apps.yaml` under `boiler_strategy`), drives an Ariston hybrid boiler from a user-selected strategy mode plus weekly legionella prevention:
 
 | Priority | Condition | Action |
 |----------|-----------|--------|
 | **P1** | Boiler hasn't reached `legionella_temp` in `legionella_boost_days` | Force mode `boost`, temporarily raise setpoint to `legionella_temp` |
 | **P2** | Boiler hasn't reached `legionella_temp` in `legionella_hybrid_days` | Force mode `hybrid` at the normal setpoint |
-| **P3** | Otherwise | Compare the relevant price (import if battery SOC < `soc_full_threshold`, export if full) against a gas-equivalent price to pick `off` / `heatpump` / `hybrid` |
+| **P3a** | `mode_select` is `heatpump` / `hybrid` / `boost` | Force that boiler mode |
+| **P3b** | `mode_select` is `economic` (default) | Run the heat pump only during whichever of the two configured windows (default 10:00–16:00 vs 00:00–06:00) has the lower average forecast price; stay `off` otherwise |
 
-The last-reached timestamp is tracked in an `input_datetime` helper (`legionella_last_ok_entity`) that the app stamps itself — no separate history-stats sensor needed. See `files/apps.yaml` for all tunables (gas price, boiler efficiency, COP, price surcharges) and `tests/test_boiler_strategy.py` for behaviour examples.
+The user mode input is an `input_select` (`mode_select`, provided by the boiler package as `input_select.boiler_strategy_mode`); the app writes decisions to the logical `select.boiler_mode` actuator. The last-reached legionella timestamp is tracked in an `input_datetime` helper (`legionella_last_ok_entity`) that the app stamps itself. See `files/apps.yaml` for all tunables (economic windows, price forecast sensor) and `tests/test_boiler_strategy.py` for behaviour examples.
 
 ---
 

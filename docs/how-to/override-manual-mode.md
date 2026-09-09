@@ -48,7 +48,7 @@ SessyStrategy supports multiple operating modes, controlled through a master `mo
 ### Manual Mode Flow
 
 ```
-mode_select → [grid_setpoint | battery_setpoint] 
+mode_select → [grid_setpoint | battery_setpoint]
     → setpoint_entity value → [grid target | battery power]
 ```
 
@@ -149,7 +149,7 @@ The `setpoint_entity` is where you specify the actual power value when in manual
      class: SessyStrategy
      mode_select: select.home_battery_mode
      setpoint_entity: number.home_battery_setpoint
-     
+
      # Optional: Sessy power_strategy option strings
      # These are used when handing control back to Sessy
      sessy_dynamic_option: roi  # Default for ha-sessy
@@ -163,7 +163,7 @@ The `setpoint_entity` is where you specify the actual power value when in manual
 
 #### Mode: grid_setpoint
 
-**What it does:** 
+**What it does:**
 - Switches Sessy to **NOM** (nominal) strategy
 - Sets the `grid_target` entity to your specified setpoint value
 - Positive values = import from grid
@@ -310,7 +310,7 @@ To confirm your manual mode setup is working:
    # When switching to grid_setpoint mode:
    MANUAL grid setpoint 1000W
    Strategy → nom (grid setpoint)
-   
+
    # When switching to battery_setpoint mode:
    MANUAL battery setpoint -1500W
    Strategy → api (battery setpoint)
