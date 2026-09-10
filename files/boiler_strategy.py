@@ -8,18 +8,18 @@ in initialize(); the literals below are only fallback defaults.
 
 Strategy (priority order):
   1. Legionella boost (temp hasn't reached legionella_temp in legionella_boost_days):
-     force mode 'boost' at legionella_temp — always, regardless of price window —
+     force mode 'boost' at legionella_temp — always, regardless of price period —
      unless the user has explicitly selected mode 'off'.
   2. Legionella warning (temp hasn't reached legionella_temp in legionella_hybrid_days):
      force mode 'hybrid' at the normal setpoint, but only during the cheapest of
-     the two configured price windows; outside that window, dispatch falls
+     the two configured day/night periods; outside that period, dispatch falls
      through to the regular user mode selection (step 3) instead.
   3. User mode dispatch (mode_select):
        off / heatpump / hybrid / boost -> force that boiler mode directly.
        economic (default)        -> run the heat pump only during whichever of
-                                     the two configured windows (e.g. 10:00-16:00
+                                     the two configured day/night periods (e.g. 10:00-16:00
                                      vs 00:00-06:00) has the lower average price;
-                                     stay off outside that window.
+                                     stay off outside that period.
 
 The setpoint is held fixed at setpoint_c except during a legionella boost.
 """
@@ -39,13 +39,13 @@ class BoilerStrategy(hass.Hass):
         self.legionella_hybrid_days = float(self.args.get("legionella_hybrid_days", 6))
         self.legionella_boost_days  = float(self.args.get("legionella_boost_days", 7))
 
-        # ── Economic mode windows (local hours, [start, end)) ────────────────
-        # 'economic' compares the average forecast price of these two windows and
-        # runs the heat pump only during whichever window is cheaper.
-        self.eco_window1_start = int(self.args.get("economic_window1_start", 10))
-        self.eco_window1_end   = int(self.args.get("economic_window1_end", 16))
-        self.eco_window2_start = int(self.args.get("economic_window2_start", 0))
-        self.eco_window2_end   = int(self.args.get("economic_window2_end", 6))
+        # ── Economic mode day/night periods (local hours, [start, end)) ─────────
+        # 'economic' compares the average forecast price of these two periods and
+        # runs the heat pump only during whichever period is cheaper.
+        self.eco_day_start = int(self.args.get("economic_day_start", 10))
+        self.eco_day_end   = int(self.args.get("economic_day_end", 16))
+        self.eco_night_start = int(self.args.get("economic_night_start", 0))
+        self.eco_night_end   = int(self.args.get("economic_night_end", 6))
 
         # Seconds to wait after a live input changes before re-running, so a
         # slider drag coalesces into a single run instead of one per intermediate value.
@@ -105,25 +105,28 @@ class BoilerStrategy(hass.Hass):
             self._set_boiler_setpoint(self.legionella_temp)
             return
 
-        # ── Priority 2: legionella warning — escalate to hybrid during cheapest window only ──
+        # ── Priority 2: legionella warning — escalate to hybrid during cheapest period only ──
         if days_since_ok >= self.legionella_hybrid_days:
             prices = self._get_prices()
             now_hour = self.datetime().hour
-            in_window, avg1, avg2, chosen = self._cheapest_window_info(now_hour, prices)
+            in_window, day_avg_price, night_avg_price, cheapest_period = self._cheapest_window_info(now_hour, prices)
             if in_window:
                 self.log(
                     f"LEGIONELLA WARNING: {days_since_ok:.1f} days since last reaching "
-                    f"{self.legionella_temp:.0f}C — cheapest={chosen} — forcing hybrid at {self.setpoint_c:.0f}C"
+                    f"{self.legionella_temp:.0f}C — cheapest={cheapest_period} — forcing hybrid at {self.setpoint_c:.0f}C"
                 )
                 self._publish_status(
                     "legionella_hybrid",
-                    window1_avg=avg1, window2_avg=avg2, cheapest_window=chosen,
+                    day_avg_price=day_avg_price,
+                    night_avg_price=night_avg_price,
+                    cheapest_period=cheapest_period,
+                    friendly_name="Legionella Hybrid",
                     **status_fields,
                 )
                 self._set_boiler_mode("hybrid")
                 self._set_boiler_setpoint(self.setpoint_c)
                 return
-            # Outside the cheap window — fall through to the regular user mode dispatch.
+            # Outside the cheap period — fall through to the regular user mode dispatch.
 
         # ── Priority 3a: forced user mode ────────────────────────────────────
         if mode in ("off", "heatpump", "hybrid", "boost"):
@@ -133,17 +136,17 @@ class BoilerStrategy(hass.Hass):
             self._set_boiler_setpoint(self.setpoint_c)
             return
 
-        # ── Priority 3b: economic — heat pump during the cheaper window ───────
+        # ── Priority 3b: economic — heat pump during the cheaper period ───────
         prices = self._get_prices()
         now_hour = self.datetime().hour
-        boiler_mode, avg1, avg2, chosen = self._economic_decision(now_hour, prices)
+        boiler_mode, day_avg_price, night_avg_price, cheapest_period = self._economic_decision(now_hour, prices)
         self.log(
-            f"ECONOMIC: hour={now_hour} window1_avg={avg1} window2_avg={avg2} "
-            f"cheapest={chosen} — mode={boiler_mode}"
+            f"ECONOMIC: hour={now_hour} day_avg_price={day_avg_price} night_avg_price={night_avg_price} "
+            f"cheapest={cheapest_period} — mode={boiler_mode}"
         )
         self._publish_status(
             f"economic_{boiler_mode}",
-            window1_avg=avg1, window2_avg=avg2, cheapest_window=chosen,
+            day_avg_price=day_avg_price, night_avg_price=night_avg_price, cheapest_period=cheapest_period,
             **status_fields,
         )
         self._set_boiler_mode(boiler_mode)
@@ -153,50 +156,50 @@ class BoilerStrategy(hass.Hass):
 
     def _cheapest_window_info(self, now_hour, prices):
         """
-        Pick the cheaper of the two configured windows by average forecast price.
-        Returns (in_window, window1_avg, window2_avg, cheapest_window_label), where
-        in_window is True when now_hour falls inside the cheapest window. If no
+        Pick the cheaper of the two configured day/night periods by average forecast price.
+        Returns (in_window, day_avg_price, night_avg_price, cheapest_period), where
+        in_window is True when now_hour falls inside the cheapest period. If no
         forecast is available, in_window is False (nothing is known to be cheap yet).
         """
-        w1 = (self.eco_window1_start, self.eco_window1_end)
-        w2 = (self.eco_window2_start, self.eco_window2_end)
-        avg1 = self._window_average(prices, *w1)
-        avg2 = self._window_average(prices, *w2)
+        day_window = (self.eco_day_start, self.eco_day_end)
+        night_window = (self.eco_night_start, self.eco_night_end)
+        day_avg_price = self._window_average(prices, *day_window)
+        night_avg_price = self._window_average(prices, *night_window)
 
         candidates = []
-        if avg1 is not None:
-            candidates.append((avg1, w1, "window1"))
-        if avg2 is not None:
-            candidates.append((avg2, w2, "window2"))
+        if day_avg_price is not None:
+            candidates.append((day_avg_price, day_window, "day"))
+        if night_avg_price is not None:
+            candidates.append((night_avg_price, night_window, "night"))
         if not candidates:
-            return False, avg1, avg2, None
+            return False, day_avg_price, night_avg_price, None
 
-        _, (start_h, end_h), label = min(candidates, key=lambda c: c[0])
+        _, (start_h, end_h), cheapest_period = min(candidates, key=lambda c: c[0])
         in_window = start_h <= now_hour < end_h
-        return in_window, avg1, avg2, label
+        return in_window, day_avg_price, night_avg_price, cheapest_period
 
     def _economic_decision(self, now_hour, prices):
         """
-        Return 'heatpump' if now falls inside the cheapest configured window, else 'off'.
-        Returns (boiler_mode, window1_avg, window2_avg, cheapest_window_label).
+        Return 'heatpump' if now falls inside the cheapest configured period, else 'off'.
+        Returns (boiler_mode, day_avg_price, night_avg_price, cheapest_period).
         """
-        in_window, avg1, avg2, chosen = self._cheapest_window_info(now_hour, prices)
-        return ("heatpump" if in_window else "off"), avg1, avg2, chosen
+        in_window, day_avg_price, night_avg_price, cheapest_period = self._cheapest_window_info(now_hour, prices)
+        return ("heatpump" if in_window else "off"), day_avg_price, night_avg_price, cheapest_period
 
     def _window_average(self, prices, start_h, end_h):
         """Average forecast price over entries whose start hour is in [start_h, end_h)."""
-        values = []
+        price_values = []
         for entry in prices or []:
             hour = self._entry_hour(entry)
             if hour is None or not (start_h <= hour < end_h):
                 continue
             try:
-                values.append(float(entry.get("price")))
+                price_values.append(float(entry.get("price")))
             except (TypeError, ValueError, AttributeError):
                 continue
-        if not values:
+        if not price_values:
             return None
-        return sum(values) / len(values)
+        return sum(price_values) / len(price_values)
 
     @staticmethod
     def _entry_hour(entry):
