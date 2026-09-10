@@ -8,12 +8,12 @@ in initialize(); the literals below are only fallback defaults.
 
 Strategy (priority order):
   1. Legionella boost (temp hasn't reached legionella_temp in legionella_boost_days):
-     force mode 'boost' at legionella_temp, but only during the cheapest of
-     the two configured price windows; mode is 'off' outside that window.
+     force mode 'boost' at legionella_temp — always, regardless of price window —
+     unless the user has explicitly selected mode 'off'.
   2. Legionella warning (temp hasn't reached legionella_temp in legionella_hybrid_days):
-     force mode 'hybrid' at the normal setpoint during the cheapest window,
-     giving the resistance a head start before the hard boost deadline hits;
-     mode is 'off' outside that window.
+     force mode 'hybrid' at the normal setpoint, but only during the cheapest of
+     the two configured price windows; outside that window, dispatch falls
+     through to the regular user mode selection (step 3) instead.
   3. User mode dispatch (mode_select):
        off / heatpump / hybrid / boost -> force that boiler mode directly.
        economic (default)        -> run the heat pump only during whichever of
@@ -94,46 +94,36 @@ class BoilerStrategy(hass.Hass):
             days_since_legionella_ok=days_since_ok,
         )
 
-        # ── Priority 1: legionella boost deadline — heat during cheapest window only ──
-        if days_since_ok >= self.legionella_boost_days:
-            prices = self._get_prices()
-            now_hour = self.datetime().hour
-            in_window, avg1, avg2, chosen = self._cheapest_window_info(now_hour, prices)
-            boiler_mode = "boost" if in_window else "off"
+        # ── Priority 1: legionella boost deadline — always, unless user forced 'off' ──
+        if days_since_ok >= self.legionella_boost_days and mode != "off":
             self.log(
                 f"LEGIONELLA BOOST: {days_since_ok:.1f} days since last reaching "
-                f"{self.legionella_temp:.0f}C — cheapest={chosen} in_window={in_window} — mode={boiler_mode}"
+                f"{self.legionella_temp:.0f}C — forcing boost to {self.legionella_temp:.0f}C"
             )
-            self._publish_status(
-                f"legionella_boost_{boiler_mode}",
-                window1_avg=avg1, window2_avg=avg2, cheapest_window=chosen,
-                **status_fields,
-            )
-            self._set_boiler_mode(boiler_mode)
-            if boiler_mode == "boost":
-                self._set_boiler_setpoint(self.legionella_temp)
-            else:
-                self._set_boiler_setpoint(self.setpoint_c)
+            self._publish_status("legionella_boost", **status_fields)
+            self._set_boiler_mode("boost")
+            self._set_boiler_setpoint(self.legionella_temp)
             return
 
-        # ── Priority 2: legionella warning — escalate to hybrid during cheapest window ──
+        # ── Priority 2: legionella warning — escalate to hybrid during cheapest window only ──
         if days_since_ok >= self.legionella_hybrid_days:
             prices = self._get_prices()
             now_hour = self.datetime().hour
             in_window, avg1, avg2, chosen = self._cheapest_window_info(now_hour, prices)
-            boiler_mode = "hybrid" if in_window else "off"
-            self.log(
-                f"LEGIONELLA WARNING: {days_since_ok:.1f} days since last reaching "
-                f"{self.legionella_temp:.0f}C — cheapest={chosen} in_window={in_window} — mode={boiler_mode}"
-            )
-            self._publish_status(
-                f"legionella_hybrid_{boiler_mode}",
-                window1_avg=avg1, window2_avg=avg2, cheapest_window=chosen,
-                **status_fields,
-            )
-            self._set_boiler_mode(boiler_mode)
-            self._set_boiler_setpoint(self.setpoint_c)
-            return
+            if in_window:
+                self.log(
+                    f"LEGIONELLA WARNING: {days_since_ok:.1f} days since last reaching "
+                    f"{self.legionella_temp:.0f}C — cheapest={chosen} — forcing hybrid at {self.setpoint_c:.0f}C"
+                )
+                self._publish_status(
+                    "legionella_hybrid",
+                    window1_avg=avg1, window2_avg=avg2, cheapest_window=chosen,
+                    **status_fields,
+                )
+                self._set_boiler_mode("hybrid")
+                self._set_boiler_setpoint(self.setpoint_c)
+                return
+            # Outside the cheap window — fall through to the regular user mode dispatch.
 
         # ── Priority 3a: forced user mode ────────────────────────────────────
         if mode in ("off", "heatpump", "hybrid", "boost"):
