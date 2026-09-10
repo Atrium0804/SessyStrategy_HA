@@ -27,6 +27,19 @@ The setpoint is held fixed at setpoint_c except during a legionella boost.
 import appdaemon.plugins.hass.hassapi as hass
 from datetime import datetime, timedelta
 
+# Human-readable label per active_branch value, exposed as the
+# 'active_branch_label' attribute on the status sensor.
+BRANCH_LABELS = {
+    "legionella_boost": "Legionella Boost",
+    "legionella_hybrid": "Legionella Hybrid",
+    "force_off": "Forced Off",
+    "force_heatpump": "Forced Heat Pump",
+    "force_hybrid": "Forced Hybrid",
+    "force_boost": "Forced Boost",
+    "economic_heatpump": "Economic Heat Pump",
+    "economic_off": "Economic Off",
+}
+
 
 class BoilerStrategy(hass.Hass):
 
@@ -120,7 +133,6 @@ class BoilerStrategy(hass.Hass):
                     day_avg_price=day_avg_price,
                     night_avg_price=night_avg_price,
                     cheapest_period=cheapest_period,
-                    friendly_name="Legionella Hybrid",
                     **status_fields,
                 )
                 self._set_boiler_mode("hybrid")
@@ -340,7 +352,11 @@ class BoilerStrategy(hass.Hass):
             self.set_state(
                 self.status_sensor,
                 state=active_branch,
-                attributes={"active_branch": active_branch, **fields},
+                attributes={
+                    "active_branch": active_branch,
+                    "active_branch_label": BRANCH_LABELS.get(active_branch, active_branch),
+                    **fields,
+                },
             )
         except Exception as e:
             self.log(f"Failed to publish status: {e}", level="WARNING")
