@@ -96,6 +96,7 @@ class BoilerStrategy(hass.Hass):
             self.log("Could not read boiler temperature — skipping this cycle", level="WARNING")
             return
 
+        self._ensure_mode_initialized()
         self._record_legionella_ok_if_reached(temp)
         days_since_ok = self._days_since_legionella_ok()
         mode = self._get_mode()
@@ -291,6 +292,22 @@ class BoilerStrategy(hass.Hass):
             self.log(f"Failed to set boiler mode: {e}", level="WARNING")
 
     # ── Sensor readers ────────────────────────────────────────────────────────
+
+    def _ensure_mode_initialized(self):
+        """Give the strategy mode a concrete value after a reboot leaves it unknown."""
+        if not self.mode_select:
+            return
+        raw = self.get_state(self.mode_select)
+        if raw in (None, "unknown", "unavailable", ""):
+            self.log("Strategy mode is unset — initializing to 'economic'", level="WARNING")
+            try:
+                self.call_service(
+                    "input_select/select_option",
+                    entity_id=self.mode_select,
+                    option="economic",
+                )
+            except Exception as e:
+                self.log(f"Failed to initialize strategy mode: {e}", level="WARNING")
 
     def _get_mode(self) -> str:
         """User-selected strategy mode; defaults to 'economic' when unset."""
