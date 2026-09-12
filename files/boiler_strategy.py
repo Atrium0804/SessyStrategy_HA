@@ -43,6 +43,19 @@ BRANCH_LABELS = {
     "economic_off": "Economic Off",
 }
 
+# Brief explanations for each rule/branch, exposed as the
+# 'rule_explanation' attribute on the status sensor.
+RULE_EXPLANATIONS = {
+    "legionella_boost": "Legionella Boost: force boost mode when temp hasn't reached target in 7 days",
+    "legionella_hybrid": "Legionella Hybrid: force hybrid mode during cheapest period when approaching deadline",
+    "force_off": "Forced Off: user manually selected off mode",
+    "force_heatpump": "Forced Heat Pump: user manually selected heat pump only mode",
+    "force_hybrid": "Forced Hybrid: user manually selected hybrid mode",
+    "force_boost": "Forced Boost: user manually selected boost mode",
+    "economic_heatpump": "Economic: run heat pump during cheaper period (day or night)",
+    "economic_off": "Economic: keep off outside the cheaper period",
+}
+
 
 class BoilerStrategy(hass.Hass):
 
@@ -351,6 +364,7 @@ class BoilerStrategy(hass.Hass):
                 attributes={
                     "active_branch": active_branch,
                     "active_branch_label": BRANCH_LABELS.get(active_branch, active_branch),
+                    "rule_explanation": RULE_EXPLANATIONS.get(active_branch, "Unknown rule"),
                     **fields,
                 },
             )

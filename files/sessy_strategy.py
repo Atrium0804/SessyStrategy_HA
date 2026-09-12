@@ -23,6 +23,25 @@ from datetime import timedelta
 
 
 class SessyStrategy(hass.Hass):
+    # Brief explanations for each rule/branch, keyed by active_branch name
+    _RULE_EXPLANATIONS = {
+        # Priority chain rules
+        "discharge": "Price-spike discharge: sell battery at high prices, discharge toward SOC floor",
+        "cheap_charge": "Cheap charge: buy energy at low/negative prices, charge toward ceiling",
+        "cheap_charge_full": "Cheap charge: already at ceiling, holding",
+        "afternoon_charge": "Afternoon charge: peak-shaving, charge at max power for evening peak",
+        "afternoon_full": "Afternoon charge: already at target SOC, holding",
+        "afternoon_skip": "Afternoon charge: skipped, evening peak not high enough vs current price",
+        "evening_peak_selloff": "Evening peak sell-off: export excess SOC during peak, spread over window",
+        "morning_selloff": "Morning sell-off: export excess SOC during morning window",
+        "default": "Default: grid setpoint 0W, absorb solar and block export",
+        # Manual and stand-down modes
+        "manual_grid": "Manual mode: user-defined grid setpoint",
+        "manual_battery": "Manual mode: user-defined battery setpoint",
+        "idle": "Idle mode: battery parked, no action",
+        "sessy_dynamic": "Sessy dynamic: handed control to Sessy's own schedule",
+        "eco": "Eco mode: handed control to Sessy's eco strategy",
+    }
 
     def initialize(self):
         # ── Tunables (overridable from apps.yaml) ───────────────────────────
@@ -572,6 +591,8 @@ class SessyStrategy(hass.Hass):
 
         attributes = {"active_branch": active_branch}
         attributes.update(fields)
+        # Add rule explanation
+        attributes["rule_explanation"] = self._RULE_EXPLANATIONS.get(active_branch, "Unknown rule")
 
         try:
             self.set_state(
@@ -591,10 +612,13 @@ class SessyStrategy(hass.Hass):
         if not self.status_sensor or not self._entity_exists(self.status_sensor):
             return
         try:
+            attributes = {"active_branch": active_branch, **extra}
+            # Add rule explanation
+            attributes["rule_explanation"] = self._RULE_EXPLANATIONS.get(active_branch, "Unknown rule")
             self.set_state(
                 self.status_sensor,
                 state=active_branch,
-                attributes={"active_branch": active_branch, **extra},
+                attributes=attributes,
             )
         except Exception as e:
             self.log(f"Failed to publish branch status: {e}", level="WARNING")
