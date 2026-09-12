@@ -8,20 +8,23 @@ in initialize(); the literals below are only fallback defaults.
 
 Strategy (priority order):
   1. Legionella boost (temp hasn't reached legionella_temp in legionella_boost_days):
-     force mode 'boost' at legionella_temp — always, regardless of price period —
-     unless the user has explicitly selected mode 'off'.
-  2. Legionella warning (temp hasn't reached legionella_temp in legionella_hybrid_days):
-     force mode 'hybrid' at the normal setpoint, but only during the cheapest of
-     the two configured day/night periods; outside that period, dispatch falls
-     through to the regular user mode selection (step 3) instead.
-  3. User mode dispatch (mode_select):
+     force mode 'boost' — always, regardless of price period — unless the user
+     has explicitly selected mode 'off'.
+  2. User mode dispatch (mode_select):
        off / heatpump / hybrid / boost -> force that boiler mode directly.
-       economic (default)        -> run the heat pump only during whichever of
-                                     the two configured day/night periods (e.g. 10:00-16:00
-                                     vs 00:00-06:00) has the lower average price;
-                                     stay off outside that period.
+       economic (default)        -> falls through to legionella warning (3),
+                                     then the economic price decision (4).
+  3. Legionella warning (temp hasn't reached legionella_temp in legionella_hybrid_days),
+     only while mode is 'economic': force mode 'hybrid', but only during the
+     cheapest of the two configured day/night periods; outside that period,
+     dispatch falls through to the economic price decision (4) instead.
+  4. Economic price decision: run the heat pump only during whichever of
+     the two configured day/night periods (e.g. 10:00-16:00
+     vs 00:00-06:00) has the lower average price;
+     stay off outside that period.
 
-The setpoint is held fixed at setpoint_c except during a legionella boost.
+The boiler's own max_temp is used as the target whenever a temperature needs
+to be pushed (boost, legionella warning); there is no separate user setpoint.
 """
 
 import appdaemon.plugins.hass.hassapi as hass
@@ -44,9 +47,6 @@ BRANCH_LABELS = {
 class BoilerStrategy(hass.Hass):
 
     def initialize(self):
-        # ── Tunables (overridable from apps.yaml) ───────────────────────────
-        self.setpoint_c = float(self.args.get("setpoint_c", 60))
-
         # ── Weekly legionella prevention ─────────────────────────────────────
         self.legionella_temp        = float(self.args.get("legionella_temp", 65))
         self.legionella_hybrid_days = float(self.args.get("legionella_hybrid_days", 6))
@@ -70,7 +70,6 @@ class BoilerStrategy(hass.Hass):
         self.price_forecast_attribute = self.args.get("price_forecast_attribute", "prices")
         self.mode_select              = self.args.get("mode_select",              "input_select.boiler_strategy_mode")
         self.boiler_mode_select       = self.args.get("boiler_mode_select",       "select.boiler_mode")
-        self.boiler_setpoint_entity   = self.args.get("boiler_setpoint_entity",   "number.boiler_setpoint")
         self.legionella_last_ok_entity = self.args.get("legionella_last_ok_entity", "input_datetime.boiler_legionella_last_ok")
         self.status_sensor            = self.args.get("status_sensor",            "sensor.boiler_strategy_status")
 
@@ -111,14 +110,20 @@ class BoilerStrategy(hass.Hass):
         if days_since_ok >= self.legionella_boost_days and mode != "off":
             self.log(
                 f"LEGIONELLA BOOST: {days_since_ok:.1f} days since last reaching "
-                f"{self.legionella_temp:.0f}C — forcing boost to {self.legionella_temp:.0f}C"
+                f"{self.legionella_temp:.0f}C — forcing boost"
             )
             self._publish_status("legionella_boost", **status_fields)
             self._set_boiler_mode("boost")
-            self._set_boiler_setpoint(self.legionella_temp)
             return
 
-        # ── Priority 2: legionella warning — escalate to hybrid during cheapest period only ──
+        # ── Priority 2: forced user mode — always takes effect immediately ───
+        if mode in ("off", "heatpump", "hybrid", "boost"):
+            self.log(f"FORCE MODE: user selected '{mode}'")
+            self._publish_status(f"force_{mode}", **status_fields)
+            self._set_boiler_mode(mode)
+            return
+
+        # ── Priority 3: legionella warning — escalate to hybrid during cheapest period only ──
         if days_since_ok >= self.legionella_hybrid_days:
             prices = self._get_prices()
             now_hour = self.datetime().hour
@@ -126,7 +131,7 @@ class BoilerStrategy(hass.Hass):
             if in_window:
                 self.log(
                     f"LEGIONELLA WARNING: {days_since_ok:.1f} days since last reaching "
-                    f"{self.legionella_temp:.0f}C — cheapest={cheapest_period} — forcing hybrid at {self.setpoint_c:.0f}C"
+                    f"{self.legionella_temp:.0f}C — cheapest={cheapest_period} — forcing hybrid"
                 )
                 self._publish_status(
                     "legionella_hybrid",
@@ -136,19 +141,10 @@ class BoilerStrategy(hass.Hass):
                     **status_fields,
                 )
                 self._set_boiler_mode("hybrid")
-                self._set_boiler_setpoint(self.setpoint_c)
                 return
-            # Outside the cheap period — fall through to the regular user mode dispatch.
+            # Outside the cheap period — fall through to the economic price decision.
 
-        # ── Priority 3a: forced user mode ────────────────────────────────────
-        if mode in ("off", "heatpump", "hybrid", "boost"):
-            self.log(f"FORCE MODE: user selected '{mode}'")
-            self._publish_status(f"force_{mode}", **status_fields)
-            self._set_boiler_mode(mode)
-            self._set_boiler_setpoint(self.setpoint_c)
-            return
-
-        # ── Priority 3b: economic — heat pump during the cheaper period ───────
+        # ── Priority 4: economic — heat pump during the cheaper period ───────
         prices = self._get_prices()
         now_hour = self.datetime().hour
         boiler_mode, day_avg_price, night_avg_price, cheapest_period = self._economic_decision(now_hour, prices)
@@ -162,7 +158,6 @@ class BoilerStrategy(hass.Hass):
             **status_fields,
         )
         self._set_boiler_mode(boiler_mode)
-        self._set_boiler_setpoint(self.setpoint_c)
 
     # ── Economic-mode decision ───────────────────────────────────────────────
 
@@ -294,22 +289,6 @@ class BoilerStrategy(hass.Hass):
                 self.log(f"Boiler mode → {option}")
         except Exception as e:
             self.log(f"Failed to set boiler mode: {e}", level="WARNING")
-
-    def _set_boiler_setpoint(self, celsius: float):
-        if not self._entity_exists(self.boiler_setpoint_entity):
-            self.log("Boiler setpoint entity not available", level="WARNING")
-            return
-        try:
-            current = self.get_state(self.boiler_setpoint_entity)
-            if current is None or float(current) != celsius:
-                self.call_service(
-                    "number/set_value",
-                    entity_id=self.boiler_setpoint_entity,
-                    value=celsius,
-                )
-                self.log(f"Boiler setpoint → {celsius:.0f}C")
-        except (TypeError, ValueError) as e:
-            self.log(f"Failed to set boiler setpoint: {e}", level="WARNING")
 
     # ── Sensor readers ────────────────────────────────────────────────────────
 

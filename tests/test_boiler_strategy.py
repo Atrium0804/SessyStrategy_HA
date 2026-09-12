@@ -62,7 +62,6 @@ from boiler_strategy import BoilerStrategy  # noqa: E402
 
 
 _DEFAULTS = dict(
-    setpoint_c=60,
     legionella_temp=65,
     legionella_hybrid_days=6,
     legionella_boost_days=7,
@@ -137,13 +136,12 @@ def _price_entry(hour, price):
 
 
 def _entity_states(temp, mode="economic", prices=None, legionella_last_ok=None,
-                   boiler_mode="init", setpoint="55"):
+                   boiler_mode="init"):
     states = {
         "sensor.boiler_temperatuur": str(temp),
         "input_select.boiler_strategy_mode": mode,
         "input_datetime.boiler_legionella_last_ok": legionella_last_ok,
         "select.boiler_mode": boiler_mode,
-        "number.boiler_setpoint": setpoint,
         "sensor.boiler_strategy_status": "ok",
     }
 
@@ -164,7 +162,7 @@ _MIDDAY_CHEAP = [_price_entry(h, 0.30) for h in range(0, 6)] + \
 
 
 class TestUpdateStrategyPriority:
-    # ── Legionella overrides (take precedence over any user mode) ────────────
+    # ── Legionella boost overrides any user mode except 'off' ────────────────
     def test_legionella_boost_forces_boost_mode(self):
         app = make_app()
         app.get_state = _entity_states(
@@ -175,22 +173,27 @@ class TestUpdateStrategyPriority:
         app.call_service.assert_any_call(
             "select/select_option", entity_id="select.boiler_mode", option="boost"
         )
-        app.call_service.assert_any_call(
-            "number/set_value", entity_id="number.boiler_setpoint", value=65.0
-        )
 
     def test_legionella_hybrid_warning_forces_hybrid_mode(self):
         app = make_app()
         app.get_state = _entity_states(
-            temp=50, mode="economic",
-            legionella_last_ok="2024-06-09 14:00:00",  # 6 days ago
+            temp=50, mode="economic", prices=_MIDDAY_CHEAP,
+            legionella_last_ok="2024-06-09 14:00:00",  # 6 days ago; clock=14:00 is inside the cheaper midday window
         )
         app.update_strategy({})
         app.call_service.assert_any_call(
             "select/select_option", entity_id="select.boiler_mode", option="hybrid"
         )
+
+    def test_forced_mode_beats_legionella_hybrid_warning(self):
+        app = make_app()
+        app.get_state = _entity_states(
+            temp=50, mode="heatpump",
+            legionella_last_ok="2024-06-09 14:00:00",  # 6 days ago -> hybrid warning active
+        )
+        app.update_strategy({})
         app.call_service.assert_any_call(
-            "number/set_value", entity_id="number.boiler_setpoint", value=60.0
+            "select/select_option", entity_id="select.boiler_mode", option="heatpump"
         )
 
     # ── Forced user modes ────────────────────────────────────────────────────
@@ -302,7 +305,7 @@ class TestEconomicDecision:
         app = make_app()
         # now=8 is outside both windows; midday cheaper → mode off (not in window)
         mode, avg1, avg2, chosen = app._economic_decision(8, _MIDDAY_CHEAP)
-        assert chosen == "window1"
+        assert chosen == "day"
         assert avg1 == pytest.approx(0.05)
         assert avg2 == pytest.approx(0.30)
         assert mode == "off"
@@ -310,7 +313,7 @@ class TestEconomicDecision:
     def test_decision_heatpump_inside_chosen_window(self):
         app = make_app()
         mode, _, _, chosen = app._economic_decision(3, _MORNING_CHEAP)
-        assert chosen == "window2"
+        assert chosen == "night"
         assert mode == "heatpump"
 
     def test_decision_off_without_forecast(self):

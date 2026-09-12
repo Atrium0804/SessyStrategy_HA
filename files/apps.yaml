@@ -96,9 +96,6 @@ boiler_strategy:
   module: boiler_strategy
   class: BoilerStrategy
 
-  # ── Boiler setpoint ──────────────────────────────────────────────────
-  setpoint_c: 60             # Fixed setpoint (C) except during a legionella boost
-
   # ── Weekly legionella prevention ─────────────────────────────────────
   legionella_temp: 65             # C the boiler must reach periodically
   legionella_hybrid_days: 6       # Days without reaching legionella_temp before forcing hybrid
@@ -123,7 +120,6 @@ boiler_strategy:
   mode_select: input_select.boiler_strategy_mode
   # Logical actuator from the boiler package (off/heatpump/hybrid/boost/ariston_app)
   boiler_mode_select: select.boiler_mode
-  boiler_setpoint_entity: number.boiler_setpoint
   # input_datetime helper this app stamps whenever the boiler reaches legionella_temp
   legionella_last_ok_entity: input_datetime.boiler_legionella_last_ok
   status_sensor: sensor.boiler_strategy_status
