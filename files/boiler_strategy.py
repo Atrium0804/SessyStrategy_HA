@@ -143,8 +143,8 @@ class BoilerStrategy(hass.Hass):
         prices = self._get_prices()
         in_window, day_avg_price, night_avg_price, cheapest_period = self._cheapest_window_info(now_hour, prices)
         price_fields = dict(
-            day_avg_price=day_avg_price,
-            night_avg_price=night_avg_price,
+            avg_price_day=day_avg_price,
+            avg_price_night=night_avg_price,
             cheapest_period=cheapest_period,
             **status_fields,
         )

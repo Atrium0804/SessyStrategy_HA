@@ -248,7 +248,7 @@ class SessyStrategy(hass.Hass):
 
         # ── Priority 1: price-spike discharge (sell price) ──────────────────
         if self._rule_enabled(self.rule_price_spike_entity) and price > price_discharge:
-            window_h    = self._spread_window_h(price_discharge, above=True)
+            window_h    = max(self._contiguous_price_hours(price_discharge, above=True), self.min_window_h)
             discharge_w = self._discharge_setpoint(soc, soc_floor, window_h)
             self.log(
                 f"DISCHARGE: price {price:.3f} > {price_discharge:.2f} — "
@@ -269,7 +269,7 @@ class SessyStrategy(hass.Hass):
                 self._publish_status("cheap_charge_full", **status_fields)
                 self._set_grid_setpoint(0)
                 return
-            window_h = self._spread_window_h(price_charge, above=False)
+            window_h = max(self._contiguous_price_hours(price_charge, above=False), self.min_window_h)
             charge_w = self._cheap_charge_setpoint(soc, cheap_soc_target, window_h)
             self.log(
                 f"CHEAP CHARGE: price {price:.5f} < {price_charge} — "
@@ -482,17 +482,13 @@ class SessyStrategy(hass.Hass):
 
     # ── Actuator helpers ─────────────────────────────────────────────────────
 
-    def _grid_limit_w(self) -> float:
-        """Allowed grid power in W: connection limit × utilisation margin."""
-        return self.max_grid_w * self.grid_utilization
-
     def _clamp_to_grid_limit(self, watts: float, kind: str) -> float:
         """
         Grid-connection guard: keep any commanded setpoint within the allowed
         grid power. For grid (nom) setpoints the limit applies directly; for
         battery (api) setpoints it is combined with the inverter's max power.
         """
-        limit = self._grid_limit_w()
+        limit = self.max_grid_w * self.grid_utilization
         if kind == "battery":
             limit = min(limit, self.max_power_w)
         clamped = max(-limit, min(watts, limit))
@@ -683,14 +679,6 @@ class SessyStrategy(hass.Hass):
                 break
             cursor += timedelta(hours=1)
         return max(count, 1)
-
-    def _spread_window_h(self, threshold: float, above: bool) -> float:
-        """
-        Adaptive spread window in hours: the contiguous run of upcoming hours the
-        price stays past threshold, floored at min_window_h.
-        """
-        run_h = self._contiguous_price_hours(threshold, above)
-        return max(run_h, self.min_window_h)
 
     def _max_price_in_window(self, start_hour: int, end_hour: int) -> float | None:
         """
