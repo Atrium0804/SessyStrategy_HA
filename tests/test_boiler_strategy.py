@@ -65,10 +65,10 @@ _DEFAULTS = dict(
     legionella_temp=65,
     legionella_hybrid_days=6,
     legionella_boost_days=7,
-    economic_window1_start=10,
-    economic_window1_end=16,
-    economic_window2_start=0,
-    economic_window2_end=6,
+    economic_day_start=10,
+    economic_day_end=16,
+    economic_night_start=0,
+    economic_night_end=6,
 )
 
 
@@ -303,23 +303,23 @@ class TestEconomicDecision:
 
     def test_decision_picks_cheaper_window(self):
         app = make_app()
-        # now=8 is outside both windows; midday cheaper → mode off (not in window)
-        mode, avg1, avg2, chosen = app._economic_decision(8, _MIDDAY_CHEAP)
+        # now=8 is outside both windows; day (midday) cheaper → not in window
+        in_window, avg1, avg2, chosen = app._cheapest_window_info(8, _MIDDAY_CHEAP)
         assert chosen == "day"
         assert avg1 == pytest.approx(0.05)
         assert avg2 == pytest.approx(0.30)
-        assert mode == "off"
+        assert in_window is False
 
     def test_decision_heatpump_inside_chosen_window(self):
         app = make_app()
-        mode, _, _, chosen = app._economic_decision(3, _MORNING_CHEAP)
+        in_window, _, _, chosen = app._cheapest_window_info(3, _MORNING_CHEAP)
         assert chosen == "night"
-        assert mode == "heatpump"
+        assert in_window is True
 
     def test_decision_off_without_forecast(self):
         app = make_app()
-        mode, avg1, avg2, chosen = app._economic_decision(14, None)
-        assert mode == "off"
+        in_window, avg1, avg2, chosen = app._cheapest_window_info(14, None)
+        assert in_window is False
         assert chosen is None
         assert avg1 is None and avg2 is None
 

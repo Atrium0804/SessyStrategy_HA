@@ -60,7 +60,7 @@ RULE_EXPLANATIONS = {
 class BoilerStrategy(hass.Hass):
 
     def initialize(self):
-        # ── Weekly legionella prevention ─────────────────────────────────────
+        # ── Weekly legionella prevention settings  ─────────────────────────────────────
         self.legionella_temp        = float(self.args.get("legionella_temp", 65))
         self.legionella_hybrid_days = float(self.args.get("legionella_hybrid_days", 6))
         self.legionella_boost_days  = float(self.args.get("legionella_boost_days", 7))
@@ -110,8 +110,11 @@ class BoilerStrategy(hass.Hass):
             return
 
         self._ensure_mode_initialized()
-        self._record_legionella_ok_if_reached(temp)
-        days_since_ok = self._days_since_legionella_ok()
+        just_reached = self._record_legionella_ok_if_reached(temp)
+        # Don't re-read the helper we just wrote: the input_datetime state
+        # update from call_service isn't guaranteed to be visible yet, which
+        # would otherwise make the counter appear stuck at legionella_hybrid_days.
+        days_since_ok = 0.0 if just_reached else self._days_since_legionella_ok()
         mode = self._get_mode()
 
         status_fields = dict(
@@ -126,52 +129,42 @@ class BoilerStrategy(hass.Hass):
                 f"LEGIONELLA BOOST: {days_since_ok:.1f} days since last reaching "
                 f"{self.legionella_temp:.0f}C — forcing boost"
             )
-            self._publish_status("legionella_boost", **status_fields)
-            self._set_boiler_mode("boost")
+            self._apply("legionella_boost", "boost", **status_fields)
             return
 
         # ── Priority 2: forced user mode — always takes effect immediately ───
         if mode in ("off", "heatpump", "hybrid", "boost"):
             self.log(f"FORCE MODE: user selected '{mode}'")
-            self._publish_status(f"force_{mode}", **status_fields)
-            self._set_boiler_mode(mode)
+            self._apply(f"force_{mode}", mode, **status_fields)
             return
 
-        # ── Priority 3: legionella warning — escalate to hybrid during cheapest period only ──
-        if days_since_ok >= self.legionella_hybrid_days:
-            prices = self._get_prices()
-            now_hour = self.datetime().hour
-            in_window, day_avg_price, night_avg_price, cheapest_period = self._cheapest_window_info(now_hour, prices)
-            if in_window:
-                self.log(
-                    f"LEGIONELLA WARNING: {days_since_ok:.1f} days since last reaching "
-                    f"{self.legionella_temp:.0f}C — cheapest={cheapest_period} — forcing hybrid"
-                )
-                self._publish_status(
-                    "legionella_hybrid",
-                    day_avg_price=day_avg_price,
-                    night_avg_price=night_avg_price,
-                    cheapest_period=cheapest_period,
-                    **status_fields,
-                )
-                self._set_boiler_mode("hybrid")
-                return
-            # Outside the cheap period — fall through to the economic price decision.
-
-        # ── Priority 4: economic — heat pump during the cheaper period ───────
-        prices = self._get_prices()
+        # Remaining branches are price-driven; evaluate the cheaper period once.
         now_hour = self.datetime().hour
-        boiler_mode, day_avg_price, night_avg_price, cheapest_period = self._economic_decision(now_hour, prices)
+        prices = self._get_prices()
+        in_window, day_avg_price, night_avg_price, cheapest_period = self._cheapest_window_info(now_hour, prices)
+        price_fields = dict(
+            day_avg_price=day_avg_price,
+            night_avg_price=night_avg_price,
+            cheapest_period=cheapest_period,
+            **status_fields,
+        )
+
+        # ── Priority 3: legionella warning — escalate to hybrid during cheapest period only ──
+        if days_since_ok >= self.legionella_hybrid_days and in_window:
+            self.log(
+                f"LEGIONELLA WARNING: {days_since_ok:.1f} days since last reaching "
+                f"{self.legionella_temp:.0f}C — cheapest={cheapest_period} — forcing hybrid"
+            )
+            self._apply("legionella_hybrid", "hybrid", **price_fields)
+            return
+
+        # ── Priority 4: economic — heat pump during the cheaper period ────────
+        boiler_mode = "heatpump" if in_window else "off"
         self.log(
             f"ECONOMIC: hour={now_hour} day_avg_price={day_avg_price} night_avg_price={night_avg_price} "
             f"cheapest={cheapest_period} — mode={boiler_mode}"
         )
-        self._publish_status(
-            f"economic_{boiler_mode}",
-            day_avg_price=day_avg_price, night_avg_price=night_avg_price, cheapest_period=cheapest_period,
-            **status_fields,
-        )
-        self._set_boiler_mode(boiler_mode)
+        self._apply(f"economic_{boiler_mode}", boiler_mode, **price_fields)
 
     # ── Economic-mode decision ───────────────────────────────────────────────
 
@@ -198,14 +191,6 @@ class BoilerStrategy(hass.Hass):
         _, (start_h, end_h), cheapest_period = min(candidates, key=lambda c: c[0])
         in_window = start_h <= now_hour < end_h
         return in_window, day_avg_price, night_avg_price, cheapest_period
-
-    def _economic_decision(self, now_hour, prices):
-        """
-        Return 'heatpump' if now falls inside the cheapest configured period, else 'off'.
-        Returns (boiler_mode, day_avg_price, night_avg_price, cheapest_period).
-        """
-        in_window, day_avg_price, night_avg_price, cheapest_period = self._cheapest_window_info(now_hour, prices)
-        return ("heatpump" if in_window else "off"), day_avg_price, night_avg_price, cheapest_period
 
     def _window_average(self, prices, start_h, end_h):
         """Average forecast price over entries whose start hour is in [start_h, end_h)."""
@@ -237,20 +222,25 @@ class BoilerStrategy(hass.Hass):
 
     # ── Legionella tracking ──────────────────────────────────────────────────
 
-    def _record_legionella_ok_if_reached(self, temp: float):
-        """Stamp legionella_last_ok_entity with now whenever the boiler reaches legionella_temp."""
+    def _record_legionella_ok_if_reached(self, temp: float) -> bool:
+        """Stamp legionella_last_ok_entity with now whenever the boiler reaches legionella_temp.
+
+        Returns True if the stamp was written this cycle.
+        """
         if temp < self.legionella_temp:
-            return
+            return False
         if not self.legionella_last_ok_entity:
-            return
+            return False
         try:
             self.call_service(
                 "input_datetime/set_datetime",
                 entity_id=self.legionella_last_ok_entity,
                 datetime=self.datetime().strftime("%Y-%m-%d %H:%M:%S"),
             )
+            return True
         except Exception as e:
             self.log(f"Failed to stamp legionella_last_ok: {e}", level="WARNING")
+            return False
 
     def _days_since_legionella_ok(self) -> float:
         """
@@ -287,6 +277,11 @@ class BoilerStrategy(hass.Hass):
         self.update_strategy({})
 
     # ── Actuator helpers ──────────────────────────────────────────────────────
+
+    def _apply(self, branch: str, boiler_mode: str, **fields):
+        """Publish the decided branch to the status sensor and set the boiler mode."""
+        self._publish_status(branch, **fields)
+        self._set_boiler_mode(boiler_mode)
 
     def _set_boiler_mode(self, option: str):
         if not self._entity_exists(self.boiler_mode_select):

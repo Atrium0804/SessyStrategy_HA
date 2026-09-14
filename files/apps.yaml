@@ -101,13 +101,13 @@ boiler_strategy:
   legionella_hybrid_days: 6       # Days without reaching legionella_temp before forcing hybrid
   legionella_boost_days: 7        # Days without reaching legionella_temp before forcing a boost
 
-  # ── Economic mode windows (local hours, [start, end)) ────────────────
-  # 'economic' runs the heat pump only during whichever of these two windows
+  # ── Economic mode day/night periods (local hours, [start, end)) ──────
+  # 'economic' runs the heat pump only during whichever of these two periods
   # has the lower average forecast price.
-  economic_window1_start: 10
-  economic_window1_end: 16
-  economic_window2_start: 0
-  economic_window2_end: 6
+  economic_day_start: 10
+  economic_day_end: 16
+  economic_night_start: 0
+  economic_night_end: 6
 
   rerun_debounce_s: 2.0
 
