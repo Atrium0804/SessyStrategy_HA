@@ -619,6 +619,13 @@ class SessyStrategy(hass.Hass):
         except Exception as e:
             self.log(f"Failed to publish branch status: {e}", level="WARNING")
 
+    def _get_soc(self) -> float | None:
+        state = self.get_state(self.soc_sensor)
+        try:
+            return float(state)
+        except (TypeError, ValueError):
+            return None
+
     def _current_price(self) -> float | None:
         """
         Read the current hour's price from the energy_prices attribute, falling
