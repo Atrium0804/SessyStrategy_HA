@@ -12,9 +12,9 @@
 | Category | Purpose | Documents |
 |----------|---------|-----------|
 | **Tutorials** | *Learning-oriented* — Follow along step-by-step | [Getting Started](docs/tutorials/getting-started.md) • [First Day](docs/tutorials/first-day-operation.md) • [Dashboard Setup](docs/tutorials/dashboard-setup.md) |
-| **How-to** | *Problem-oriented* — Solve specific problems | [Tune Thresholds](docs/how-to/tune-price-thresholds.md) • [Debug Decisions](docs/how-to/debug-strategy-decisions.md) • [Manual Override](docs/how-to/override-manual-mode.md) • [Live Tuning](docs/how-to/add-live-tuning-helpers.md) • [Migration Guide](docs/how-to/migrate-from-older-version.md) |
-| **Explanation** | *Understanding-oriented* — Learn the concepts | [Priority Chain](docs/explanation/strategy-priority-chain.md) • [Price Basis](docs/explanation/price-basis-raw-vs-import.md) • [Spread Windows](docs/explanation/adaptive-spread-windows.md) • [Setpoint Types](docs/explanation/setpoint-types-explained.md) • [Arbitrage Margin](docs/explanation/arbitrage-margin.md) |
-| **Reference** | *Information-oriented* — Look up technical details | [apps.yaml Config](docs/reference/configuration/apps-yaml.md) • [Entity Reference](docs/reference/entity-reference.md) • [Live Entities](docs/reference/live-tuning-entities.md) • [Status Attributes](docs/reference/status-sensor-attributes.md) • [Service Calls](docs/reference/service-calls.md) • [Architecture](docs/reference/architecture.md) • [Algorithms](docs/reference/algorithms.md) |
+| **How-to** | *Problem-oriented* — Solve specific problems | [Set Up Boiler Strategy](docs/how-to/setup-boiler-strategy.md) • [Tune Thresholds](docs/how-to/tune-price-thresholds.md) • [Debug Decisions](docs/how-to/debug-strategy-decisions.md) • [Manual Override](docs/how-to/override-manual-mode.md) • [Live Tuning](docs/how-to/add-live-tuning-helpers.md) • [Migration Guide](docs/how-to/migrate-from-older-version.md) |
+| **Explanation** | *Understanding-oriented* — Learn the concepts | [Priority Chain](docs/explanation/strategy-priority-chain.md) • [Price Basis](docs/explanation/price-basis-raw-vs-import.md) • [Spread Windows](docs/explanation/adaptive-spread-windows.md) • [Setpoint Types](docs/explanation/setpoint-types-explained.md) • [Arbitrage Margin](docs/explanation/arbitrage-margin.md) • [Boiler Strategy Priority Chain](docs/explanation/boiler-strategy-priority-chain.md) |
+| **Reference** | *Information-oriented* — Look up technical details | [apps.yaml Config](docs/reference/configuration/apps-yaml.md) • [Boiler Strategy Config](docs/reference/configuration/boiler-strategy-config.md) • [Entity Reference](docs/reference/entity-reference.md) • [Live Entities](docs/reference/live-tuning-entities.md) • [Status Attributes](docs/reference/status-sensor-attributes.md) • [Service Calls](docs/reference/service-calls.md) • [Architecture](docs/reference/architecture.md) • [Algorithms](docs/reference/algorithms.md) |
 
 ---
 
@@ -107,7 +107,7 @@ sessy_strategy:
 
 ## � Boiler Strategy (add-on)
 
-A companion AppDaemon app, `files/boiler_strategy.py` (config in `apps.yaml` under `boiler_strategy`), drives an Ariston hybrid boiler from a user-selected strategy mode plus weekly legionella prevention:
+A companion AppDaemon app, `files/boiler_strategy.py` (config in `apps.yaml` under `boiler_strategy`), drives an Ariston hybrid boiler from a user-selected strategy mode plus weekly legionella prevention. See the full documentation for configuration and behavior details.
 
 | Priority | Condition | Action |
 |----------|-----------|--------|
@@ -116,7 +116,11 @@ A companion AppDaemon app, `files/boiler_strategy.py` (config in `apps.yaml` und
 | **P3** | `mode_select` is `economic` (default) and boiler hasn't reached `legionella_temp` in `legionella_hybrid_days` | Force mode `hybrid`, but only during the cheapest of the two configured windows |
 | **P4** | `mode_select` is `economic` (default), otherwise | Run the heat pump only during whichever of the two configured windows (default 10:00–16:00 vs 00:00–06:00) has the lower average forecast price; stay `off` otherwise |
 
-The user mode input is an `input_select` (`mode_select`, provided by the boiler package as `input_select.boiler_strategy_mode`); the app writes decisions to the logical `select.boiler_mode` actuator, which in turn pushes the Ariston integration's own `max_temp` whenever a temperature needs to be set (there is no separate user-controllable setpoint). The last-reached legionella timestamp is tracked in an `input_datetime` helper (`legionella_last_ok_entity`) that the app stamps itself. See `files/apps.yaml` for all tunables (economic windows, price forecast sensor) and `tests/test_boiler_strategy.py` for behaviour examples.
+The user mode input is an `input_select` (`mode_select`, provided by the boiler package as `input_select.boiler_strategy_mode`); the app writes decisions to the logical `select.boiler_mode` actuator, which in turn pushes the Ariston integration's own `max_temp` whenever a temperature needs to be set (there is no separate user-controllable setpoint). The last-reached legionella timestamp is tracked in an `input_datetime` helper (`legionella_last_ok_entity`) that the app stamps itself.
+
+See:
+- [Boiler Strategy Configuration Reference](docs/reference/configuration/boiler-strategy-config.md)
+- [Boiler Strategy Priority Chain Explained](docs/explanation/boiler-strategy-priority-chain.md)
 
 ---
 
