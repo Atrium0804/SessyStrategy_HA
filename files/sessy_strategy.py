@@ -618,7 +618,6 @@ class SessyStrategy(hass.Hass):
             )
         except Exception as e:
             self.log(f"Failed to publish branch status: {e}", level="WARNING")
-pike
 
     def _current_price(self) -> float | None:
         """
