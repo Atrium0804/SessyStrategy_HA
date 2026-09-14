@@ -2,12 +2,6 @@
 
 *Last updated: 2026-08-01 | Part of [Reference Documentation](../index.md)*
 
-Source: **NS Huisstijl Richtlijnen v4.4** (corporate brand guide). This page translates the
-print-oriented corporate identity into web tokens for the documentation theme so the
-documentation stays on-brand while keeping the focus on content.
-
----
-
 ## Color palette
 
 All values are taken directly from the corporate guide. Do not alter these hex values.

@@ -618,13 +618,7 @@ class SessyStrategy(hass.Hass):
             )
         except Exception as e:
             self.log(f"Failed to publish branch status: {e}", level="WARNING")
-
-    def _get_soc(self) -> float | None:
-        state = self.get_state(self.soc_sensor)
-        try:
-            return float(state)
-        except (TypeError, ValueError):
-            return None
+pike
 
     def _current_price(self) -> float | None:
         """
@@ -654,16 +648,19 @@ class SessyStrategy(hass.Hass):
             return None
         return prices
 
-    def _contiguous_price_hours(self, threshold: float, above: bool) -> int:
+    def _contiguous_price_hours(self, threshold: float, above: bool) -> float:
         """
-        Count consecutive upcoming hours (including the current one) whose price
-        stays past threshold — above it when above=True, below it when above=False.
-        The run stops at the first hour that crosses back. Returns at least 1.
+        Fractional hours remaining (from now) that price stays past threshold —
+        above it when above=True, below it when above=False. Counts whole hourly
+        slots, then subtracts the elapsed part of the current hour so the result
+        reflects time actually left, not a full extra hour for a partial one.
+        The run stops at the first hour that crosses back.
         """
         prices = self._get_prices_dict()
         if not prices:
-            return 1
-        cursor = self.datetime().replace(minute=0, second=0, microsecond=0)
+            return 1.0
+        now = self.datetime()
+        cursor = now.replace(minute=0, second=0, microsecond=0)
         count  = 0
         for _ in range(48):
             key = cursor.strftime("%Y-%m-%dT%H:00:00")
@@ -678,7 +675,10 @@ class SessyStrategy(hass.Hass):
             else:
                 break
             cursor += timedelta(hours=1)
-        return max(count, 1)
+        if count == 0:
+            return 1.0
+        elapsed_h = (now - now.replace(minute=0, second=0, microsecond=0)).total_seconds() / 3600.0
+        return max(count - elapsed_h, 0.0)
 
     def _max_price_in_window(self, start_hour: int, end_hour: int) -> float | None:
         """
