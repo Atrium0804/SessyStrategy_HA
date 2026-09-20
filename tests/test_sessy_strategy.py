@@ -222,11 +222,11 @@ class TestUpdateStrategyBranches:
         # charge → negative watts
         assert app._set_battery_setpoint.call_args[0][0] < 0
 
-    def test_priority2_cheap_price_at_ceiling_holds_grid_zero(self):
+    def test_priority2_cheap_price_at_ceiling_holds_battery_zero(self):
         app = self._make_app_with_sensors(soc=100, price=-0.20)
         app.update_strategy({})
-        app._set_grid_setpoint.assert_called_once_with(0)
-        app._set_battery_setpoint.assert_not_called()
+        app._set_battery_setpoint.assert_called_once_with(0)
+        app._set_grid_setpoint.assert_not_called()
 
     def test_priority3_afternoon_window_charges(self):
         # 17:00, SOC below target, spread > margin

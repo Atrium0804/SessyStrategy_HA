@@ -284,11 +284,11 @@ INFO sessy_strategy: CHEAP CHARGE: raw price -0.15678 < -0.10 — battery setpoi
 
 ```
 INFO sessy_strategy: Hour=03  SOC=100%  Raw price=-0.15678  Import price=-0.04678
-INFO sessy_strategy: CHEAP CHARGE: SOC 100% already at ceiling 100% — holding grid setpoint 0W
+INFO sessy_strategy: CHEAP CHARGE: SOC 100% already at ceiling 100% — holding battery setpoint 0W for the rest of the cheap period
 ```
 
 - **Status Sensor:** `cheap_charge_full`
-- **Behavior:** Holds at 0W since battery is already full
+- **Behavior:** Holds the battery setpoint at 0W (no charge/discharge) for the remainder of the cheap period, so it does not discharge and re-trigger cheap charge
 
 ### Why This Matters
 

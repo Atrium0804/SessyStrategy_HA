@@ -65,7 +65,7 @@ The `active_branch` attribute indicates which priority rule matched. Each branch
 | `active_branch` | str | Branch identifier | `cheap_charge` or `cheap_charge_full` |
 | All common attributes | | See above | |
 
-**`cheap_charge_full`:** SOC is already at or above `cheap_soc_target`, so the strategy holds at grid setpoint 0W.
+**`cheap_charge_full`:** SOC is already at or above `cheap_soc_target`, so the strategy holds the battery setpoint at 0W for the remainder of the cheap period. This prevents the battery from discharging into house load and re-triggering the cheap-charge cycle.
 
 ### Priority 3: Afternoon Charge (`active_branch: "afternoon_charge"`, `"afternoon_full"`, or `"afternoon_skip"`)
 

@@ -264,10 +264,11 @@ class SessyStrategy(hass.Hass):
             if soc >= cheap_soc_target:
                 self.log(
                     f"CHEAP CHARGE: SOC {soc:.0f}% already at ceiling "
-                    f"{cheap_soc_target:.0f}% — holding grid setpoint 0W"
+                    f"{cheap_soc_target:.0f}% — holding battery setpoint 0W "
+                    f"for the rest of the cheap period"
                 )
                 self._publish_status("cheap_charge_full", **status_fields)
-                self._set_grid_setpoint(0)
+                self._set_battery_setpoint(0)
                 return
             window_h = max(self._contiguous_price_hours(price_charge, above=False), self.min_window_h)
             charge_w = self._cheap_charge_setpoint(soc, cheap_soc_target, window_h)
