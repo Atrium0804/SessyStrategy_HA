@@ -173,6 +173,55 @@ class TestCheapChargeSetpoint:
         assert result == app.max_power_w
 
 
+class TestIsCheapestHour:
+    def _mk_prices(self, values, day="2024-06-15"):
+        return {f"{day}T{h:02d}:00:00": v for h, v in enumerate(values)}
+
+    def _app(self, prices, now_hour):
+        app = make_app()
+        app.datetime = MagicMock(return_value=datetime(2024, 6, 15, now_hour, 0, 0))
+        app._get_prices_dict = MagicMock(return_value=prices)
+        return app
+
+    # Day profile: mostly 0.30, cheapest cluster at 3/4, second cluster at 10/11.
+    def _profile(self):
+        values = [0.30] * 24
+        values[3], values[4] = 0.05, 0.06
+        values[10], values[11] = 0.10, 0.11
+        return self._mk_prices(values)
+
+    def test_current_hour_is_cheapest(self):
+        app = self._app(self._profile(), now_hour=3)
+        assert app._is_cheapest_hour(2) is True
+
+    def test_second_cheapest_hour_still_matches(self):
+        app = self._app(self._profile(), now_hour=4)
+        assert app._is_cheapest_hour(2) is True
+
+    def test_after_cheap_cluster_not_cheapest(self):
+        # 05:00 — the 3/4 cluster is in the past, next cheapest are 10/11.
+        app = self._app(self._profile(), now_hour=5)
+        assert app._is_cheapest_hour(2) is False
+
+    def test_later_cheap_cluster_matches(self):
+        app = self._app(self._profile(), now_hour=10)
+        assert app._is_cheapest_hour(2) is True
+
+    def test_zero_n_never_matches(self):
+        app = self._app(self._profile(), now_hour=3)
+        assert app._is_cheapest_hour(0) is False
+
+    def test_no_price_data_returns_false(self):
+        app = self._app(None, now_hour=3)
+        assert app._is_cheapest_hour(2) is False
+
+    def test_horizon_limits_candidate_window(self):
+        # With a 2h horizon from 03:00, only slots 3 and 4 are considered, so
+        # both are trivially among the 2 cheapest.
+        app = self._app(self._profile(), now_hour=3)
+        assert app._is_cheapest_hour(2, horizon_h=2) is True
+
+
 # ===========================================================================
 # update_strategy — decision branches
 # ===========================================================================
@@ -227,6 +276,27 @@ class TestUpdateStrategyBranches:
         app.update_strategy({})
         app._set_battery_setpoint.assert_called_once_with(0)
         app._set_grid_setpoint.assert_not_called()
+
+    def test_priority3_cheapest_hours_charges_at_max(self):
+        app = self._make_app_with_sensors(soc=60, price=0.15)
+        app._is_cheapest_hour = MagicMock(return_value=True)
+        app.update_strategy({})
+        app._set_battery_setpoint.assert_called_once_with(-app.max_power_w)
+        app._set_grid_setpoint.assert_not_called()
+
+    def test_priority3_cheapest_hours_at_ceiling_holds_battery_zero(self):
+        app = self._make_app_with_sensors(soc=100, price=0.15)
+        app._is_cheapest_hour = MagicMock(return_value=True)
+        app.update_strategy({})
+        app._set_battery_setpoint.assert_called_once_with(0)
+        app._set_grid_setpoint.assert_not_called()
+
+    def test_priority3_not_cheapest_hour_falls_through(self):
+        app = self._make_app_with_sensors(soc=60, price=0.15)
+        app._is_cheapest_hour = MagicMock(return_value=False)
+        app.update_strategy({})
+        app._set_grid_setpoint.assert_called_once_with(0)
+        app._set_battery_setpoint.assert_not_called()
 
     def test_priority3_afternoon_window_charges(self):
         # 17:00, SOC below target, spread > margin

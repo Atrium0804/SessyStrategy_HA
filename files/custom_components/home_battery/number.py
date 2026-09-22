@@ -61,6 +61,10 @@ _NUMBERS: tuple[_Spec, ...] = (
         "soc_ceiling", "Charge at low price limit", "mdi:battery-charging-100",
         0, 100, 5, PERCENTAGE, 100, NumberMode.SLIDER,
     ),
+    _Spec(
+        "cheapest_hours_n", "Cheapest hours to charge", "mdi:clock-star-four-points",
+        0, 12, 1, "h", 2, NumberMode.BOX,
+    ),
     # Price thresholds (€/kWh) the optimizer reads each cycle, owned by this device.
     _Spec(
         "price_discharge", "Discharge at high prices", "mdi:cash-plus",

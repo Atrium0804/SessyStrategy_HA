@@ -40,6 +40,8 @@ _BRANCH_NAMES: dict[str, str] = {
     "discharge":           "Price spike — discharging",
     "cheap_charge":        "Cheap price — charging",
     "cheap_charge_full":   "Cheap price — battery full",
+    "cheapest_hours":      "Cheapest hours — charging",
+    "cheapest_hours_full": "Cheapest hours — battery full",
     "afternoon_charge":    "Afternoon — charging",
     "afternoon_full":      "Afternoon — battery full",
     "afternoon_skip":      "Afternoon — spread too small",

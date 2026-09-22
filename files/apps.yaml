@@ -14,6 +14,12 @@ sessy_strategy:
   soc_floor: 0              # % SOC floor — never discharge below this
   cheap_soc_target: 100      # % SOC ceiling for cheap-price charging
 
+  # ── Cheapest-hours charge (P3) ──────────────────────────────────────
+  # Charge at max power during the N cheapest hourly slots of the coming
+  # horizon, regardless of the absolute price level.
+  cheapest_hours_n: 2          # Number of cheapest hours to charge in
+  cheapest_hours_horizon_h: 24 # Look-ahead horizon (hours) the cheapest N are picked from
+
   # ── Pricing ─────────────────────────────────────────────────────────
   # A single market price sensor is used for both charge and discharge
   # decisions. Account for any buy/sell price difference via the margins below.
@@ -79,6 +85,7 @@ sessy_strategy:
   target_morning_soc_entity: number.home_battery_target_morning_soc
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling
+  cheapest_hours_n_entity: number.home_battery_cheapest_hours_n
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
@@ -88,6 +95,7 @@ sessy_strategy:
   # always enabled. The grid guard and default fall-through are always active.
   rule_price_spike_entity: switch.home_battery_rule_price_spike
   rule_cheap_charge_entity: switch.home_battery_rule_cheap_charge
+  rule_cheapest_hours_entity: switch.home_battery_rule_cheapest_hours
   rule_afternoon_charge_entity: switch.home_battery_rule_afternoon_charge
   rule_evening_peak_entity: switch.home_battery_rule_evening_peak
   rule_morning_selloff_entity: switch.home_battery_rule_morning_selloff
