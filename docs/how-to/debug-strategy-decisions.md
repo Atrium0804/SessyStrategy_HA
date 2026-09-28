@@ -104,13 +104,13 @@ soc: 65.3                    # Current SOC percentage
 price: 0.25000               # Current market price
 price_discharge: 0.39        # Current discharge threshold
 price_charge: -0.10          # Current charge threshold
-target_afternoon_charging: 70 # Current afternoon charge target (P3)
-target_peak_discharge: 70    # Current evening peak sell-off target (P4)
-target_morning_soc: 30       # Current morning sell-off target (P5)
+target_afternoon_charging: 70 # Current afternoon charge target (P4)
+target_peak_discharge: 70    # Current evening peak sell-off target (P5)
+target_morning_soc: 30       # Current morning sell-off target (P6)
 soc_floor: 0                # Current SOC floor
 cheap_soc_target: 100        # Current cheap charge ceiling
-min_arbitrage_margin: 0.05   # Current arbitrage margin (P4)
-afternoon_margin: 0.05       # Current afternoon margin (P3)
+min_arbitrage_margin: 0.05   # Current arbitrage margin (P5)
+afternoon_margin: 0.05       # Current afternoon margin (P4)
 afternoon_start: 16         # Current afternoon window start
 afternoon_end: 18           # Current afternoon window end
 afternoon_window_h: 2.0     # Current afternoon charge window
@@ -173,31 +173,41 @@ Evaluation: (0.25000 < -0.10) AND (65.3 < 100)? NO → Priority 2 not triggered
 
 If this condition is **NOT met**, check Priority 3.
 
-#### Priority 3: Afternoon Charge Window
+#### Priority 3: Cheapest Hours Charge
+```
+Condition 1: current hour is among the N cheapest hours of the current day
+Condition 2: soc < cheap_soc_target
+Your values: cheapest_hours_n = 2, hour = 14, soc = 65.3, cheap_soc_target = 100
+Evaluation: hour 14 among today's 2 cheapest? depends on the day's prices
+```
+
+If this condition is **NOT met**, check Priority 4.
+
+#### Priority 4: Afternoon Charge Window
 ```
 Condition 1: afternoon_start <= current_hour < afternoon_end
 Condition 2: soc < target_afternoon_charging
 Condition 3: (evening_peak_buy - current_buy) >= afternoon_margin
 Your values: afternoon_start = 15, afternoon_end = 17, hour = 14, soc = 65.3, target = 70
-Evaluation: (15 <= 14 < 17)? NO → Priority 3 not triggered
+Evaluation: (15 <= 14 < 17)? NO → Priority 4 not triggered
 ```
 
-If this condition is **NOT met**, check Priority 4.
+If this condition is **NOT met**, check Priority 5.
 
 **Note:** `evening_peak_buy` is the highest import price (raw + surcharge) during the evening peak window; `current_buy` is the current import price. The rule tops up only when charging now meaningfully undercuts importing at the evening peak.
 
-#### Priority 4: Evening Peak Sell-off Discharge
+#### Priority 5: Evening Peak Sell-off Discharge
 ```
 Condition 1: evening_peak_start <= current_hour < evening_peak_end
 Condition 2: soc > target_peak_discharge
 Your values: evening_peak_start = 18, evening_peak_end = 23, hour = 14, soc = 65.3, target_peak_discharge = 70
-Evaluation: (18 <= 14 < 23)? NO → Priority 4 not triggered
-Evaluation: (18 <= 14 < 23) AND (65.3 > 70)? NO → Priority 4 not triggered
+Evaluation: (18 <= 14 < 23)? NO → Priority 5 not triggered
+Evaluation: (18 <= 14 < 23) AND (65.3 > 70)? NO → Priority 5 not triggered
 ```
 
-If this condition is **NOT met**, Priority 5 (default) is used.
+If this condition is **NOT met**, Priority 6 (morning sell-off) is checked, then Priority 7 (default) is used.
 
-#### Priority 5: Default
+#### Priority 7: Default
 ```
 Condition: Always (no conditions to check)
 Action: Grid setpoint 0W — absorb solar, block export
@@ -230,15 +240,15 @@ The logs provide detailed information about each strategy decision.
    Hour=03  SOC=45%  Raw price=-0.15000  Import price=-0.04000
    CHEAP CHARGE: raw price -0.15000 < -0.10 — battery setpoint -2200W (SOC 45% → 100% over 2.00h cheap window)
 
-   # Priority 3 example:
+   # Priority 4 example:
    Hour=16  SOC=65%  Raw price=0.25000  Import price=0.36000
    AFTERNOON CHARGE: battery setpoint -2000W (SOC 65% → target 70% over 2.0h)
 
-   # Priority 3 skip example:
+   # Priority 4 skip example:
    Hour=16  SOC=65%  Raw price=0.32000  Import price=0.43000
    AFTERNOON SKIP: evening peak import 0.450 vs current import 0.430 (spread < margin 0.05) — holding grid setpoint 0W
 
-   # Priority 4 example:
+   # Priority 5 example:
    Hour=20  SOC=85%  Raw price=0.40000  Import price=0.51000
    EVENING PEAK SELL-OFF: SOC 85% > target 70% — grid export setpoint -800W (spread over 2.50h remaining peak window)
    ```

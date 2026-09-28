@@ -15,10 +15,9 @@ sessy_strategy:
   cheap_soc_target: 100      # % SOC ceiling for cheap-price charging
 
   # ── Cheapest-hours charge (P3) ──────────────────────────────────────
-  # Charge at max power during the N cheapest hourly slots of the coming
-  # horizon, regardless of the absolute price level.
+  # Charge at max power during the N cheapest hourly slots of the current
+  # calendar day, regardless of the absolute price level.
   cheapest_hours_n: 2          # Number of cheapest hours to charge in
-  cheapest_hours_horizon_h: 24 # Look-ahead horizon (hours) the cheapest N are picked from
 
   # ── Pricing ─────────────────────────────────────────────────────────
   # A single market price sensor is used for both charge and discharge

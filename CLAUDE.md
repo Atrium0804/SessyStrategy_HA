@@ -39,9 +39,11 @@ Restart AppDaemon after any change to `sessy_strategy.py` or `apps.yaml`.
 
 1. **Price spike** — raw price > `price_discharge` → discharge toward SOC floor over an adaptive window (the hours price stays above the threshold, floored at `min_window_h`)
 2. **Cheap/negative price** — raw price < `price_charge` → charge toward 100% SOC over remaining cheap window
-3. **Afternoon charge** — in time window (16–18h) AND SOC < target AND the evening peak import price beats the current import price by `afternoon_margin` → charge toward SOC target (peak-shaving, not trading)
-4. **Evening peak sell-off** — inside `evening_peak_start`–`evening_peak_end` (20–22h) AND SOC > target AND no price spike remaining → export excess via grid setpoint
-5. **Default** — grid setpoint = 0W (absorb solar, block export)
+3. **Cheapest hours** — current hour is one of the `cheapest_hours_n` cheapest hours of the current calendar day (per-day, not a sliding window) → charge at full power toward the ceiling regardless of the absolute price level
+4. **Afternoon charge** — in time window (16–18h) AND SOC < target AND the evening peak import price beats the current import price by `afternoon_margin` → charge toward SOC target (peak-shaving, not trading)
+5. **Evening peak sell-off** — inside `evening_peak_start`–`evening_peak_end` (20–22h) AND SOC > target AND no price spike remaining → export excess via grid setpoint
+6. **Morning sell-off** — inside the morning window AND SOC > `target_morning_soc` → export the reserved excess via grid setpoint
+7. **Default** — grid setpoint = 0W (absorb solar, block export)
 
 ### Helper method categories
 

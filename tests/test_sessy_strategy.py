@@ -199,13 +199,15 @@ class TestIsCheapestHour:
         assert app._is_cheapest_hour(2) is True
 
     def test_after_cheap_cluster_not_cheapest(self):
-        # 05:00 — the 3/4 cluster is in the past, next cheapest are 10/11.
+        # 05:00 — the 3/4 cluster (day's cheapest) is in the past, so now is not cheapest.
         app = self._app(self._profile(), now_hour=5)
         assert app._is_cheapest_hour(2) is False
 
-    def test_later_cheap_cluster_matches(self):
+    def test_later_cluster_not_cheapest_when_day_has_lower(self):
+        # 10:00 sits in the second-cheapest cluster, but the day's 2 cheapest are
+        # 3/4, so per-day logic must not flag it.
         app = self._app(self._profile(), now_hour=10)
-        assert app._is_cheapest_hour(2) is True
+        assert app._is_cheapest_hour(2) is False
 
     def test_zero_n_never_matches(self):
         app = self._app(self._profile(), now_hour=3)
@@ -215,11 +217,21 @@ class TestIsCheapestHour:
         app = self._app(None, now_hour=3)
         assert app._is_cheapest_hour(2) is False
 
-    def test_horizon_limits_candidate_window(self):
-        # With a 2h horizon from 03:00, only slots 3 and 4 are considered, so
-        # both are trivially among the 2 cheapest.
-        app = self._app(self._profile(), now_hour=3)
-        assert app._is_cheapest_hour(2, horizon_h=2) is True
+    def test_next_day_lows_do_not_leak_into_today(self):
+        # Regression for the sliding-window bug: today's evening is expensive and
+        # the next day is cheaper, but an evening hour must never count as cheapest
+        # just because tomorrow's prices are low.
+        today = [0.30] * 24
+        today[3], today[4] = 0.05, 0.06   # today's real cheapest
+        today[18] = 0.19                  # evening — not cheapest for today
+        tomorrow = [0.01] * 24            # entire next day cheaper than today
+        prices = {}
+        prices.update(self._mk_prices(today, day="2024-06-15"))
+        prices.update(self._mk_prices(tomorrow, day="2024-06-16"))
+        app = make_app()
+        app.datetime = MagicMock(return_value=datetime(2024, 6, 15, 18, 0, 0))
+        app._get_prices_dict = MagicMock(return_value=prices)
+        assert app._is_cheapest_hour(2) is False
 
 
 # ===========================================================================

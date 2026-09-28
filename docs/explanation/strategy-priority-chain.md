@@ -2,9 +2,10 @@
 
 ## Overview
 
-The SessyStrategy uses a **top-down priority chain** to determine the optimal battery behavior. The strategy evaluates conditions in order from Priority 1 (highest) to Priority 6 (lowest). The **first matching condition wins**, sets the appropriate setpoint, and stops evaluation — subsequent priorities are skipped. A **grid-connection guard (Priority 0)** then clamps every resulting setpoint to the safe grid power before it is applied. This creates a self-correcting system that re-evaluates every 5 minutes (or immediately when live inputs change).
+The SessyStrategy uses a **top-down priority chain** to determine the optimal battery behavior. The strategy evaluates conditions in order from Priority 1 (highest) to Priority 7 (lowest). The **first matching condition wins**, sets the appropriate setpoint, and stops evaluation — subsequent priorities are skipped. A **grid-connection guard (Priority 0)** then clamps every resulting setpoint to the safe grid power before it is applied. This creates a self-correcting system that re-evaluates every 5 minutes (or immediately when live inputs change).
 
 **Key principles:**
+
 - Top-down evaluation: highest priority conditions are checked first
 - First match wins: only one priority branch executes per cycle
 - Grid guard always applies: every setpoint is clamped to the grid limit (P0)
@@ -26,19 +27,22 @@ flowchart TD
     B -->|Yes| C[Discharge toward SOC floor]
     B -->|No| D{P2: buy_price < price_charge?}
     D -->|Yes| E[Charge toward cheap_soc_target]
-    D -->|No| F{P3: In afternoon window and SOC < target?}
+    D -->|No| CH{P3: Hour among N cheapest of today?}
+    CH -->|Yes| CHY[Charge at full power toward ceiling]
+    CH -->|No| F{P4: In afternoon window and SOC < target?}
     F -->|Yes| H{Evening peak buy price beats now by margin?}
     H -->|Yes| I[Charge at full power toward target]
     H -->|No| J[Hold at grid 0W]
-    F -->|No| K{P4: In evening peak and SOC > target?}
+    F -->|No| K{P5: In evening peak and SOC > target?}
     K -->|Yes| L{No spike remaining and evening beats morning?}
     L -->|Yes| N[Export excess]
     L -->|No| O[Hold]
-    K -->|No| P{P5: In morning window and SOC > morning floor?}
+    K -->|No| P{P6: In morning window and SOC > morning floor?}
     P -->|Yes| Q[Export excess over window]
-    P -->|No| R[P6: Default grid 0W]
+    P -->|No| R[P7: Default grid 0W]
     C --> S
     E --> S
+    CHY --> S
     I --> S
     J --> S
     N --> S
@@ -61,6 +65,7 @@ flowchart TD
 Clamps the commanded power to the safe grid limit in both directions (import and export):
 
 **Formula:**
+
 ```
 grid_limit_w = max_grid_w × grid_utilization         # default 8000 × 0.9 = 7200W
 # Grid (nom) setpoints:
@@ -71,6 +76,7 @@ clamped = max(-limit, min(watts, limit))
 ```
 
 **Parameters:**
+
 - `max_grid_w`: Physical grid-connection limit in W (default: 8000)
 - `grid_utilization`: Safety margin fraction of the connection (default: 0.9)
 
@@ -91,6 +97,7 @@ clamped = max(-limit, min(watts, limit))
 - Rule can be disabled from the GUI (`rule_price_spike`)
 
 **Example:**
+
 - Sell price = €0.46/kWh
 - `price_discharge` = €0.39/kWh
 - **Result:** Trigger fires, battery discharges
@@ -102,6 +109,7 @@ clamped = max(-limit, min(watts, limit))
 3. **Sets battery setpoint:** Uses `api` mode (direct battery power control)
 
 **Formula:**
+
 ```
 available_wh = (soc - soc_floor) / 100 × capacity_wh
 spread_w = available_wh / window_h
@@ -109,6 +117,7 @@ discharge_w = max(50, min(spread_w, max_power_w))
 ```
 
 **Parameters:**
+
 - `soc_floor`: Minimum SOC level (default: 0%)
 - `min_window_h`: Minimum spread window in hours (default: 2.0)
 - `max_power_w`: Maximum inverter power (default: 2200W)
@@ -134,6 +143,7 @@ discharge_w = max(50, min(spread_w, max_power_w))
 - Rule can be disabled from the GUI (`rule_cheap_charge`)
 
 **Example:**
+
 - Buy price = -€0.05/kWh (grid pays you to consume)
 - `price_charge` = €0.01/kWh
 - **Result:** Trigger fires, battery charges from grid
@@ -145,12 +155,14 @@ discharge_w = max(50, min(spread_w, max_power_w))
 3. **Sets battery setpoint:** Uses `api` mode (direct battery power control), negative = charge
 
 **Formula:**
+
 ```
 window_h = max(contiguous_hours_buy_price_below_threshold, min_window_h)
 charge_w = max_power_w  (when soc < cheap_soc_target)
 ```
 
 **Parameters:**
+
 - `cheap_soc_target`: Target SOC for cheap charging (default: 100%)
 - `max_power_w`: Maximum charge power (default: 2200W)
 
@@ -167,16 +179,55 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 
 ---
 
-## Priority 3: Afternoon Charge Window
+## Priority 3: Cheapest Hours Charge
 
 ### When It Triggers
 
 **Conditions (all must be true):**
+
+1. The current hour is one of the **N cheapest hours of the current calendar day** (`cheapest_hours_n`, default: 2)
+2. SOC < `cheap_soc_target` (default: 100%); at or above the ceiling it holds grid 0W
+3. Rule can be disabled from the GUI (`rule_cheapest_hours`)
+
+**Example (buy prices for the day):**
+
+- Cheapest two hours today: 14:00 (−€0.0001/kWh) and 15:00 (€0.00/kWh)
+- Current hour: 14:00 → among the two cheapest today → **charge at full power**
+- Current hour: 17:00 (€0.11/kWh) → not among the two cheapest today → does not fire
+
+### What It Does
+
+1. **Groups prices by calendar day:** All hourly slots are bucketed by their date
+2. **Selects the N cheapest hours of today only:** The `cheapest_hours_n` lowest-priced hours within the current day are chosen
+3. **Charges at full power:** Drives the battery at `max_power_w` while below `cheap_soc_target`; holds at the ceiling once full so it does not discharge and re-trigger
+4. **Sets battery setpoint:** Uses `api` mode (direct battery power control), negative = charge
+
+**Parameters:**
+
+- `cheapest_hours_n`: Number of cheapest hours per day to charge in (default: 2)
+- `cheap_soc_target`: SOC ceiling for charging (default: 100%)
+- `max_power_w`: Charge power (default: 2200W)
+
+### Why It's Priority #3
+
+**Rationale:** Even when prices never drop below the `price_charge` threshold (Priority 2), the cheapest hours of the day are still the best moment to top up the battery. Selecting the cheapest hours guarantees the battery fills at the lowest available cost each day.
+
+**Per-day, not a sliding window:** The cheapest hours are computed **within the current calendar day** rather than over a rolling look-ahead horizon. A sliding window would keep flagging the current/upcoming hours as "cheapest" whenever prices climb into the next day, charging the battery during expensive evening hours. Bucketing by day anchors the selection to the genuine daily lows.
+
+---
+
+## Priority 4: Afternoon Charge Window
+
+### When It Triggers
+
+**Conditions (all must be true):**
+
 1. Current hour is within `afternoon_start` to `afternoon_end` (default: 16:00-18:00)
 2. SOC < `target_afternoon_charging` (default: 70%)
 3. **Peak-shaving guard passes:** `evening_peak_buy_price - current_buy_price >= afternoon_margin`
 
 **Example:**
+
 - Current hour: 16:30
 - Current buy price: €0.26/kWh (import)
 - Highest **buy** price during the evening peak window: €0.61/kWh (import)
@@ -192,6 +243,7 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 4. **Sets battery setpoint:** Uses `api` mode (direct battery power control), negative = charge
 
 **Formula:**
+
 ```
 evening_peak_buy = max(buy price over evening_peak_start..evening_peak_end)
 if evening_peak_buy - current_buy_price < afternoon_margin:  hold grid 0W
@@ -199,32 +251,35 @@ else:                                                        charge_w = max_powe
 ```
 
 **Parameters:**
+
 - `afternoon_start` / `afternoon_end`: Afternoon window (hours)
 - `target_afternoon_charging`: Target SOC to reach before the peak (default: 70%)
 - `afternoon_margin`: Minimum import-price reduction to justify charging (default: €0.05/kWh)
 - `max_power_w`: Charge power once the guard passes (default: 2200W)
 
-### Why It's Priority #3
+### Why It's Priority #4
 
 **Rationale:** On dull days when solar cannot fill the battery, a **grid top-up** is the only way to have stored energy ready for the expensive evening hours. Charging at full power maximises the SOC reached within the (possibly short) window.
 
-**Peak-shaving, not trading:** Both prices compared are **buy/import** prices (raw + surcharge). The rule tops up self-consumed energy at a low afternoon import price to avoid a more expensive grid import during the evening peak. It is explicitly **not** grid trading — when trading, export taxes and fees paid are a loss, so this rule only manages energy you will consume yourself. The separate `min_arbitrage_margin` governs the Priority 4 evening peak hold-vs-sell (trading) decision.
+**Peak-shaving, not trading:** Both prices compared are **buy/import** prices (raw + surcharge). The rule tops up self-consumed energy at a low afternoon import price to avoid a more expensive grid import during the evening peak. It is explicitly **not** grid trading — when trading, export taxes and fees paid are a loss, so this rule only manages energy you will consume yourself. The separate `min_arbitrage_margin` governs the Priority 5 evening peak hold-vs-sell (trading) decision.
 
 **The peak-shaving guard is critical:** charging now only pays off if the avoided evening import is meaningfully more expensive than the current import. The `afternoon_margin` prevents topping up for a negligible import-price reduction after round-trip losses.
 
 ---
 
-## Priority 4: Evening Peak Sell-off Discharge
+## Priority 5: Evening Peak Sell-off Discharge
 
 ### When It Triggers
 
 **Conditions (all must be true):**
+
 1. Current hour is within `evening_peak_start` to `evening_peak_end` (default: 20:00-22:00)
 2. SOC > `target_peak_discharge` (default: 70%)
 3. No remaining hour today has a sell price above `price_discharge` (no more spikes to save energy for)
 4. **Evening beats morning:** either there is no known morning peak tomorrow, or `sell_price >= morning_peak - min_arbitrage_margin`
 
 **Example:**
+
 - Current hour: 21:00, SOC: 95%, `target_peak_discharge`: 70%
 - Max remaining sell price today: €0.25/kWh (< `price_discharge` €0.39 → no spike)
 - Current sell price: €0.30/kWh; tomorrow's morning peak: €0.28/kWh
@@ -237,32 +292,35 @@ else:                                                        charge_w = max_powe
 3. **Sets grid setpoint:** Uses `nom` mode (grid meter target), negative = export
 
 **Formula:**
+
 ```
 gap_wh = (soc - target_peak_discharge) / 100 × capacity_wh
 spread_w = gap_wh / max(hours_remaining, 0.083)  # avoid division by zero
 discharge_w = max(500, min(spread_w, max_power_w))
 ```
 
-**Morning reserve behavior:** If tomorrow's morning peak is clearly better than the current evening sell price, the branch does **not** fire — the battery holds its charge so the morning sell-off (Priority 5) can capture the better price. This prevents dumping everything in the evening only to be short in the morning. Because the branch only ever exports the excess **above** `target_peak_discharge`, a reserve is always kept regardless.
+**Morning reserve behavior:** If tomorrow's morning peak is clearly better than the current evening sell price, the branch does **not** fire — the battery holds its charge so the morning sell-off (Priority 6) can capture the better price. This prevents dumping everything in the evening only to be short in the morning. Because the branch only ever exports the excess **above** `target_peak_discharge`, a reserve is always kept regardless.
 
 **Important behavior:** Using the grid setpoint (not the battery setpoint) means the battery covers household load **on top of** the export target and never imports to top up.
 
-### Why It's Priority #4
+### Why It's Priority #5
 
 **Rationale:** Holding charge past the target SOC only pays if a **bigger sell opportunity is still ahead** — either later today (a spike) or tomorrow morning. Once neither is true, the excess is worth more used now than carried overnight.
 
 ---
 
-## Priority 5: Morning Sell-Off
+## Priority 6: Morning Sell-Off
 
 ### When It Triggers
 
 **Conditions (all must be true):**
+
 1. Current hour is within `morning_selloff_start` to `morning_selloff_end` (default: 07:00-09:00)
 2. SOC > `target_morning_soc` (default: 30%)
 3. Rule can be disabled from the GUI (`rule_morning_selloff`)
 
 **Example:**
+
 - Current hour: 08:00, SOC: 80%, `target_morning_soc`: 30%
 - **Result:** Trigger fires, the excess above 30% is exported across the remaining morning window
 
@@ -273,19 +331,20 @@ discharge_w = max(500, min(spread_w, max_power_w))
 3. **Sets grid setpoint:** Uses `nom` mode (grid meter target), negative = export
 
 **Formula:**
+
 ```
 gap_wh = (soc - target_morning_soc) / 100 × capacity_wh
 spread_w = gap_wh / max(hours_remaining, 0.083)
 discharge_w = max(500, min(spread_w, max_power_w))
 ```
 
-### Why It's Priority #5
+### Why It's Priority #6
 
-**Rationale:** The morning peak is often the counterpart to the evening peak. Priority 4 deliberately holds charge back when the morning is the better sell moment; Priority 5 is where that reserved energy is actually sold. It runs **purely on time and SOC** (no price threshold) — the reserve was already set aside by P4's evening-vs-morning comparison, so once the morning window arrives the excess above `target_morning_soc` is sold and the battery is emptied down to the floor before the solar day begins.
+**Rationale:** The morning peak is often the counterpart to the evening peak. Priority 5 deliberately holds charge back when the morning is the better sell moment; Priority 6 is where that reserved energy is actually sold. It runs **purely on time and SOC** (no price threshold) — the reserve was already set aside by P5's evening-vs-morning comparison, so once the morning window arrives the excess above `target_morning_soc` is sold and the battery is emptied down to the floor before the solar day begins.
 
 ---
 
-## Priority 6: Default
+## Priority 7: Default
 
 ### When It Triggers
 
@@ -298,6 +357,7 @@ This covers the **bulk of the day** — typically daytime hours with moderate pr
 **Sets grid setpoint:** Uses `nom` mode with 0W target
 
 **Behavior:**
+
 - Grid meter target = 0W
 - All PV generation is **forced into the battery first**
 - Grid export is **blocked** until battery is full
@@ -317,15 +377,16 @@ This covers the **bulk of the day** — typically daytime hours with moderate pr
 
 ## Priority Summary Table
 
-| Priority | Name | Trigger Condition | Setpoint Type | Mode | Primary Benefit |
-|----------|------|-------------------|---------------|------|-----------------|
-| 0 | Grid-connection guard | Always (final clamp) | Both | — | Never exceed the grid limit |
-| 1 | Price-spike discharge | sell_price > price_discharge | Battery | api | Sell into peaks / avoid imports |
-| 2 | Cheap price charge | buy_price < price_charge | Battery | api | Capture cheap energy |
-| 3 | Afternoon charge | In afternoon window + SOC < target_afternoon_charging + afternoon margin met | Battery | api | Prepare for evening peak |
-| 4 | Evening peak sell-off | In evening peak + SOC > target_peak_discharge + no spikes remaining + evening beats morning | Grid | nom | Monetize excess SOC, reserve for morning |
-| 5 | Morning sell-off | In morning window + SOC > target_morning_soc | Grid | nom | Sell the reserved morning energy |
-| 6 | Default | None of above | Grid | nom | Maximize self-consumption |
+| Priority | Name                  | Trigger Condition                                                                           | Setpoint Type | Mode | Primary Benefit                            |
+| -------- | --------------------- | ------------------------------------------------------------------------------------------- | ------------- | ---- | ------------------------------------------ |
+| 0        | Grid-connection guard | Always (final clamp)                                                                        | Both          | —   | Never exceed the grid limit                |
+| 1        | Price-spike discharge | sell_price > price_discharge                                                                | Battery       | api  | Sell into peaks / avoid imports            |
+| 2        | Cheap price charge    | buy_price < price_charge                                                                    | Battery       | api  | Capture cheap energy                       |
+| 3        | Cheapest hours charge | Hour among N cheapest of today + SOC < cheap_soc_target                                     | Battery       | api  | Fill at the daily lows regardless of level |
+| 4        | Afternoon charge      | In afternoon window + SOC < target_afternoon_charging + afternoon margin met                | Battery       | api  | Prepare for evening peak                   |
+| 5        | Evening peak sell-off | In evening peak + SOC > target_peak_discharge + no spikes remaining + evening beats morning | Grid          | nom  | Monetize excess SOC, reserve for morning   |
+| 6        | Morning sell-off      | In morning window + SOC > target_morning_soc                                                | Grid          | nom  | Sell the reserved morning energy           |
+| 7        | Default               | None of above                                                                               | Grid          | nom  | Maximize self-consumption                  |
 
 ---
 
@@ -333,11 +394,11 @@ This covers the **bulk of the day** — typically daytime hours with moderate pr
 
 The single `soc_target` was split into three purpose-specific targets, and buy/sell prices are now read separately:
 
-| Old | New | Used by |
-|-----|-----|---------|
-| `soc_target` | `target_afternoon_charging` | Priority 3 (charge target) |
-| `soc_target` | `target_peak_discharge` | Priority 4 (evening discharge floor) |
-| `soc_target` | `target_morning_soc` | Priority 5 (morning sell-off floor) |
+| Old                              | New                            | Used by                                  |
+| -------------------------------- | ------------------------------ | ---------------------------------------- |
+| `soc_target`                   | `target_afternoon_charging`  | Priority 3 (charge target)               |
+| `soc_target`                   | `target_peak_discharge`      | Priority 4 (evening discharge floor)     |
+| `soc_target`                   | `target_morning_soc`         | Priority 5 (morning sell-off floor)      |
 | `raw_price` / `import_price` | `buy_price` / `sell_price` | Charging uses buy, discharging uses sell |
 
 New parameters: `max_grid_w`, `grid_utilization` (P0), `morning_selloff_start`, `morning_selloff_end` (P5). Each rule (P1–P5) has a GUI switch (`rule_price_spike`, `rule_cheap_charge`, `rule_afternoon_charge`, `rule_evening_peak`, `rule_morning_selloff`) that defaults to on.

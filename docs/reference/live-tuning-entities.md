@@ -33,15 +33,16 @@ The app runs every 5 minutes, and **immediately whenever a live input changes** 
 
 | Entity ID | apps.yaml Key | Description | Range | Default Fallback | Unit |
 |---|---|---|---|---|---|
-| `number.home_battery_target_afternoon_charging` | `target_afternoon_charging_entity` | Target SOC to reach before the evening peak (P3) | 0-100 | `target_afternoon_charging` from apps.yaml | % |
-| `number.home_battery_target_peak_discharge` | `target_peak_discharge_entity` | SOC above which evening excess is sold (P4) | 0-100 | `target_peak_discharge` from apps.yaml | % |
-| `number.home_battery_target_morning_soc` | `target_morning_soc_entity` | SOC to unload down to in the morning window (P5) | 0-100 | `target_morning_soc` from apps.yaml | % |
+| `number.home_battery_target_afternoon_charging` | `target_afternoon_charging_entity` | Target SOC to reach before the evening peak (P4) | 0-100 | `target_afternoon_charging` from apps.yaml | % |
+| `number.home_battery_target_peak_discharge` | `target_peak_discharge_entity` | SOC above which evening excess is sold (P5) | 0-100 | `target_peak_discharge` from apps.yaml | % |
+| `number.home_battery_target_morning_soc` | `target_morning_soc_entity` | SOC to unload down to in the morning window (P6) | 0-100 | `target_morning_soc` from apps.yaml | % |
 | `number.home_battery_soc_floor` | `soc_floor_entity` | Minimum SOC floor | 0-100 | `soc_floor` from apps.yaml | % |
 | `number.home_battery_soc_ceiling` | `cheap_soc_target_entity` | Target SOC for cheap-price charging | 0-100 | `cheap_soc_target` from apps.yaml | % |
+| `number.home_battery_cheapest_hours_n` | `cheapest_hours_n_entity` | Number of cheapest hours per day to charge at full power (P3) | ≥ 0 | `cheapest_hours_n` from apps.yaml | hours |
 | `number.home_battery_price_discharge` | `price_discharge_entity` | Price threshold for discharge | any | `price_discharge` from apps.yaml | €/kWh |
 | `number.home_battery_price_charge` | `price_charge_entity` | Price threshold for charging | any | `price_charge` from apps.yaml | €/kWh |
-| `number.home_battery_min_arbitrage_margin` | `min_arbitrage_margin_entity` | Minimum spread for the evening peak hold-vs-sell decision (P4) | ≥ 0 | `min_arbitrage_margin` from apps.yaml | €/kWh |
-| `number.home_battery_afternoon_margin` | `afternoon_margin_entity` | Minimum import-price reduction (evening peak vs now) to justify afternoon charge (P3) | 0-0.5 | `afternoon_margin` from apps.yaml | €/kWh |
+| `number.home_battery_min_arbitrage_margin` | `min_arbitrage_margin_entity` | Minimum spread for the evening peak hold-vs-sell decision (P5) | ≥ 0 | `min_arbitrage_margin` from apps.yaml | €/kWh |
+| `number.home_battery_afternoon_margin` | `afternoon_margin_entity` | Minimum import-price reduction (evening peak vs now) to justify afternoon charge (P4) | 0-0.5 | `afternoon_margin` from apps.yaml | €/kWh |
 
 ---
 
@@ -64,6 +65,7 @@ Use Home Assistant's UI to create the helpers:
 | Morning SOC Target | `number.home_battery_target_morning_soc` | 0 | 100 | 1 | % | mdi:battery-30 |
 | SOC Floor | `number.home_battery_soc_floor` | 0 | 100 | 1 | % | mdi:battery-outline |
 | SOC Ceiling | `number.home_battery_soc_ceiling` | 0 | 100 | 1 | % | mdi:battery |
+| Cheapest Hours | `number.home_battery_cheapest_hours_n` | 0 | 12 | 1 | hours | mdi:clock-star-four-points |
 | Price Discharge | `number.home_battery_price_discharge` | -1 | 1 | 0.01 | €/kWh | mdi:lightning-bolt |
 | Price Charge | `number.home_battery_price_charge` | -1 | 1 | 0.01 | €/kWh | mdi:lightning-bolt |
 | Min Arbitrage Margin | `number.home_battery_min_arbitrage_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:swap-horizontal |
@@ -84,6 +86,7 @@ sessy_strategy:
   target_morning_soc: 30
   soc_floor: 20
   cheap_soc_target: 100
+  cheapest_hours_n: 2
   price_discharge: 0.39
   price_charge: -0.10
   min_arbitrage_margin: 0.05
@@ -94,6 +97,7 @@ sessy_strategy:
   target_morning_soc_entity: number.home_battery_target_morning_soc
   soc_floor_entity: number.home_battery_soc_floor
   cheap_soc_target_entity: number.home_battery_soc_ceiling
+  cheapest_hours_n_entity: number.home_battery_cheapest_hours_n
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin

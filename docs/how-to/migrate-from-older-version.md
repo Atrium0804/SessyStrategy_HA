@@ -53,7 +53,7 @@ last_updated: 2026-08-01
 **Major changes:**
 - [x] **New**: Live tuning entities for all major parameters
 - [x] **New**: Adaptive spread windows for charge/discharge
-- [x] **New**: Priority 4 — Evening peak sell-off discharge
+- [x] **New**: Priority 5 — Evening peak sell-off discharge
 - [x] **New**: Afternoon top-up margin check (evening peak import vs current import)
 - [x] **Removed**: Seasonal mode (`season_mode`, winter overrides) — use live tuning instead
 - [x] **Removed**: Single `soc_target` fallback — replaced by per-rule targets
@@ -407,9 +407,11 @@ sessy_strategy:
 4. **Test each priority:**
    - **Priority 1:** Wait for high prices, verify discharge behavior
    - **Priority 2:** Wait for low/negative prices, verify charge behavior
-   - **Priority 3:** Wait for afternoon window, verify charge behavior
-   - **Priority 4:** Wait for evening peak with excess SOC, verify discharge
-   - **Priority 5:** Default behavior — grid setpoint 0W
+   - **Priority 3:** Wait for one of the day's cheapest hours, verify charge behavior
+   - **Priority 4:** Wait for afternoon window, verify charge behavior
+   - **Priority 5:** Wait for evening peak with excess SOC, verify discharge
+   - **Priority 6:** Wait for the morning window with excess SOC, verify sell-off
+   - **Priority 7:** Default behavior — grid setpoint 0W
 
 5. **Test modes:**
    - Switch `mode_select` to `grid_setpoint`, verify grid target is set

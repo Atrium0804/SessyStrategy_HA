@@ -146,7 +146,7 @@ Additionally, grid setpoint is used in **manual mode** when `grid_setpoint` mode
 
 ### Mathematical Control
 
-**Priority 4 (Evening Peak Sell-off):**
+**Priority 5 (Evening Peak Sell-off):**
 ```
 gap_wh = (soc - soc_target) / 100 × capacity_wh
 spread_w = gap_wh / max(hours_remaining, 0.083)
@@ -154,7 +154,7 @@ discharge_w = max(50, min(spread_w, max_power_w))
 Setpoint: -discharge_w (negative = export)
 ```
 
-**Priority 5 (Default):**
+**Priority 7 (Default):**
 ```
 Setpoint: 0 W (net zero at meter)
 ```
@@ -234,9 +234,9 @@ All of these require **precise control of battery power** to ensure the right am
 
 ### Grid Setpoint for Grid Interaction
 
-Priorities 4-5 are fundamentally about **grid interaction**:
-- P4: Sell excess stored energy back to grid
-- P5: Prevent exporting solar to grid (use it all locally)
+Priorities 5-7 are fundamentally about **grid interaction**:
+- P5-P6: Sell excess stored energy back to grid
+- P7: Prevent exporting solar to grid (use it all locally)
 
 These use grid setpoint because the **primary concern is what happens at the grid connection**, not the battery's internal state.
 
@@ -297,14 +297,14 @@ The strategy supports manual override modes via the `mode_select` entity:
 ```mermaid
 %%{init: {'theme': 'neutral'}}%%
 flowchart TD
-    A[Strategy Decision] --> B{Priority 1-3?}
+    A[Strategy Decision] --> B{Priority 1-4?}
     B -->|Yes| C[Set api mode]
     C --> D[Set battery setpoint]
-    B -->|No| E{Priority 4?}
+    B -->|No| E{Priority 5-6?}
     E -->|Yes| F[Set nom mode]
     F --> G[Set grid setpoint
       (negative = export)]
-    E -->|No| H[Priority 5?]
+    E -->|No| H[Priority 7?]
     H -->|Yes| I[Set nom mode]
     I --> J[Set grid setpoint = 0W]
     H -->|No| K[Manual mode?]

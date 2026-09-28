@@ -174,7 +174,7 @@ The surcharge affects:
 - **Import equivalent:** €0.01/kWh
 - **Logic:** Capture energy when it's essentially free or better
 
-### Priority 3: Afternoon Charge
+### Priority 4: Afternoon Charge
 
 - **Comparison:** Uses **import (buy)** prices for both the current hour and the evening peak
 - **Peak-shaving calculation:** `evening_peak_buy_price - current_buy_price >= afternoon_margin`
@@ -183,7 +183,7 @@ The surcharge affects:
 
 **Why import prices for afternoon charge?**
 
-Priority 3 is **peak-shaving, not trading**. Both sides of the comparison are import prices, because the energy you charge now is energy you will **self-consume** during the evening peak instead of importing it from the grid:
+Priority 4 is **peak-shaving, not trading**. Both sides of the comparison are import prices, because the energy you charge now is energy you will **self-consume** during the evening peak instead of importing it from the grid:
 ```
 (evening_peak_raw + surcharge) - (current_raw + surcharge) >= afternoon_margin
 ```
@@ -191,15 +191,15 @@ Priority 3 is **peak-shaving, not trading**. Both sides of the comparison are im
 The surcharge is present on both sides, but it must stay because the decision is about the **actual import cost avoided**. You compare what you would pay to import during the evening peak against what you pay to charge now. If that reduction is at least `afternoon_margin`, charging is worthwhile.
 
 !!! note
-    This is deliberately **not** grid trading. When trading (buy to later export), taxes and fees paid on the import are a pure loss. Priority 3 only manages self-consumed energy, so it uses the buy price on both sides. The trading decision (hold vs sell) is Priority 4 and uses `min_arbitrage_margin`.
+    This is deliberately **not** grid trading. When trading (buy to later export), taxes and fees paid on the import are a pure loss. Priority 4 only manages self-consumed energy, so it uses the buy price on both sides. The trading decision (hold vs sell) is Priority 5 and uses `min_arbitrage_margin`.
 
-### Priority 4: Evening Peak Sell-off Discharge
+### Priority 5: Evening Peak Sell-off Discharge
 
 - **Comparison:** `max_remaining_price < price_discharge`
 - **Raw threshold:** €0.39/kWh
 - **Logic:** Discharge excess if no more expensive spikes are expected
 
-### Priority 5: Default
+### Priority 7: Default
 
 - **No price comparison**
 - **Logic:** Maximize self-consumption regardless of price

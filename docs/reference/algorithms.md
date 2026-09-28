@@ -16,7 +16,7 @@ SessyStrategy uses several key algorithms for calculating charge/discharge power
 
 **Method:** `_charge_setpoint(soc: float, soc_target: float, afternoon_window_h: float) -> float`
 
-**Purpose:** Calculate power to charge the battery during the afternoon window (Priority 3).
+**Purpose:** Calculate power to charge the battery during the afternoon window (Priority 4).
 
 **Formula:**
 ```
@@ -125,7 +125,7 @@ return max_power_w  # Always charge at maximum power
 
 **Method:** `_evening_peak_selloff_setpoint(soc: float, soc_target: float, hours_remaining: float) -> float`
 
-**Purpose:** Calculate power to discharge excess SOC during evening peak (Priority 4).
+**Purpose:** Calculate power to discharge excess SOC during evening peak (Priority 5).
 
 **Formula:**
 ```
@@ -289,12 +289,12 @@ result = max(run_h, min_window_h)
 
 | Algorithm | Formula | Purpose | Used In |
 |---|---|---|---|
-| Charge Setpoint | `(target-soc)/100 * cap / window * 1.5` | Afternoon charging | Priority 3 |
+| Charge Setpoint | `(target-soc)/100 * cap / window * 1.5` | Afternoon charging | Priority 4 |
 | Discharge Setpoint | `(soc-floor)/100 * cap / window` | Price spike discharge | Priority 1 |
 | Cheap Charge | `max_power_w` (constant) | Cheap price charging | Priority 2 |
-| Excess Discharge | `(soc-target)/100 * cap / hours` | Evening surplus export | Priority 4 |
+| Excess Discharge | `(soc-target)/100 * cap / hours` | Evening surplus export | Priority 5 |
 | Adaptive Window | `max(contiguous_hours, min_window)` | Spread window sizing | P1, P2 |
-| Max Price | `max(prices[start:end])` | Peak detection | P3, P4 |
+| Max Price | `max(prices[start:end])` | Peak detection | P4, P5 |
 
 ---
 

@@ -37,17 +37,18 @@ The configuration is organized into logical sections:
 | `capacity_wh` | float | 5000 | Yes | Battery capacity in watt-hours | > 0 | `5000` |
 | `max_power_w` | float | 2200 | Yes | Maximum inverter/battery power in watts — final setpoint clamp | > 0 | `2200` |
 | **State-of-Charge Targets** |||||||
-| `target_afternoon_charging` | float | 70 | No | Target SOC to reach before the evening peak (P3) | 0-100 | `70` |
-| `target_peak_discharge` | float | 70 | No | SOC above which evening excess is sold (P4) | 0-100 | `70` |
-| `target_morning_soc` | float | 30 | No | SOC to unload down to in the morning window (P5) | 0-100 | `30` |
+| `target_afternoon_charging` | float | 70 | No | Target SOC to reach before the evening peak (P4) | 0-100 | `70` |
+| `target_peak_discharge` | float | 70 | No | SOC above which evening excess is sold (P5) | 0-100 | `70` |
+| `target_morning_soc` | float | 30 | No | SOC to unload down to in the morning window (P6) | 0-100 | `30` |
 | `soc_floor` | float | 0 | No | SOC floor percentage — battery never discharges below this | 0-100 | `20` |
 | `cheap_soc_target` | float | 100 | No | SOC ceiling for cheap-price charging | 0-100 | `100` |
+| `cheapest_hours_n` | int | 2 | No | Number of cheapest hours per calendar day to charge at full power (P3) | ≥ 0 | `2` |
 | **Pricing** |||||||
 | `surcharge` | float | 0.11 | No | Import surcharge €/kWh (raw export → import price conversion) | ≥ 0 | `0.11` |
 | `price_discharge` | float | 0.39 | No | Raw price threshold above which to force discharge | any | `0.39` |
 | `price_charge` | float | -0.10 | No | Raw price threshold below which to charge from grid | any | `-0.10` |
-| `min_arbitrage_margin` | float | 0.05 | No | Minimum €/kWh spread for the evening peak hold-vs-sell decision (P4) | ≥ 0 | `0.05` |
-| `afternoon_margin` | float | 0.05 | No | Minimum €/kWh by which the evening peak import price must beat the current import price to justify afternoon charge (P3) | ≥ 0 | `0.05` |
+| `min_arbitrage_margin` | float | 0.05 | No | Minimum €/kWh spread for the evening peak hold-vs-sell decision (P5) | ≥ 0 | `0.05` |
+| `afternoon_margin` | float | 0.05 | No | Minimum €/kWh by which the evening peak import price must beat the current import price to justify afternoon charge (P4) | ≥ 0 | `0.05` |
 | **Adaptive Spread Window** |||||||
 | `min_window_h` | float | 2.0 | No | Minimum adaptive spread window in hours | > 0 | `2.0` |
 | `rerun_debounce_s` | float | 2.0 | No | Delay in seconds before re-running after live input changes | ≥ 0 | `2.0` |
@@ -96,11 +97,12 @@ These define the physical capabilities of your battery system.
 
 These control how the battery is charged and discharged.
 
-- **`target_afternoon_charging`**: The target SOC to reach before the evening peak. Used in Priority 3 (afternoon charge).
-- **`target_peak_discharge`**: The SOC above which the evening peak sell-off (Priority 4) discharges surplus energy.
-- **`target_morning_soc`**: The SOC to unload down to during the morning sell-off window (Priority 5).
+- **`target_afternoon_charging`**: The target SOC to reach before the evening peak. Used in Priority 4 (afternoon charge).
+- **`target_peak_discharge`**: The SOC above which the evening peak sell-off (Priority 5) discharges surplus energy.
+- **`target_morning_soc`**: The SOC to unload down to during the morning sell-off window (Priority 6).
 - **`soc_floor`**: The minimum SOC level. The battery will never discharge below this percentage.
 - **`cheap_soc_target`**: The target SOC for cheap-price charging (Priority 2). Typically set to 100% to fully charge during cheap hours.
+- **`cheapest_hours_n`**: The number of cheapest hours **per calendar day** to charge at full power (Priority 3). The cheapest hours are selected within each day, not over a rolling look-ahead horizon.
 
 ### Pricing
 
@@ -109,8 +111,8 @@ Price-related configuration uses **raw export prices** (what the grid pays you),
 - **`surcharge`**: The tax/fee added to raw prices to get import prices. Default €0.11/kWh for Dutch energy tax.
 - **`price_discharge`**: When raw price exceeds this, Priority 1 (price-spike discharge) triggers.
 - **`price_charge`**: When raw price is below this (typically negative), Priority 2 (cheap charge) triggers.
-- **`min_arbitrage_margin`**: Minimum price spread required for Priority 4 (evening peak hold-vs-sell decision).
-- **`afternoon_margin`**: Minimum amount (€/kWh) by which the evening peak import price must beat the current import price for Priority 3 (afternoon charge) to top up. This is a peak-shaving check to avoid net grid import at the evening peak, not a trading margin.
+- **`min_arbitrage_margin`**: Minimum price spread required for Priority 5 (evening peak hold-vs-sell decision).
+- **`afternoon_margin`**: Minimum amount (€/kWh) by which the evening peak import price must beat the current import price for Priority 4 (afternoon charge) to top up. This is a peak-shaving check to avoid net grid import at the evening peak, not a trading margin.
 
 **Important**: All price thresholds are in **raw export prices**. The import equivalent is `raw_price + surcharge`.
 
@@ -124,7 +126,7 @@ Price-related configuration uses **raw export prices** (what the grid pays you),
 All times are in **local hours** (24-hour format).
 
 - **Afternoon window** (`afternoon_start` to `afternoon_end`): When to top up in preparation for the evening peak.
-- **Evening peak window** (`evening_peak_start` to `evening_peak_end`): Evening peak period for Priority 4 (excess discharge).
+- **Evening peak window** (`evening_peak_start` to `evening_peak_end`): Evening peak period for Priority 5 (excess discharge).
 
 ---
 

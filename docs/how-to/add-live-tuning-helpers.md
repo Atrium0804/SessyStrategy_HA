@@ -55,15 +55,16 @@ SessyStrategy supports live tuning for these parameters:
 
 | Parameter | Entity Type | Purpose | Default Static Value |
 |-----------|-------------|---------|---------------------|
-| `target_afternoon_charging_entity` | input_number | Target SOC for afternoon charging (P3) | `target_afternoon_charging: 70` |
-| `target_peak_discharge_entity` | input_number | Target SOC for evening peak sell-off (P4) | `target_peak_discharge: 70` |
-| `target_morning_soc_entity` | input_number | Target SOC for morning sell-off (P5) | `target_morning_soc: 30` |
+| `target_afternoon_charging_entity` | input_number | Target SOC for afternoon charging (P4) | `target_afternoon_charging: 70` |
+| `target_peak_discharge_entity` | input_number | Target SOC for evening peak sell-off (P5) | `target_peak_discharge: 70` |
+| `target_morning_soc_entity` | input_number | Target SOC for morning sell-off (P6) | `target_morning_soc: 30` |
 | `soc_floor_entity` | input_number | Minimum SOC — never discharge below | `soc_floor: 0` |
 | `cheap_soc_target_entity` | input_number | Maximum SOC for cheap-price charging | `cheap_soc_target: 100` |
+| `cheapest_hours_n_entity` | input_number | Number of cheapest hours per day to charge at full power (P3) | `cheapest_hours_n: 2` |
 | `price_discharge_entity` | input_number | Raw price threshold for discharging | `price_discharge: 0.39` |
 | `price_charge_entity` | input_number | Raw price threshold for charging | `price_charge: -0.10` |
-| `min_arbitrage_margin_entity` | input_number | Minimum price spread for the evening peak hold-vs-sell decision (P4) | `min_arbitrage_margin: 0.05` |
-| `afternoon_margin_entity` | input_number | Minimum import-price reduction to justify afternoon charge (P3) | `afternoon_margin: 0.05` |
+| `min_arbitrage_margin_entity` | input_number | Minimum price spread for the evening peak hold-vs-sell decision (P5) | `min_arbitrage_margin: 0.05` |
+| `afternoon_margin_entity` | input_number | Minimum import-price reduction to justify afternoon charge (P4) | `afternoon_margin: 0.05` |
 
 **Note:** The `mode_select` entity is also live-tuned and controls the operating mode.
 

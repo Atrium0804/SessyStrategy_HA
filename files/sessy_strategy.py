@@ -9,7 +9,7 @@ Strategy (priority order, each rule individually switchable from the GUI):
   0. Grid-connection guard: every setpoint is clamped to max_grid_w * grid_utilization
   1. Price-spike discharge (price > price_discharge): battery setpoint, discharge toward SOC floor
   2. Cheap/negative price (price < price_charge): battery setpoint, charge toward ceiling
-  3. Cheapest hours: current hour is one of the N cheapest in the coming horizon:
+  3. Cheapest hours: current hour is one of the N cheapest in its calendar day:
      battery setpoint, charge at max power toward ceiling regardless of price level.
   4. Afternoon charge, SOC < target_afternoon_charging, and the evening peak price
      beats the current price by afternoon_margin: battery setpoint, charge at max power.
@@ -31,7 +31,7 @@ class SessyStrategy(hass.Hass):
         "discharge": "Price-spike discharge: sell battery at high prices, discharge toward SOC floor",
         "cheap_charge": "Cheap charge: buy energy at low/negative prices, charge toward ceiling",
         "cheap_charge_full": "Cheap charge: already at ceiling, holding",
-        "cheapest_hours": "Cheapest hours: charge at max power during the N cheapest hours of the horizon",
+        "cheapest_hours": "Cheapest hours: charge at max power during the N cheapest hours of the day",
         "cheapest_hours_full": "Cheapest hours: already at ceiling, holding",
         "afternoon_charge": "Afternoon charge: peak-shaving, charge at max power for evening peak",
         "afternoon_full": "Afternoon charge: already at target SOC, holding",
@@ -58,9 +58,8 @@ class SessyStrategy(hass.Hass):
         self.soc_floor            = float(self.args.get("soc_floor", 20))
         self.cheap_soc_target     = float(self.args.get("cheap_soc_target", 100))
         # Cheapest-hours charge: charge at max power during the N cheapest hourly
-        # slots of the coming horizon, regardless of the absolute price level.
+        # slots of the current calendar day, regardless of the absolute price level.
         self.cheapest_hours_n         = int(self.args.get("cheapest_hours_n", 2))
-        self.cheapest_hours_horizon_h = int(self.args.get("cheapest_hours_horizon_h", 24))
         self.price_discharge      = float(self.args.get("price_discharge", 0.39))
         self.price_charge         = float(self.args.get("price_charge", -0.10))
         self.afternoon_start      = int(self.args.get("afternoon_start", 15))
@@ -302,7 +301,7 @@ class SessyStrategy(hass.Hass):
 
         # ── Priority 3: cheapest-hours charge ───────────────────────────────
         # Charge at max power when the current hour is one of the N cheapest in
-        # the coming horizon, regardless of the absolute price level. Holds at the
+        # its calendar day, regardless of the absolute price level. Holds at the
         # ceiling once full so it does not discharge and re-trigger.
         if self._rule_enabled(self.rule_cheapest_hours_entity) and \
                 self._is_cheapest_hour(cheapest_hours_n):
@@ -685,11 +684,13 @@ class SessyStrategy(hass.Hass):
             return None
         return prices
 
-    def _is_cheapest_hour(self, n: int, horizon_h: int | None = None) -> bool:
+    def _is_cheapest_hour(self, n: int) -> bool:
         """
-        Whether the current hour is one of the n cheapest hourly slots in the
-        coming horizon (cheapest_hours_horizon_h hours from the current hour,
-        inclusive). Returns False when n <= 0 or no price data is available.
+        Whether the current hour is one of the n cheapest hourly slots of its own
+        calendar day. Prices are grouped per day and the cheapest n hours are
+        picked within the current day only, so hours never inherit "cheapest"
+        status from prices climbing into the next day. Returns False when n <= 0
+        or no price data is available.
         """
         n = int(n)
         if n <= 0:
@@ -697,24 +698,25 @@ class SessyStrategy(hass.Hass):
         prices = self._get_prices_dict()
         if not prices:
             return False
-        horizon = self.cheapest_hours_horizon_h if horizon_h is None else int(horizon_h)
         now = self.datetime()
         base = now.replace(minute=0, second=0, microsecond=0)
         current_key = base.strftime("%Y-%m-%dT%H:00:00")
-        cursor = base
-        slots = []
-        for _ in range(max(horizon, 0)):
-            key = cursor.strftime("%Y-%m-%dT%H:00:00")
-            if key in prices:
-                try:
-                    slots.append((float(prices[key]), key))
-                except (TypeError, ValueError):
-                    pass
-            cursor += timedelta(hours=1)
-        if not slots:
+        current_date = base.strftime("%Y-%m-%d")
+
+        # Collect the current day's hourly slots (key format: YYYY-MM-DDTHH:00:00).
+        today_slots = []
+        for key, price_val in prices.items():
+            if key[:10] != current_date:
+                continue
+            try:
+                today_slots.append((float(price_val), key))
+            except (TypeError, ValueError):
+                pass
+        if not today_slots:
             return False
-        slots.sort(key=lambda kv: kv[0])
-        cheapest_keys = {key for _, key in slots[:n]}
+
+        today_slots.sort(key=lambda kv: kv[0])
+        cheapest_keys = {key for _, key in today_slots[:n]}
         return current_key in cheapest_keys
 
     def _contiguous_price_hours(self, threshold: float, above: bool) -> float:

@@ -2,10 +2,10 @@
 
 ## Overview
 
-The **arbitrage margin** (`min_arbitrage_margin`) is a critical safeguard in the SessyStrategy that prevents uneconomic battery cycling. It governs the **Priority 4 evening peak hold-vs-sell decision**: it ensures that stored energy is only sold (or that charging for a later sell is only pursued) when the expected price spread justifies the round-trip losses and the strategy's own overhead.
+The **arbitrage margin** (`min_arbitrage_margin`) is a critical safeguard in the SessyStrategy that prevents uneconomic battery cycling. It governs the **Priority 5 evening peak hold-vs-sell decision**: it ensures that stored energy is only sold (or that charging for a later sell is only pursued) when the expected price spread justifies the round-trip losses and the strategy's own overhead.
 
 !!! note
-    `min_arbitrage_margin` is a **trading** safeguard used by Priority 4. It is not used by Priority 3 (afternoon charge). Priority 3 uses a separate `afternoon_margin`, a peak-shaving check that compares two **import** prices. See [Strategy Priority Chain](../explanation/strategy-priority-chain.md).
+    `min_arbitrage_margin` is a **trading** safeguard used by Priority 5. It is not used by Priority 4 (afternoon charge). Priority 4 uses a separate `afternoon_margin`, a peak-shaving check that compares two **import** prices. See [Strategy Priority Chain](../explanation/strategy-priority-chain.md).
 
 ---
 
@@ -69,13 +69,13 @@ min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
 
 ## How It Works
 
-### In Priority 4: Evening peak hold-vs-sell
+### In Priority 5: Evening peak hold-vs-sell
 
-The arbitrage margin is used in the **evening peak** (Priority 4) to determine whether holding or selling stored energy across the peak is economically justified.
+The arbitrage margin is used in the **evening peak** (Priority 5) to determine whether holding or selling stored energy across the peak is economically justified.
 
 **Condition:**
 ```python
-# Evening peak hold-vs-sell decision (Priority 4)
+# Evening peak hold-vs-sell decision (Priority 5)
 expected_peak = self._max_price_in_window(now_hour, 24)
 if expected_peak is not None and \
         (expected_peak - price) < min_arbitrage_margin:
