@@ -127,12 +127,8 @@ class TestLegionellaTracking:
 # update_strategy priority chain
 # ===========================================================================
 
-def _price_entry(hour, price):
-    return {
-        "from": f"2024-06-15T{hour:02d}:00:00+02:00",
-        "till": f"2024-06-15T{hour + 1:02d}:00:00+02:00",
-        "price": price,
-    }
+def _sessy_prices(price, hours):
+    return {f"2024-06-15T{h:02d}:00:00": price for h in hours}
 
 
 def _entity_states(temp, mode="economic", prices=None, legionella_last_ok=None,
@@ -146,7 +142,7 @@ def _entity_states(temp, mode="economic", prices=None, legionella_last_ok=None,
     }
 
     def _get_state(entity_id=None, attribute=None):
-        if entity_id == "sensor.frankenergy_current_electricity_market_price" and attribute == "prices":
+        if entity_id == "sensor.sessy_dnhh_energy_price" and attribute == "energy_prices":
             return prices
         return states.get(entity_id)
 
@@ -154,11 +150,9 @@ def _entity_states(temp, mode="economic", prices=None, legionella_last_ok=None,
 
 
 # Cheaper morning window (0-6) vs pricier midday window (10-16).
-_MORNING_CHEAP = [_price_entry(h, 0.05) for h in range(0, 6)] + \
-                 [_price_entry(h, 0.30) for h in range(10, 16)]
+_MORNING_CHEAP = {**_sessy_prices(0.05, range(0, 6)), **_sessy_prices(0.30, range(10, 16))}
 # Cheaper midday window (10-16) vs pricier morning window (0-6).
-_MIDDAY_CHEAP = [_price_entry(h, 0.30) for h in range(0, 6)] + \
-                [_price_entry(h, 0.05) for h in range(10, 16)]
+_MIDDAY_CHEAP = {**_sessy_prices(0.30, range(0, 6)), **_sessy_prices(0.05, range(10, 16))}
 
 
 class TestUpdateStrategyPriority:
@@ -295,6 +289,7 @@ class TestEconomicDecision:
 
     def test_entry_hour_parses_iso_timestamp(self):
         assert BoilerStrategy._entry_hour({"from": "2024-06-15T10:00:00+02:00"}) == 10
+        assert BoilerStrategy._entry_hour("2024-06-15T10:00:00") == 10
 
     def test_entry_hour_none_for_malformed(self):
         assert BoilerStrategy._entry_hour({"from": "not-a-date"}) is None
@@ -320,6 +315,6 @@ class TestEconomicDecision:
         app = make_app()
         in_window, avg1, avg2, chosen = app._cheapest_window_info(14, None)
         assert in_window is False
-        assert chosen is None
+        assert chosen == "none"
         assert avg1 is None and avg2 is None
 

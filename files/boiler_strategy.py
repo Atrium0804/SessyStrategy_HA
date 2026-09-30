@@ -79,8 +79,8 @@ class BoilerStrategy(hass.Hass):
 
         # ── Entity IDs (overridable from apps.yaml) ─────────────────────────
         self.temp_sensor              = self.args.get("temp_sensor",              "sensor.boiler_temperatuur")
-        self.price_forecast_sensor    = self.args.get("price_forecast_sensor",    "sensor.frankenergy_current_electricity_market_price")
-        self.price_forecast_attribute = self.args.get("price_forecast_attribute", "prices")
+        self.price_forecast_sensor    = self.args.get("price_forecast_sensor",    "sensor.sessy_dnhh_energy_price")
+        self.price_forecast_attribute = self.args.get("price_forecast_attribute", "energy_prices")
         self.mode_select              = self.args.get("mode_select",              "input_select.boiler_strategy_mode")
         self.boiler_mode_select       = self.args.get("boiler_mode_select",       "select.boiler_mode")
         self.legionella_last_ok_entity = self.args.get("legionella_last_ok_entity", "input_datetime.boiler_legionella_last_ok")
@@ -141,11 +141,15 @@ class BoilerStrategy(hass.Hass):
         # Remaining branches are price-driven; evaluate the cheaper period once.
         now_hour = self.datetime().hour
         prices = self._get_prices()
+        self.log(f"Prices data: {type(prices).__name__} - {prices}", level="DEBUG")
         in_window, day_avg_price, night_avg_price, cheapest_period = self._cheapest_window_info(now_hour, prices)
         price_fields = dict(
-            avg_price_day=day_avg_price,
-            avg_price_night=night_avg_price,
+            avg_price_day=str(round(day_avg_price, 4)) if day_avg_price is not None else "N/A",
+            avg_price_night=str(round(night_avg_price, 4)) if night_avg_price is not None else "N/A",
             cheapest_period=cheapest_period,
+            day_window=f"{self.eco_day_start}:00-{self.eco_day_end}:00",
+            night_window=f"{self.eco_night_start}:00-{self.eco_night_end}:00",
+            in_cheapest_window=in_window,
             **status_fields,
         )
 
@@ -186,38 +190,68 @@ class BoilerStrategy(hass.Hass):
         if night_avg_price is not None:
             candidates.append((night_avg_price, night_window, "night"))
         if not candidates:
-            return False, day_avg_price, night_avg_price, None
+            return False, day_avg_price, night_avg_price, "none"
 
         _, (start_h, end_h), cheapest_period = min(candidates, key=lambda c: c[0])
         in_window = start_h <= now_hour < end_h
         return in_window, day_avg_price, night_avg_price, cheapest_period
 
     def _window_average(self, prices, start_h, end_h):
-        """Average forecast price over entries whose start hour is in [start_h, end_h)."""
+        """Average forecast price over entries whose start hour is in [start_h, end_h).
+        
+        Supports two formats:
+        - FrankEnergy: list of dicts [{from, till, price}, ...]
+        - Sessy: dict {ISO_timestamp: price, ...}
+        """
         price_values = []
-        for entry in prices or []:
-            hour = self._entry_hour(entry)
-            if hour is None or not (start_h <= hour < end_h):
-                continue
-            try:
-                price_values.append(float(entry.get("price")))
-            except (TypeError, ValueError, AttributeError):
-                continue
+        if prices is None:
+            return None
+        
+        if isinstance(prices, dict):
+            # Sessy format: dict with ISO timestamp keys
+            for timestamp_str, price_val in prices.items():
+                hour = self._entry_hour(timestamp_str)
+                if hour is None:
+                    continue
+                if start_h <= hour < end_h:
+                    try:
+                        price_values.append(float(price_val))
+                    except (TypeError, ValueError) as e:
+                        self.log(f"Failed to parse price {price_val}: {e}", level="DEBUG")
+                        continue
+        else:
+            # FrankEnergy format: list of dicts
+            for entry in prices or []:
+                hour = self._entry_hour(entry)
+                if hour is None or not (start_h <= hour < end_h):
+                    continue
+                try:
+                    price_values.append(float(entry.get("price")))
+                except (TypeError, ValueError, AttributeError):
+                    continue
+        
         if not price_values:
             return None
         return sum(price_values) / len(price_values)
 
     @staticmethod
     def _entry_hour(entry):
-        if not isinstance(entry, dict):
-            return None
-        raw = entry.get("from")
-        if not raw:
-            return None
-        try:
-            return datetime.fromisoformat(str(raw)).hour
-        except ValueError:
-            return None
+        if isinstance(entry, dict):
+            # FrankEnergy format: dict with 'from' key
+            raw = entry.get("from")
+            if not raw:
+                return None
+            try:
+                return datetime.fromisoformat(str(raw)).hour
+            except ValueError:
+                return None
+        elif isinstance(entry, str):
+            # Sessy format: ISO timestamp string
+            try:
+                return datetime.fromisoformat(entry).hour
+            except ValueError:
+                return None
+        return None
 
 
     # ── Legionella tracking ──────────────────────────────────────────────────
@@ -332,12 +366,17 @@ class BoilerStrategy(hass.Hass):
         return str(raw).strip().lower()
 
     def _get_prices(self):
-        """Hourly forecast list ([{from, till, price}, ...]) or None."""
+        """Hourly forecast prices or None.
+        
+        Sessy format: dict {ISO_timestamp: price, ...}
+        FrankEnergy format: list of dicts [{from, till, price}, ...]
+        """
         if not self.price_forecast_sensor:
             return None
         try:
             return self.get_state(self.price_forecast_sensor, attribute=self.price_forecast_attribute)
-        except Exception:
+        except Exception as e:
+            self.log(f"Failed to get prices: {e}", level="DEBUG")
             return None
 
     def _get_temp(self) -> float | None:

@@ -120,9 +120,9 @@ boiler_strategy:
 
   # ── Entity IDs (map these to your own installation) ─────────────────
   temp_sensor: sensor.boiler_temperatuur       # Boiler water temperature (C)
-  # Frank Energie forecast sensor exposing a `prices` list of {from, till, price}.
-  price_forecast_sensor: sensor.frankenergy_current_electricity_market_price
-  price_forecast_attribute: prices
+  # Sessy price sensor exposing an `energy_prices` dict of {ISO_timestamp: price}.
+  price_forecast_sensor: sensor.sessy_dnhh_energy_price
+  price_forecast_attribute: energy_prices
   # User-selected strategy mode: economic | heatpump | hybrid | boost
   mode_select: input_select.boiler_strategy_mode
   # Logical actuator from the boiler package (off/heatpump/hybrid/boost/ariston_app)
