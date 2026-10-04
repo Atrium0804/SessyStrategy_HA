@@ -37,12 +37,17 @@ The boiler strategy configuration is organized into logical sections:
 | `economic_day_end` | int | 16 | No | End hour of the first economic window (day period) | 0-23 | `16` |
 | `economic_night_start` | int | 0 | No | Start hour of the second economic window (night period) | 0-23 | `0` |
 | `economic_night_end` | int | 6 | No | End hour of the second economic window (night period) | 0-23 | `6` |
+| **Price-Based Strategies** |||||||
+| `market_price_threshold` | float | 0.1 | No | Maximum current price in €/kWh at which to run the heat pump | >= 0 | `0.1` |
+| `cheapest_hours_count` | int | 1 | No | Number of cheapest forecast hours per day to run the heat pump | 1-24 | `3` |
 | `rerun_debounce_s` | float | 2.0 | No | Delay in seconds before re-running after a live input changes. Prevents rapid re-runs during slider drags. | >= 0 | `2.0` |
 | **Entity IDs** |||||||
 | `temp_sensor` | str | `sensor.boiler_temperatuur` | **Yes** | Boiler water temperature sensor | valid entity ID | `sensor.boiler_temperature` |
 | `price_forecast_sensor` | str | `sensor.frankenergy_current_electricity_market_price` | **Yes** | Energy price forecast sensor exposing a `prices` attribute | valid entity ID | `sensor.electricity_price_forecast` |
 | `price_forecast_attribute` | str | `prices` | No | Attribute name on `price_forecast_sensor` containing the price list | string | `prices` |
-| `mode_select` | str | `input_select.boiler_strategy_mode` | **Yes** | User-selected strategy mode input select | valid entity ID | `input_select.boiler_mode_strategy` |
+| `current_price_sensor` | str | `sensor.current_energy_price` | Required for `market_price_threshold` | Current-price sensor | valid entity ID | `sensor.current_energy_price` |
+| `current_price_attribute` | str | `price` | No | Attribute containing the current price; use an empty string when the sensor state is the price | string or empty | `price` |
+| `mode_select` | str | `input_select.boiler_strategy_mode` | **Yes** | User-selected strategy mode input select (`off`, `heatpump`, `hybrid`, `boost`, `economic`, `market_price_threshold`, `cheapest_hours`) | valid entity ID | `input_select.boiler_mode_strategy` |
 | `boiler_mode_select` | str | `select.boiler_mode` | **Yes** | Logical actuator for boiler mode (off/heatpump/hybrid/boost/ariston_app) | valid entity ID | `select.boiler_operating_mode` |
 | `legionella_last_ok_entity` | str | `input_datetime.boiler_legionella_last_ok` | **Yes** | input_datetime helper that the app stamps whenever the boiler reaches `legionella_temp` | valid entity ID | `input_datetime.boiler_last_legionella_ok` |
 | `status_sensor` | str | `sensor.boiler_strategy_status` | **Yes** | Status sensor published by the app with current state and attributes | valid entity ID | `sensor.boiler_strategy_status` |

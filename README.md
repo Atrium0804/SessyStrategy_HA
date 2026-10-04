@@ -115,10 +115,12 @@ A companion AppDaemon app, `files/boiler_strategy.py` (config in `apps.yaml` und
 |----------|-----------|--------|
 | **P1** | Boiler hasn't reached `legionella_temp` in `legionella_boost_days` | Force mode `boost`, unless the user explicitly selected `off` |
 | **P2** | `mode_select` is `off` / `heatpump` / `hybrid` / `boost` | Force that boiler mode directly — always takes effect |
-| **P3** | `mode_select` is `economic` (default) and boiler hasn't reached `legionella_temp` in `legionella_hybrid_days` | Force mode `hybrid`, but only during the cheapest of the two configured windows |
-| **P4** | `mode_select` is `economic` (default), otherwise | Run the heat pump only during whichever of the two configured windows (default 10:00–16:00 vs 00:00–06:00) has the lower average forecast price; stay `off` otherwise |
+| **P3** | Boiler hasn't reached `legionella_temp` in `legionella_hybrid_days` and the selected price strategy is in its cheap period | Force mode `hybrid` |
+| **P4** | `mode_select` is `economic` (default) | Run the heat pump during the cheaper of the two configured windows (default 10:00–16:00 vs 00:00–06:00); stay `off` otherwise |
+| **P5** | `mode_select` is `market_price_threshold` | Run the heat pump when the current price is at or below `market_price_threshold`; stay `off` otherwise |
+| **P6** | `mode_select` is `cheapest_hours` | Run the heat pump during the configured number of cheapest forecast hours; stay `off` otherwise |
 
-The user mode input is an `input_select` (`mode_select`, provided by the boiler package as `input_select.boiler_strategy_mode`); the app writes decisions to the logical `select.boiler_mode` actuator, which in turn pushes the Ariston integration's own `max_temp` whenever a temperature needs to be set (there is no separate user-controllable setpoint). The last-reached legionella timestamp is tracked in an `input_datetime` helper (`legionella_last_ok_entity`) that the app stamps itself.
+The user mode input is an `input_select` (`mode_select`, provided by the boiler package as `input_select.boiler_strategy_mode`) with options `off`, `heatpump`, `hybrid`, `boost`, `economic`, `market_price_threshold`, and `cheapest_hours`. The threshold strategy also reads `current_price_sensor`; leave `current_price_attribute` empty when the price is the sensor state. The app writes decisions to the logical `select.boiler_mode` actuator, which in turn pushes the Ariston integration's own `max_temp` whenever a temperature needs to be set (there is no separate user-controllable setpoint). The last-reached legionella timestamp is tracked in an `input_datetime` helper (`legionella_last_ok_entity`) that the app stamps itself.
 
 See:
 - [Boiler Strategy Configuration Reference](docs/reference/configuration/boiler-strategy-config.md)

@@ -1,0 +1,192 @@
+# Home Assistant Configuration for Boiler Strategy
+# Add these sections to your configuration.yaml or appropriate packages
+
+# ============================================================================
+# REQUIRED: Input Select for Strategy Mode Selection
+# ============================================================================
+input_select:
+  boiler_strategy_mode:
+    name: "Boiler Strategy Mode"
+    options:
+      - off
+      - heatpump
+      - hybrid
+      - boost
+      - economic
+      - market_price_threshold
+      - cheapest_hours
+    initial: economic
+    icon: mdi:thermostat
+
+# ============================================================================
+# REQUIRED: Legionella Tracking Helper
+# ============================================================================
+input_datetime:
+  boiler_legionella_last_ok:
+    name: "Boiler Legionella Last OK"
+    has_time: true
+    has_date: true
+    icon: mdi:calendar-check
+
+# ============================================================================
+# OPTION A: Current Price Sensor (for market_price_threshold strategy)
+# If your energy provider offers a current price sensor directly
+# ============================================================================
+# Example using Sessy integration (if available):
+# sensor:
+#   - platform: sessy
+#     current_price_sensor: true
+
+# ============================================================================
+# OPTION B: Template Sensor for Current Price
+# Create from existing forecast sensor
+# ============================================================================
+template:
+  - sensor:
+      - name: "Current Energy Price"
+        unique_id: current_energy_price
+        unit_of_measurement: "€/kWh"
+        device_class: monetary
+        state: >
+          {% set forecast = state_attr('sensor.sessy_dnhh_energy_price', 'energy_prices') %}
+          {% if forecast is mapping %}
+            {% set now = now().strftime('%Y-%m-%dT%H:00:00') %}
+            {% for timestamp, price in forecast.items() %}
+              {% if timestamp.startswith(now) %}
+                {{ price | float }}
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            {{ states('sensor.sessy_dnhh_energy_price') | float }}
+          {% endif %}
+
+# ============================================================================
+# OPTION C: Utility Meter for Price Tracking
+# ============================================================================
+# utility_meter:
+#   current_energy_price:
+#     source: sensor.your_energy_price_source
+#     name: Current Energy Price
+#     unit_prefix: none
+#     unit_of_measurement: "€/kWh"
+#     cycle: hourly
+
+# ============================================================================
+# OPTIONAL: Enhanced Status Sensor with Friendly Names
+# ============================================================================
+      - name: "Boiler Strategy Mode Friendly"
+        unique_id: boiler_strategy_mode_friendly
+        icon: mdi:thermostat
+        state: >
+          {% set mode = states('input_select.boiler_strategy_mode') %}
+          {% set status = states('sensor.boiler_strategy_status') %}
+          {% if mode == 'off' %}Forced Off
+          {% elif mode == 'heatpump' %}Forced Heat Pump
+          {% elif mode == 'hybrid' %}Forced Hybrid
+          {% elif mode == 'boost' %}Forced Boost
+          {% elif mode == 'economic' %}Economic Mode
+          {% elif mode == 'market_price_threshold' %}Price Threshold Mode
+          {% elif mode == 'cheapest_hours' %}Cheapest Hours Mode
+          {% else %}Unknown ({{ mode }})
+          {% endif %}
+        
+        attributes:
+          current_mode: >
+            {{ states('input_select.boiler_strategy_mode') }}
+          current_status: >
+            {{ states('sensor.boiler_strategy_status') }}
+          active_branch: >
+            {{ state_attr('sensor.boiler_strategy_status', 'active_branch') }}
+          branch_label: >
+            {{ state_attr('sensor.boiler_strategy_status', 'active_branch_label') }}
+          explanation: >
+            {{ state_attr('sensor.boiler_strategy_status', 'rule_explanation') }}
+          temperature: >
+            {{ state_attr('sensor.boiler_strategy_status', 'temp') }}°C
+          days_since_legionella: >
+            {{ state_attr('sensor.boiler_strategy_status', 'days_since_legionella_ok') }}
+
+# ============================================================================
+# OPTIONAL: Automation to Notify When Strategy Changes
+# ============================================================================
+automation:
+  - alias: "Notify Boiler Strategy Change"
+    trigger:
+      - platform: state
+        entity_id: input_select.boiler_strategy_mode
+    action:
+      - service: notify.notify
+        data:
+          message: "Boiler strategy changed to {{ trigger.to_state.name }}"
+          title: "Boiler Strategy Update"
+          data:
+            tag: boiler-strategy
+            actions:
+              - action: "URI"
+                title: "View Status"
+                uri: "/lovelace/energy"
+
+# ============================================================================
+# OPTIONAL: Dashboard Cards for Monitoring
+# Add these to your Lovelace dashboard
+# ============================================================================
+# 
+# Example card for overview:
+#
+# type: entities
+# title: Boiler Strategy Status
+# entities:
+#   - input_select.boiler_strategy_mode
+#   - sensor.boiler_strategy_status
+#   - sensor.boiler_strategy_mode_friendly
+#   - sensor.boiler_temperatuur
+#   - select.boiler_mode
+#   - input_datetime.boiler_legionella_last_ok
+#
+# Example card for detailed status:
+#
+# type: markdown
+# title: Strategy Explanation
+# content: >
+#   **Current Mode:** {{ states('input_select.boiler_strategy_mode') }}
+#   
+#   **Active Rule:** {{ state_attr('sensor.boiler_strategy_status', 'active_branch_label') }}
+#   
+#   **Explanation:** {{ state_attr('sensor.boiler_strategy_status', 'rule_explanation') }}
+#   
+#   **Temperature:** {{ state_attr('sensor.boiler_strategy_status', 'temp') }}°C
+#   
+#   {% if state_attr('sensor.boiler_strategy_status', 'current_price') %}
+#   **Current Price:** {{ state_attr('sensor.boiler_strategy_status', 'current_price') }} €/kWh
+#   {% endif %}
+#   
+#   {% if state_attr('sensor.boiler_strategy_status', 'cheapest_hours') %}
+#   **Cheapest Hours:** {{ state_attr('sensor.boiler_strategy_status', 'cheapest_hours') }}
+#   {% endif %}
+
+# ============================================================================
+# OPTIONAL: History Sensor for Tracking Usage
+# ============================================================================
+# utility_meter:
+#   boiler_heatpump_hours:
+#     source: select.boiler_mode
+#     name: Boiler Heat Pump Hours
+#     unit_prefix: none
+#     unit_of_measurement: "h"
+#     cycle: daily
+#     condition: >
+#       {{ is_state('select.boiler_mode', 'heatpump') }}
+#     tariffs: 
+#       - peak
+#       - off_peak
+
+# ============================================================================
+# NOTE: Entity ID Mapping
+# ============================================================================
+# Make sure these entity IDs match what you configured in apps.yaml:
+# - sensor.boiler_temperatuur -> temp_sensor
+# - sensor.sessy_dnhh_energy_price -> price_forecast_sensor
+# - input_select.boiler_strategy_mode -> mode_select
+# - select.boiler_mode -> boiler_mode_select
+# - input_datetime.boiler_legionella_last_ok -> legionella_last_ok_entity
+# - sensor.boiler_strategy_status -> status_sensor

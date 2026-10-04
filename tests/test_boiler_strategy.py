@@ -132,7 +132,7 @@ def _sessy_prices(price, hours):
 
 
 def _entity_states(temp, mode="economic", prices=None, legionella_last_ok=None,
-                   boiler_mode="init"):
+                   boiler_mode="init", current_price=None):
     states = {
         "sensor.boiler_temperatuur": str(temp),
         "input_select.boiler_strategy_mode": mode,
@@ -144,6 +144,8 @@ def _entity_states(temp, mode="economic", prices=None, legionella_last_ok=None,
     def _get_state(entity_id=None, attribute=None):
         if entity_id == "sensor.sessy_dnhh_energy_price" and attribute == "energy_prices":
             return prices
+        if entity_id == "sensor.current_energy_price":
+            return current_price
         return states.get(entity_id)
 
     return _get_state
@@ -255,6 +257,60 @@ class TestUpdateStrategyPriority:
             "select/select_option", entity_id="select.boiler_mode", option="off"
         )
 
+    def test_market_price_threshold_includes_price_equal_to_threshold(self):
+        app = make_app(
+            market_price_threshold=0.1,
+            current_price_sensor="sensor.current_energy_price",
+            current_price_attribute="",
+        )
+        app.get_state = _entity_states(
+            temp=50, mode="market_price_threshold", current_price=0.1,
+            legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        app.call_service.assert_any_call(
+            "select/select_option", entity_id="select.boiler_mode", option="heatpump"
+        )
+
+    def test_market_price_threshold_stays_off_above_threshold(self):
+        app = make_app(
+            market_price_threshold=0.1,
+            current_price_sensor="sensor.current_energy_price",
+            current_price_attribute="",
+        )
+        app.get_state = _entity_states(
+            temp=50, mode="market_price_threshold", current_price=0.11,
+            legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        app.call_service.assert_any_call(
+            "select/select_option", entity_id="select.boiler_mode", option="off"
+        )
+
+    def test_cheapest_hours_runs_during_selected_cheapest_hour(self):
+        app = make_app(cheapest_hours_count=1)
+        app.get_state = _entity_states(
+            temp=50, mode="cheapest_hours",
+            prices=_sessy_prices(0.30, range(0, 24)) | {"2024-06-15T14:00:00": 0.01},
+            legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        app.call_service.assert_any_call(
+            "select/select_option", entity_id="select.boiler_mode", option="heatpump"
+        )
+
+    def test_cheapest_hours_stays_off_outside_selected_hour(self):
+        app = make_app(cheapest_hours_count=1)
+        app.get_state = _entity_states(
+            temp=50, mode="cheapest_hours",
+            prices=_sessy_prices(0.30, range(0, 24)) | {"2024-06-15T13:00:00": 0.01},
+            legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        app.call_service.assert_any_call(
+            "select/select_option", entity_id="select.boiler_mode", option="off"
+        )
+
     def test_unset_mode_defaults_to_economic(self):
         app = make_app()
         app.get_state = _entity_states(
@@ -317,4 +373,14 @@ class TestEconomicDecision:
         assert in_window is False
         assert chosen == "none"
         assert avg1 is None and avg2 is None
+
+    def test_current_price_reads_sensor_state_when_attribute_is_empty(self):
+        app = make_app(
+            current_price_sensor="sensor.current_energy_price",
+            current_price_attribute="",
+        )
+        app.get_state = MagicMock(return_value="0.08")
+
+        assert app._get_current_price() == pytest.approx(0.08)
+        app.get_state.assert_called_once_with("sensor.current_energy_price")
 

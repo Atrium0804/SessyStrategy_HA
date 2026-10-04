@@ -1,0 +1,141 @@
+# Example configuration for Boiler Strategy AppDaemon app
+# Add this to your apps.yaml file
+
+boiler_strategy:
+  module: boiler_strategy
+  class: BoilerStrategy
+  
+  # ============================================================================
+  # LEGIONELLA PREVENTION SETTINGS
+  # ============================================================================
+  
+  # Temperature that must be reached to reset legionella counters (default: 65)
+  legionella_temp: 65
+  
+  # Days since last reaching legionella_temp when hybrid mode is forced
+  # during cheapest periods (default: 6)
+  legionella_hybrid_days: 6
+  
+  # Days since last reaching legionella_temp when boost mode is forced
+  # regardless of price (default: 7)
+  legionella_boost_days: 7
+
+  # ============================================================================
+  # ECONOMIC STRATEGY SETTINGS (day/night window comparison)
+  # ============================================================================
+  
+  # Day period for economic strategy (default: 10:00-16:00)
+  economic_day_start: 10
+  economic_day_end: 16
+  
+  # Night period for economic strategy (default: 00:00-06:00)
+  economic_night_start: 0
+  economic_night_end: 6
+
+  # ============================================================================
+  # MARKET PRICE THRESHOLD STRATEGY SETTINGS
+  # ============================================================================
+  
+  # Price threshold (default: 0.1) - when current price is below this, use heat pump
+  market_price_threshold: 0.1
+
+  # ============================================================================
+  # CHEAPEST HOURS STRATEGY SETTINGS
+  # ============================================================================
+  
+  # Number of cheapest hours to use heat pump (default: 1)
+  # Set to higher values like 3, 4, 6, etc. to use heat pump during more hours
+  cheapest_hours_count: 3
+
+  # ============================================================================
+  # DEBOUNCE AND TIMING SETTINGS
+  # ============================================================================
+  
+  # Seconds to wait after input changes before re-running (default: 2.0)
+  # Prevents rapid cycling when sliders are being adjusted
+  rerun_debounce_s: 2.0
+
+  # ============================================================================
+  # ENTITY IDs - Customize these to match your Home Assistant setup
+  # ============================================================================
+  
+  # Boiler temperature sensor
+  temp_sensor: "sensor.boiler_temperatuur"
+  
+  # Price forecast sensor (Sessy format: dict with ISO timestamps as keys)
+  price_forecast_sensor: "sensor.sessy_dnhh_energy_price"
+  price_forecast_attribute: "energy_prices"
+  
+  # Current price sensor (for market price threshold strategy)
+  current_price_sensor: "sensor.current_energy_price"
+  current_price_attribute: "price"
+  
+  # Strategy mode selector - this determines which strategy to use
+  # Options: off, heatpump, hybrid, boost, economic, market_price_threshold, cheapest_hours
+  mode_select: "input_select.boiler_strategy_mode"
+  
+  # Boiler mode selector - this is the output that controls your boiler
+  # Options: off, heatpump, hybrid, boost
+  boiler_mode_select: "select.boiler_mode"
+  
+  # Legionella tracking - timestamp of when boiler last reached legionella_temp
+  legionella_last_ok_entity: "input_datetime.boiler_legionella_last_ok"
+  
+  # Status sensor - provides detailed status information
+  status_sensor: "sensor.boiler_strategy_status"
+
+# ============================================================================
+# STRATEGY MODE OPTIONS
+# ============================================================================
+# 
+# Create an input_select in Home Assistant with these options:
+# - off: Force boiler off
+# - heatpump: Force heat pump only
+# - hybrid: Force hybrid mode
+# - boost: Force boost mode
+# - economic: Use day/night window comparison (default)
+# - market_price_threshold: Use heat pump when price is below threshold
+# - cheapest_hours: Use heat pump during N cheapest hours of the day
+#
+# Example for configuration.yaml:
+# input_select:
+#   boiler_strategy_mode:
+#     name: "Boiler Strategy Mode"
+#     options:
+#       - off
+#       - heatpump
+#       - hybrid
+#       - boost
+#       - economic
+#       - market_price_threshold
+#       - cheapest_hours
+#     initial: economic
+
+# ============================================================================
+# USAGE EXAMPLES
+# ============================================================================
+#
+# 1. Economic strategy (default):
+#    - Compares average price of day vs night periods
+#    - Uses heat pump during the cheaper period
+#    - Configuration: economic_day_start, economic_day_end, economic_night_start, economic_night_end
+#
+# 2. Market price threshold strategy:
+#    - Uses heat pump whenever current price is below threshold
+#    - Configuration: market_price_threshold
+#    - Requires: current_price_sensor
+#
+# 3. Cheapest hours strategy:
+#    - Finds N cheapest hours in the calendar day
+#    - Uses heat pump only during those hours
+#    - Configuration: cheapest_hours_count
+#    - Requires: price_forecast_sensor with full day forecast
+
+# ============================================================================
+# NOTES
+# ============================================================================
+#
+# - All strategies respect legionella prevention (priority 1: boost, priority 3: hybrid)
+# - User mode selection (off, heatpump, hybrid, boost) always takes precedence
+# - The status sensor provides detailed information about the current decision
+# - Prices can be in Sessy format (dict) or FrankEnergy format (list of dicts)

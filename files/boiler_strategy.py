@@ -14,14 +14,22 @@ Strategy (priority order):
        off / heatpump / hybrid / boost -> force that boiler mode directly.
        economic (default)        -> falls through to legionella warning (3),
                                      then the economic price decision (4).
+       market_price_threshold   -> falls through to legionella warning (3),
+                                     then market price threshold decision (5).
+       cheapest_hours           -> falls through to legionella warning (3),
+                                     then cheapest hours decision (6).
   3. Legionella warning (temp hasn't reached legionella_temp in legionella_hybrid_days),
-     only while mode is 'economic': force mode 'hybrid', but only during the
-     cheapest of the two configured day/night periods; outside that period,
-     dispatch falls through to the economic price decision (4) instead.
+     only while mode is 'economic', 'market_price_threshold', or 'cheapest_hours':
+     force mode 'hybrid', but only during the cheapest period for that strategy;
+     outside that period, dispatch falls through to the respective price decision.
   4. Economic price decision: run the heat pump only during whichever of
      the two configured day/night periods (e.g. 10:00-16:00
      vs 00:00-06:00) has the lower average price;
      stay off outside that period.
+  5. Market price threshold: run the heat pump whenever current market price
+     is below the configured threshold (default: 0.1).
+  6. Cheapest hours: find the N cheapest hours in the calendar day and run
+     the heat pump during those hours (N is configurable, default: 1).
 
 The boiler's own max_temp is used as the target whenever a temperature needs
 to be pushed (boost, legionella warning); there is no separate user setpoint.
@@ -41,6 +49,10 @@ BRANCH_LABELS = {
     "force_boost": "Forced Boost",
     "economic_heatpump": "Economic Heat Pump",
     "economic_off": "Economic Off",
+    "market_price_heatpump": "Market Price Heat Pump",
+    "market_price_off": "Market Price Off",
+    "cheapest_hours_heatpump": "Cheapest Hours Heat Pump",
+    "cheapest_hours_off": "Cheapest Hours Off",
 }
 
 # Brief explanations for each rule/branch, exposed as the
@@ -54,6 +66,10 @@ RULE_EXPLANATIONS = {
     "force_boost": "Forced Boost: user manually selected boost mode",
     "economic_heatpump": "Economic: run heat pump during cheaper period (day or night)",
     "economic_off": "Economic: keep off outside the cheaper period",
+    "market_price_heatpump": "Market Price: run heat pump when price is below threshold",
+    "market_price_off": "Market Price: keep off when price is above threshold",
+    "cheapest_hours_heatpump": "Cheapest Hours: run heat pump during N cheapest hours of the day",
+    "cheapest_hours_off": "Cheapest Hours: keep off outside the N cheapest hours",
 }
 
 
@@ -73,6 +89,16 @@ class BoilerStrategy(hass.Hass):
         self.eco_night_start = int(self.args.get("economic_night_start", 0))
         self.eco_night_end   = int(self.args.get("economic_night_end", 6))
 
+        # ── Market price threshold strategy ───────────────────────────────────
+        # Run heat pump when current market price is below this threshold
+        self.market_price_threshold = float(self.args.get("market_price_threshold", 0.1))
+        self.market_price_threshold_entity = self.args.get("market_price_threshold_entity", "input_number.boiler_market_price_threshold")
+
+        # ── Cheapest hours strategy ──────────────────────────────────────────
+        # Number of cheapest hours to use heat pump (default: 1)
+        self.cheapest_hours_count = int(self.args.get("cheapest_hours_count", 1))
+        self.cheapest_hours_count_entity = self.args.get("cheapest_hours_count_entity", "input_number.boiler_cheapest_hours_count")
+
         # Seconds to wait after a live input changes before re-running, so a
         # slider drag coalesces into a single run instead of one per intermediate value.
         self.rerun_debounce_s = float(self.args.get("rerun_debounce_s", 2.0))
@@ -81,6 +107,8 @@ class BoilerStrategy(hass.Hass):
         self.temp_sensor              = self.args.get("temp_sensor",              "sensor.boiler_temperatuur")
         self.price_forecast_sensor    = self.args.get("price_forecast_sensor",    "sensor.sessy_dnhh_energy_price")
         self.price_forecast_attribute = self.args.get("price_forecast_attribute", "energy_prices")
+        self.current_price_sensor     = self.args.get("current_price_sensor",     "sensor.current_energy_price")
+        self.current_price_attribute = self.args.get("current_price_attribute", "price")
         self.mode_select              = self.args.get("mode_select",              "input_select.boiler_strategy_mode")
         self.boiler_mode_select       = self.args.get("boiler_mode_select",       "select.boiler_mode")
         self.legionella_last_ok_entity = self.args.get("legionella_last_ok_entity", "input_datetime.boiler_legionella_last_ok")
@@ -95,7 +123,10 @@ class BoilerStrategy(hass.Hass):
         live_inputs = [
             self.temp_sensor,
             self.price_forecast_sensor,
+            self.current_price_sensor,
             self.mode_select,
+            self.market_price_threshold_entity,
+            self.cheapest_hours_count_entity,
         ]
         for entity in live_inputs:
             if entity:
@@ -138,37 +169,100 @@ class BoilerStrategy(hass.Hass):
             self._apply(f"force_{mode}", mode, **status_fields)
             return
 
-        # Remaining branches are price-driven; evaluate the cheaper period once.
+        # Remaining branches are strategy-specific and price-driven
         now_hour = self.datetime().hour
         prices = self._get_prices()
+        current_price = self._get_current_price()
+        
         self.log(f"Prices data: {type(prices).__name__} - {prices}", level="DEBUG")
-        in_window, day_avg_price, night_avg_price, cheapest_period = self._cheapest_window_info(now_hour, prices)
-        price_fields = dict(
-            avg_price_day=str(round(day_avg_price, 4)) if day_avg_price is not None else "N/A",
-            avg_price_night=str(round(night_avg_price, 4)) if night_avg_price is not None else "N/A",
-            cheapest_period=cheapest_period,
-            day_window=f"{self.eco_day_start}:00-{self.eco_day_end}:00",
-            night_window=f"{self.eco_night_start}:00-{self.eco_night_end}:00",
-            in_cheapest_window=in_window,
-            **status_fields,
-        )
+        self.log(f"Current price: {current_price}", level="DEBUG")
 
         # ── Priority 3: legionella warning — escalate to hybrid during cheapest period only ──
-        if days_since_ok >= self.legionella_hybrid_days and in_window:
-            self.log(
-                f"LEGIONELLA WARNING: {days_since_ok:.1f} days since last reaching "
-                f"{self.legionella_temp:.0f}C — cheapest={cheapest_period} — forcing hybrid"
-            )
-            self._apply("legionella_hybrid", "hybrid", **price_fields)
-            return
+        # Get live-tunable values
+        live_threshold = self._get_market_price_threshold()
+        live_cheapest_count = self._get_cheapest_hours_count()
+        
+        if days_since_ok >= self.legionella_hybrid_days:
+            in_cheapest_period = False
+            cheapest_period_label = "none"
+            
+            if mode == "economic":
+                in_cheapest_period, _, _, cheapest_period_label = self._cheapest_window_info(now_hour, prices)
+            elif mode == "market_price_threshold":
+                in_cheapest_period = current_price is not None and current_price <= live_threshold
+                cheapest_period_label = "below_threshold" if in_cheapest_period else "above_threshold"
+            elif mode == "cheapest_hours":
+                cheapest_hours = self._find_cheapest_hours(prices, live_cheapest_count)
+                in_cheapest_period = self._is_current_hour_in_cheapest_list(now_hour, cheapest_hours)
+                cheapest_period_label = f"cheapest_{len(cheapest_hours)}h"
+            
+            if in_cheapest_period:
+                self.log(
+                    f"LEGIONELLA WARNING: {days_since_ok:.1f} days since last reaching "
+                    f"{self.legionella_temp:.0f}C — cheapest={cheapest_period_label} — forcing hybrid"
+                )
+                price_fields = dict(
+                    cheapest_period=cheapest_period_label,
+                    in_cheapest_window=in_cheapest_period,
+                    **status_fields,
+                )
+                self._apply("legionella_hybrid", "hybrid", **price_fields)
+                return
 
         # ── Priority 4: economic — heat pump during the cheaper period ────────
-        boiler_mode = "heatpump" if in_window else "off"
-        self.log(
-            f"ECONOMIC: hour={now_hour} day_avg_price={day_avg_price} night_avg_price={night_avg_price} "
-            f"cheapest={cheapest_period} — mode={boiler_mode}"
-        )
-        self._apply(f"economic_{boiler_mode}", boiler_mode, **price_fields)
+        if mode == "economic":
+            in_window, day_avg_price, night_avg_price, cheapest_period = self._cheapest_window_info(now_hour, prices)
+            price_fields = dict(
+                avg_price_day=str(round(day_avg_price, 4)) if day_avg_price is not None else "N/A",
+                avg_price_night=str(round(night_avg_price, 4)) if night_avg_price is not None else "N/A",
+                cheapest_period=cheapest_period,
+                day_window=f"{self.eco_day_start}:00-{self.eco_day_end}:00",
+                night_window=f"{self.eco_night_start}:00-{self.eco_night_end}:00",
+                in_cheapest_window=in_window,
+                **status_fields,
+            )
+            boiler_mode = "heatpump" if in_window else "off"
+            self.log(
+                f"ECONOMIC: hour={now_hour} day_avg_price={day_avg_price} night_avg_price={night_avg_price} "
+                f"cheapest={cheapest_period} — mode={boiler_mode}"
+            )
+            self._apply(f"economic_{boiler_mode}", boiler_mode, **price_fields)
+            return
+
+        # ── Priority 5: market price threshold ──────────────────────────────
+        if mode == "market_price_threshold":
+            live_threshold = self._get_market_price_threshold()
+            price_fields = dict(
+                current_price=str(round(current_price, 4)) if current_price is not None else "N/A",
+                threshold=str(live_threshold),
+                **status_fields,
+            )
+            boiler_mode = "heatpump" if current_price is not None and current_price <= live_threshold else "off"
+            self.log(
+                f"MARKET PRICE THRESHOLD: current={current_price}, threshold={live_threshold} — mode={boiler_mode}"
+            )
+            self._apply(f"market_price_{boiler_mode}", boiler_mode, **price_fields)
+            return
+
+        # ── Priority 6: cheapest hours ───────────────────────────────────────
+        if mode == "cheapest_hours":
+            live_cheapest_count = self._get_cheapest_hours_count()
+            cheapest_hours = self._find_cheapest_hours(prices, live_cheapest_count)
+            in_cheapest_period = self._is_current_hour_in_cheapest_list(now_hour, cheapest_hours)
+            
+            cheapest_hours_str = ", ".join([f"{h}:00-{h+1}:00" for h in sorted(cheapest_hours)])
+            price_fields = dict(
+                cheapest_hours=cheapest_hours_str,
+                cheapest_hours_count=self.cheapest_hours_count,
+                in_cheapest_window=in_cheapest_period,
+                **status_fields,
+            )
+            boiler_mode = "heatpump" if in_cheapest_period else "off"
+            self.log(
+                f"CHEAPEST HOURS: hour={now_hour}, cheapest_hours={cheapest_hours_str} — mode={boiler_mode}"
+            )
+            self._apply(f"cheapest_hours_{boiler_mode}", boiler_mode, **price_fields)
+            return
 
     # ── Economic-mode decision ───────────────────────────────────────────────
 
@@ -233,6 +327,82 @@ class BoilerStrategy(hass.Hass):
         if not price_values:
             return None
         return sum(price_values) / len(price_values)
+
+    # ── Cheapest hours decision ─────────────────────────────────────────────
+
+    def _find_cheapest_hours(self, prices, n_hours):
+        """
+        Find the n cheapest hours in the calendar day based on forecast prices.
+        Returns a list of hour numbers (0-23) representing the cheapest hours.
+        """
+        if prices is None or n_hours <= 0:
+            return []
+        
+        # Calculate average price for each hour of the day
+        hourly_prices = {}
+        
+        if isinstance(prices, dict):
+            # Sessy format: dict with ISO timestamp keys
+            for timestamp_str, price_val in prices.items():
+                hour = self._entry_hour(timestamp_str)
+                if hour is None:
+                    continue
+                try:
+                    price = float(price_val)
+                    if hour not in hourly_prices:
+                        hourly_prices[hour] = []
+                    hourly_prices[hour].append(price)
+                except (TypeError, ValueError):
+                    continue
+        else:
+            # FrankEnergy format: list of dicts
+            for entry in prices or []:
+                hour = self._entry_hour(entry)
+                if hour is None:
+                    continue
+                try:
+                    price = float(entry.get("price"))
+                    if hour not in hourly_prices:
+                        hourly_prices[hour] = []
+                    hourly_prices[hour].append(price)
+                except (TypeError, ValueError, AttributeError):
+                    continue
+        
+        # Calculate average price for each hour
+        hourly_avg_prices = []
+        for hour, price_list in hourly_prices.items():
+            if price_list:
+                avg_price = sum(price_list) / len(price_list)
+                hourly_avg_prices.append((hour, avg_price))
+        
+        if not hourly_avg_prices:
+            return []
+        
+        # Sort by average price (cheapest first) and take top n
+        hourly_avg_prices.sort(key=lambda x: x[1])
+        cheapest_hours = [hour for hour, _ in hourly_avg_prices[:n_hours]]
+        
+        return cheapest_hours
+
+    def _is_current_hour_in_cheapest_list(self, current_hour, cheapest_hours):
+        """Check if current hour is in the list of cheapest hours."""
+        return current_hour in cheapest_hours
+
+    def _get_current_price(self):
+        """Get the current market price."""
+        if not self.current_price_sensor:
+            return None
+        try:
+            if self.current_price_attribute:
+                price = self.get_state(self.current_price_sensor, attribute=self.current_price_attribute)
+            else:
+                price = self.get_state(self.current_price_sensor)
+            if price is not None:
+                return float(price)
+            return None
+        except Exception as e:
+            self.log(f"Failed to get current price: {e}", level="DEBUG")
+            return None
 
     @staticmethod
     def _entry_hour(entry):
@@ -378,6 +548,28 @@ class BoilerStrategy(hass.Hass):
         except Exception as e:
             self.log(f"Failed to get prices: {e}", level="DEBUG")
             return None
+
+    def _get_market_price_threshold(self):
+        """Get market price threshold from live entity or fallback to config."""
+        if self.market_price_threshold_entity and self._entity_exists(self.market_price_threshold_entity):
+            try:
+                threshold = self.get_state(self.market_price_threshold_entity)
+                if threshold is not None:
+                    return float(threshold)
+            except (TypeError, ValueError) as e:
+                self.log(f"Failed to get live market_price_threshold: {e}", level="DEBUG")
+        return self.market_price_threshold
+
+    def _get_cheapest_hours_count(self):
+        """Get cheapest hours count from live entity or fallback to config."""
+        if self.cheapest_hours_count_entity and self._entity_exists(self.cheapest_hours_count_entity):
+            try:
+                count = self.get_state(self.cheapest_hours_count_entity)
+                if count is not None:
+                    return int(float(count))
+            except (TypeError, ValueError) as e:
+                self.log(f"Failed to get live cheapest_hours_count: {e}", level="DEBUG")
+        return self.cheapest_hours_count
 
     def _get_temp(self) -> float | None:
         try:
