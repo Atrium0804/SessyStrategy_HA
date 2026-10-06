@@ -132,15 +132,15 @@ boiler_strategy:
   price_forecast_sensor: sensor.sessy_dnhh_energy_price
   price_forecast_attribute: energy_prices
   # Current price sensor for market price threshold strategy
-  current_price_sensor: sensor.current_energy_price
+  current_price_sensor: sensor.sessy_dnhh_energy_price
   current_price_attribute: ""   # Empty when the sensor state is the price
   # User-selected strategy mode: off | heatpump | hybrid | boost | economic | market_price_threshold | cheapest_hours
   mode_select: input_select.boiler_strategy_mode
-  
+
   # Live-tuning helpers (optional) - allows changing thresholds from HA UI
   market_price_threshold_entity: input_number.boiler_market_price_threshold
   cheapest_hours_count_entity: input_number.boiler_cheapest_hours_count
-  
+
   # Logical actuator from the boiler package (off/heatpump/hybrid/boost/ariston_app)
   boiler_mode_select: select.boiler_mode
   # input_datetime helper this app stamps whenever the boiler reaches legionella_temp

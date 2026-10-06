@@ -173,7 +173,7 @@ class BoilerStrategy(hass.Hass):
         now_hour = self.datetime().hour
         prices = self._get_prices()
         current_price = self._get_current_price()
-        
+
         self.log(f"Prices data: {type(prices).__name__} - {prices}", level="DEBUG")
         self.log(f"Current price: {current_price}", level="DEBUG")
 
@@ -181,11 +181,11 @@ class BoilerStrategy(hass.Hass):
         # Get live-tunable values
         live_threshold = self._get_market_price_threshold()
         live_cheapest_count = self._get_cheapest_hours_count()
-        
+
         if days_since_ok >= self.legionella_hybrid_days:
             in_cheapest_period = False
             cheapest_period_label = "none"
-            
+
             if mode == "economic":
                 in_cheapest_period, _, _, cheapest_period_label = self._cheapest_window_info(now_hour, prices)
             elif mode == "market_price_threshold":
@@ -195,7 +195,7 @@ class BoilerStrategy(hass.Hass):
                 cheapest_hours = self._find_cheapest_hours(prices, live_cheapest_count)
                 in_cheapest_period = self._is_current_hour_in_cheapest_list(now_hour, cheapest_hours)
                 cheapest_period_label = f"cheapest_{len(cheapest_hours)}h"
-            
+
             if in_cheapest_period:
                 self.log(
                     f"LEGIONELLA WARNING: {days_since_ok:.1f} days since last reaching "
@@ -249,10 +249,10 @@ class BoilerStrategy(hass.Hass):
             live_cheapest_count = self._get_cheapest_hours_count()
             cheapest_hours = self._find_cheapest_hours(prices, live_cheapest_count)
             in_cheapest_period = self._is_current_hour_in_cheapest_list(now_hour, cheapest_hours)
-            
-            cheapest_hours_str = ", ".join([f"{h}:00-{h+1}:00" for h in sorted(cheapest_hours)])
+
+            cheapest_hours_str = ",".join(str(h) for h in sorted(cheapest_hours))
             price_fields = dict(
-                cheapest_hours=cheapest_hours_str,
+                cheapest_hours=sorted(cheapest_hours),
                 cheapest_hours_count=self.cheapest_hours_count,
                 in_cheapest_window=in_cheapest_period,
                 **status_fields,
@@ -292,7 +292,7 @@ class BoilerStrategy(hass.Hass):
 
     def _window_average(self, prices, start_h, end_h):
         """Average forecast price over entries whose start hour is in [start_h, end_h).
-        
+
         Supports two formats:
         - FrankEnergy: list of dicts [{from, till, price}, ...]
         - Sessy: dict {ISO_timestamp: price, ...}
@@ -300,7 +300,7 @@ class BoilerStrategy(hass.Hass):
         price_values = []
         if prices is None:
             return None
-        
+
         if isinstance(prices, dict):
             # Sessy format: dict with ISO timestamp keys
             for timestamp_str, price_val in prices.items():
@@ -323,7 +323,7 @@ class BoilerStrategy(hass.Hass):
                     price_values.append(float(entry.get("price")))
                 except (TypeError, ValueError, AttributeError):
                     continue
-        
+
         if not price_values:
             return None
         return sum(price_values) / len(price_values)
@@ -337,10 +337,10 @@ class BoilerStrategy(hass.Hass):
         """
         if prices is None or n_hours <= 0:
             return []
-        
+
         # Calculate average price for each hour of the day
         hourly_prices = {}
-        
+
         if isinstance(prices, dict):
             # Sessy format: dict with ISO timestamp keys
             for timestamp_str, price_val in prices.items():
@@ -367,21 +367,21 @@ class BoilerStrategy(hass.Hass):
                     hourly_prices[hour].append(price)
                 except (TypeError, ValueError, AttributeError):
                     continue
-        
+
         # Calculate average price for each hour
         hourly_avg_prices = []
         for hour, price_list in hourly_prices.items():
             if price_list:
                 avg_price = sum(price_list) / len(price_list)
                 hourly_avg_prices.append((hour, avg_price))
-        
+
         if not hourly_avg_prices:
             return []
-        
+
         # Sort by average price (cheapest first) and take top n
         hourly_avg_prices.sort(key=lambda x: x[1])
         cheapest_hours = [hour for hour, _ in hourly_avg_prices[:n_hours]]
-        
+
         return cheapest_hours
 
     def _is_current_hour_in_cheapest_list(self, current_hour, cheapest_hours):
@@ -537,7 +537,7 @@ class BoilerStrategy(hass.Hass):
 
     def _get_prices(self):
         """Hourly forecast prices or None.
-        
+
         Sessy format: dict {ISO_timestamp: price, ...}
         FrankEnergy format: list of dicts [{from, till, price}, ...]
         """
