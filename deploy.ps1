@@ -17,21 +17,22 @@ $HA_HOST            = $env:HA_HOST
 $HA_USER            = if ($env:HA_USER) { $env:HA_USER } else { "root" }
 $HA_CONFIG          = if ($env:HA_CONFIG) { $env:HA_CONFIG } else { "/config" }
 $APPDAEMON_APPS_DIR = $env:APPDAEMON_APPS_DIR
+$HA_PORT            = if ($env:HA_PORT) { $env:HA_PORT } else { "22222" }
 
-Write-Host "Deploying to ${HA_USER}@${HA_HOST} ..."
+Write-Host "Deploying to ${HA_USER}@${HA_HOST}:${HA_PORT} ..."
 
-# -O forces the legacy SCP protocol; the NAS SFTP subsystem is chrooted elsewhere.
-scp -O files/sessy_strategy.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/sessy_strategy.py"
-scp -O files/boiler_strategy.py "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/boiler_strategy.py"
-scp -O files/apps.yaml          "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/apps.yaml"
+# -O forces the legacy SCP protocol; -P specifies the port.
+scp -O -P $HA_PORT files/sessy_strategy.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/sessy_strategy.py"
+scp -O -P $HA_PORT files/boiler_strategy.py "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/boiler_strategy.py"
+scp -O -P $HA_PORT files/apps.yaml          "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/apps.yaml"
 
 # Home Battery custom integration (creates the device + entities).
-ssh "${HA_USER}@${HA_HOST}" "mkdir -p ${HA_CONFIG}/custom_components/home_battery"
-scp -O -r files/custom_components/home_battery/* "${HA_USER}@${HA_HOST}:${HA_CONFIG}/custom_components/home_battery/"
+ssh -p $HA_PORT "${HA_USER}@${HA_HOST}" "mkdir -p ${HA_CONFIG}/custom_components/home_battery"
+scp -O -P $HA_PORT -r files/custom_components/home_battery/* "${HA_USER}@${HA_HOST}:${HA_CONFIG}/custom_components/home_battery/"
 
 Write-Host ""
 Write-Host "Restarting Home Assistant + AppDaemon ..."
-ssh "${HA_USER}@${HA_HOST}" "cd /volume1/docker/homeassistant && sudo -n /usr/local/bin/docker compose restart ha appdaemon"
+ssh -p $HA_PORT "${HA_USER}@${HA_HOST}" "docker compose restart ha appdaemon"
 
 Write-Host ""
 Write-Host "Done. Home Assistant is restarting. AppDaemon will come back up with it."
