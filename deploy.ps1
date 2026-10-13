@@ -11,12 +11,12 @@ if (Test-Path .env) {
 }
 
 if (-not $env:HA_HOST)            { throw "Set HA_HOST in .env or environment" }
-if (-not $env:APPDAEMON_APPS_DIR) { throw "Set APPDAEMON_APPS_DIR in .env or environment" }
 
 $HA_HOST            = $env:HA_HOST
 $HA_USER            = if ($env:HA_USER) { $env:HA_USER } else { "root" }
 $HA_CONFIG          = if ($env:HA_CONFIG) { $env:HA_CONFIG } else { "/config" }
-$APPDAEMON_APPS_DIR = $env:APPDAEMON_APPS_DIR
+$APPDAEMON_APPS_DIR = if ($env:APPDAEMON_APPS_DIR) { $env:APPDAEMON_APPS_DIR } else { "/app_configs/a0d7b954_appdaemon/apps" }
+$APPDAEMON_ADDON    = if ($env:APPDAEMON_ADDON) { $env:APPDAEMON_ADDON } else { "a0d7b954_appdaemon" }
 $HA_PORT            = if ($env:HA_PORT) { $env:HA_PORT } else { "22222" }
 
 Write-Host "Deploying to ${HA_USER}@${HA_HOST}:${HA_PORT} ..."
@@ -32,7 +32,7 @@ scp -O -P $HA_PORT -r files/custom_components/home_battery/* "${HA_USER}@${HA_HO
 
 Write-Host ""
 Write-Host "Restarting Home Assistant + AppDaemon ..."
-ssh -p $HA_PORT "${HA_USER}@${HA_HOST}" "docker compose restart ha appdaemon"
+ssh -p $HA_PORT "${HA_USER}@${HA_HOST}" "ha apps restart ${APPDAEMON_ADDON} && ha core restart"
 
 Write-Host ""
 Write-Host "Done. Home Assistant is restarting. AppDaemon will come back up with it."

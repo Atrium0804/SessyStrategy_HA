@@ -50,12 +50,15 @@ template:
         state: >
           {% set forecast = state_attr('sensor.sessy_dnhh_energy_price', 'energy_prices') %}
           {% if forecast is mapping %}
-            {% set now = now().strftime('%Y-%m-%dT%H:00:00') %}
+            {% set hour = now().replace(minute=0, second=0, microsecond=0) %}
+            {% set ns = namespace(price=none) %}
             {% for timestamp, price in forecast.items() %}
-              {% if timestamp.startswith(now) %}
-                {{ price | float }}
+              {% set ts = timestamp if timestamp is datetime else as_datetime(timestamp | string) %}
+              {% if ns.price is none and ts is not none and as_local(ts) == hour %}
+                {% set ns.price = price | float(0) %}
               {% endif %}
             {% endfor %}
+            {{ ns.price if ns.price is not none else states('sensor.sessy_dnhh_energy_price') | float(0) }}
           {% else %}
             {{ states('sensor.sessy_dnhh_energy_price') | float }}
           {% endif %}
@@ -89,7 +92,7 @@ template:
           {% elif mode == 'cheapest_hours' %}Cheapest Hours Mode
           {% else %}Unknown ({{ mode }})
           {% endif %}
-        
+
         attributes:
           current_mode: >
             {{ states('input_select.boiler_strategy_mode') }}
@@ -130,7 +133,7 @@ automation:
 # OPTIONAL: Dashboard Cards for Monitoring
 # Add these to your Lovelace dashboard
 # ============================================================================
-# 
+#
 # Example card for overview:
 #
 # type: entities
@@ -149,17 +152,17 @@ automation:
 # title: Strategy Explanation
 # content: >
 #   **Current Mode:** {{ states('input_select.boiler_strategy_mode') }}
-#   
+#
 #   **Active Rule:** {{ state_attr('sensor.boiler_strategy_status', 'active_branch_label') }}
-#   
+#
 #   **Explanation:** {{ state_attr('sensor.boiler_strategy_status', 'rule_explanation') }}
-#   
+#
 #   **Temperature:** {{ state_attr('sensor.boiler_strategy_status', 'temp') }}°C
-#   
+#
 #   {% if state_attr('sensor.boiler_strategy_status', 'current_price') %}
 #   **Current Price:** {{ state_attr('sensor.boiler_strategy_status', 'current_price') }} €/kWh
 #   {% endif %}
-#   
+#
 #   {% if state_attr('sensor.boiler_strategy_status', 'cheapest_hours') %}
 #   **Cheapest Hours:** {{ state_attr('sensor.boiler_strategy_status', 'cheapest_hours') }}
 #   {% endif %}
@@ -176,7 +179,7 @@ automation:
 #     cycle: daily
 #     condition: >
 #       {{ is_state('select.boiler_mode', 'heatpump') }}
-#     tariffs: 
+#     tariffs:
 #       - peak
 #       - off_peak
 
