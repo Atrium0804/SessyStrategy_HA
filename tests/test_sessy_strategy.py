@@ -233,6 +233,33 @@ class TestIsCheapestHour:
         app._get_prices_dict = MagicMock(return_value=prices)
         assert app._is_cheapest_hour(2) is False
 
+    def test_cheapest_hours_today_lists_hours_chronologically(self):
+        values = [0.30] * 24
+        values[14], values[3] = 0.01, 0.02   # cheaper slot later in the day
+        app = self._app(self._mk_prices(values), now_hour=9)
+        assert app._cheapest_hours_today(2) == ["03:00", "14:00"]
+
+    def test_cheapest_hours_today_empty_without_prices(self):
+        app = self._app(None, now_hour=3)
+        assert app._cheapest_hours_today(2) == []
+
+    def test_cheapest_hours_published_in_status(self):
+        app = make_app()
+        app.get_state = MagicMock(side_effect=lambda e, **kw: {
+            app.soc_sensor: "60", app.price_sensor: "0.30",
+        }.get(e))
+        app._get_soc = MagicMock(return_value=60.0)
+        app._current_price = MagicMock(return_value=0.30)
+        app.datetime = MagicMock(return_value=datetime(2024, 6, 15, 3, 0, 0))
+        app._get_prices_dict = MagicMock(return_value=self._profile())
+        app._publish_status = MagicMock()
+        app._set_battery_setpoint = MagicMock()
+        app._set_grid_setpoint = MagicMock()
+        app.update_strategy({})
+        fields = app._publish_status.call_args.kwargs
+        assert app._publish_status.call_args.args[0] == "cheapest_hours"
+        assert fields["cheapest_hours"] == ["03:00", "04:00"]
+
 
 # ===========================================================================
 # update_strategy — decision branches
@@ -576,6 +603,22 @@ class TestPublishBranch:
         assert kwargs["attributes"]["active_branch"] == "manual_grid"
         assert kwargs["attributes"]["setpoint"] == pytest.approx(-500.0)
 
+    def test_includes_live_sessy_strategy(self):
+        app = make_app()
+        app._entity_exists = MagicMock(return_value=True)
+        app.get_state = MagicMock(
+            side_effect=lambda e, **kw: "nom" if e == app.strategy_select else None
+        )
+        app._publish_branch("manual_grid", setpoint=0.0)
+        assert app.set_state.call_args.kwargs["attributes"]["sessy_strategy"] == "nom"
+
+    def test_explicit_sessy_strategy_wins(self):
+        app = make_app()
+        app._entity_exists = MagicMock(return_value=True)
+        app.get_state = MagicMock(return_value="api")
+        app._publish_branch("sessy_dynamic", sessy_strategy="roi")
+        assert app.set_state.call_args.kwargs["attributes"]["sessy_strategy"] == "roi"
+
     def test_skipped_when_status_sensor_unset(self):
         app = make_app()
         app.status_sensor = None
@@ -725,4 +768,36 @@ class TestPublishStatus:
         app = make_app()
         app.status_sensor = None
         self._call_publish(app)
+        app.set_state.assert_not_called()
+
+    def test_includes_live_sessy_strategy(self):
+        app = make_app()
+        app._entity_exists = MagicMock(return_value=True)
+        app.get_state = MagicMock(
+            side_effect=lambda e, **kw: "api" if e == app.strategy_select else None
+        )
+        self._call_publish(app)
+        assert app.set_state.call_args.kwargs["attributes"]["sessy_strategy"] == "api"
+
+
+class TestSessyStrategyAttribute:
+    def test_initialize_listens_to_strategy_select(self):
+        app = make_app()
+        app.listen_state.assert_any_call(app._on_sessy_strategy_change, app.strategy_select)
+
+    def test_change_updates_only_sessy_strategy_attribute(self):
+        app = make_app()
+        app._entity_exists = MagicMock(return_value=True)
+        app.get_state = MagicMock(return_value="cheapest_hours")
+        app._on_sessy_strategy_change(app.strategy_select, "state", "nom", "api", {})
+        app.set_state.assert_called_once_with(
+            app.status_sensor,
+            state="cheapest_hours",
+            attributes={"sessy_strategy": "api"},
+        )
+
+    def test_change_skipped_when_status_sensor_unset(self):
+        app = make_app()
+        app.status_sensor = None
+        app._on_sessy_strategy_change(app.strategy_select, "state", "nom", "api", {})
         app.set_state.assert_not_called()

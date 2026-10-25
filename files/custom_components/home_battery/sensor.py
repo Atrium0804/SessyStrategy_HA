@@ -16,6 +16,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, UnitOfPower
 from homeassistant.core import Event, HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 
@@ -29,6 +30,7 @@ from .const import (
     CONF_STATUS_SOURCE,
     CONF_SYSTEM_STATE_SOURCE,
     DEFAULTS,
+    DOMAIN,
 )
 from .entity import device_info
 
@@ -69,6 +71,13 @@ async def async_setup_entry(
 ) -> None:
     """Set up the mirror sensors."""
     cfg = {**DEFAULTS, **entry.data}
+    # The Sessy strategy mirror sensor was folded into the AppDaemon status
+    # sensor's sessy_strategy attribute; drop its stale registry entry.
+    registry = er.async_get(hass)
+    if stale := registry.async_get_entity_id(
+        "sensor", DOMAIN, f"{entry.entry_id}_sessy_strategy"
+    ):
+        registry.async_remove(stale)
     async_add_entities(
         [
             HomeBatteryNumericSensor(
@@ -111,14 +120,6 @@ async def async_setup_entry(
                 mode_entity="select.home_battery_mode",
                 sessy_strategy_entity=cfg[CONF_SESSY_STRATEGY_SOURCE],
                 status_entity=cfg[CONF_STATUS_SOURCE],
-            ),
-            HomeBatteryTextSensor(
-                entry,
-                key="sessy_strategy",
-                name="Sessy strategy",
-                sources=[cfg[CONF_SESSY_STRATEGY_SOURCE]],
-                icon="mdi:transmission-tower-import",
-                value_fn=lambda hass: _state(hass, cfg[CONF_SESSY_STRATEGY_SOURCE]),
             ),
             HomeBatteryActualSetpointSensor(
                 entry,

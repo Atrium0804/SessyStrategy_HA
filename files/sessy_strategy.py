@@ -170,6 +170,10 @@ class SessyStrategy(hass.Hass):
             if entity:
                 self.listen_state(self._on_input_change, entity)
 
+        # The select switches after the status is published (and can be changed
+        # outside the app), so keep the status's sessy_strategy attribute live.
+        self.listen_state(self._on_sessy_strategy_change, self.strategy_select)
+
     # ── Main logic ────────────────────────────────────────────────────────────
 
     def update_strategy(self, kwargs):
@@ -251,6 +255,7 @@ class SessyStrategy(hass.Hass):
             soc_floor=soc_floor,
             cheap_soc_target=cheap_soc_target,
             cheapest_hours_n=cheapest_hours_n,
+            cheapest_hours=self._cheapest_hours_today(cheapest_hours_n),
             price_discharge=price_discharge,
             price_charge=price_charge,
             min_arbitrage_margin=min_arbitrage_margin,
@@ -615,7 +620,7 @@ class SessyStrategy(hass.Hass):
         if not self.status_sensor or not self._entity_exists(self.status_sensor):
             return
 
-        attributes = {"active_branch": active_branch}
+        attributes = {"active_branch": active_branch, "sessy_strategy": self._sessy_strategy()}
         attributes.update(fields)
         # Add rule explanation
         attributes["rule_explanation"] = self._RULE_EXPLANATIONS.get(active_branch, "Unknown rule")
@@ -638,7 +643,11 @@ class SessyStrategy(hass.Hass):
         if not self.status_sensor or not self._entity_exists(self.status_sensor):
             return
         try:
-            attributes = {"active_branch": active_branch, **extra}
+            attributes = {
+                "active_branch": active_branch,
+                "sessy_strategy": self._sessy_strategy(),
+                **extra,
+            }
             # Add rule explanation
             attributes["rule_explanation"] = self._RULE_EXPLANATIONS.get(active_branch, "Unknown rule")
             self.set_state(
@@ -648,6 +657,26 @@ class SessyStrategy(hass.Hass):
             )
         except Exception as e:
             self.log(f"Failed to publish branch status: {e}", level="WARNING")
+
+    def _sessy_strategy(self) -> str | None:
+        """The Sessy power_strategy currently selected (nom, api, roi, ...)."""
+        try:
+            return self.get_state(self.strategy_select)
+        except Exception:
+            return None
+
+    def _on_sessy_strategy_change(self, entity, attribute, old, new, kwargs):
+        """Refresh only the sessy_strategy attribute; attributes are merged."""
+        if not self.status_sensor or not self._entity_exists(self.status_sensor):
+            return
+        try:
+            self.set_state(
+                self.status_sensor,
+                state=self.get_state(self.status_sensor),
+                attributes={"sessy_strategy": new},
+            )
+        except Exception as e:
+            self.log(f"Failed to update sessy_strategy attribute: {e}", level="WARNING")
 
     def _get_soc(self) -> float | None:
         state = self.get_state(self.soc_sensor)
@@ -685,23 +714,24 @@ class SessyStrategy(hass.Hass):
         return prices
 
     def _is_cheapest_hour(self, n: int) -> bool:
+        """Whether the current hour is one of today's n cheapest hours."""
+        current = self.datetime().strftime("%H:00")
+        return current in self._cheapest_hours_today(n)
+
+    def _cheapest_hours_today(self, n: int) -> list[str]:
         """
-        Whether the current hour is one of the n cheapest hourly slots of its own
-        calendar day. Prices are grouped per day and the cheapest n hours are
-        picked within the current day only, so hours never inherit "cheapest"
-        status from prices climbing into the next day. Returns False when n <= 0
-        or no price data is available.
+        The n cheapest hourly slots of the current calendar day, as "HH:00" in
+        chronological order. Picked within the current day only, so hours never
+        inherit "cheapest" status from prices climbing into the next day. Empty
+        when n <= 0 or no price data is available.
         """
         n = int(n)
         if n <= 0:
-            return False
+            return []
         prices = self._get_prices_dict()
         if not prices:
-            return False
-        now = self.datetime()
-        base = now.replace(minute=0, second=0, microsecond=0)
-        current_key = base.strftime("%Y-%m-%dT%H:00:00")
-        current_date = base.strftime("%Y-%m-%d")
+            return []
+        current_date = self.datetime().strftime("%Y-%m-%d")
 
         # Collect the current day's hourly slots (key format: YYYY-MM-DDTHH:00:00).
         today_slots = []
@@ -712,12 +742,9 @@ class SessyStrategy(hass.Hass):
                 today_slots.append((float(price_val), key))
             except (TypeError, ValueError):
                 pass
-        if not today_slots:
-            return False
 
         today_slots.sort(key=lambda kv: kv[0])
-        cheapest_keys = {key for _, key in today_slots[:n]}
-        return current_key in cheapest_keys
+        return sorted(key[11:16] for _, key in today_slots[:n])
 
     def _contiguous_price_hours(self, threshold: float, above: bool) -> float:
         """

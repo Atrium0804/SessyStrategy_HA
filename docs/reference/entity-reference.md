@@ -185,9 +185,12 @@ The optional Home Battery custom integration (`custom_components/home_battery`) 
 | `sensor.home_battery_grid_power` | Grid net power (negative = export) |
 | `sensor.home_battery_system_state` | System state |
 | `sensor.home_battery_active_strategy` | Active power strategy |
-| `sensor.home_battery_sessy_strategy` | Underlying Sessy strategy |
 | `sensor.home_battery_active_substrategy` | Active rule with friendly name |
 | `sensor.home_battery_actual_setpoint` | Actual setpoint being targeted |
+
+Sessy's underlying `power_strategy` is available as the `sessy_strategy`
+attribute of `sensor.sessy_strategy_status` (the former
+`sensor.home_battery_sessy_strategy` was removed).
 
 ---
 

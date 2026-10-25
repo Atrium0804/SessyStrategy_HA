@@ -24,8 +24,12 @@ These attributes are updated on every strategy cycle, regardless of the active b
 | Attribute | Type | Description | Example | When Updated |
 |---|---|---|---|---|
 | `active_branch` | str | The currently active priority branch | `discharge`, `afternoon_charge`, `default` | Every cycle |
+| `sessy_strategy` | str | Sessy's current `power_strategy` (`nom`, `api`, `roi`, `eco`, `idle`). Replaces the former `sensor.home_battery_sessy_strategy` | `api` | Every cycle, and whenever Sessy's strategy select changes |
+| `rule_explanation` | str | Human-readable explanation of the active branch | | Every cycle |
 | `soc` | float | Current State of Charge | `65.5` | Every cycle |
 | `price` | float | Current market price | `0.25450` | Every cycle |
+| `cheapest_hours_n` | int | Number of cheapest hours to charge in | `2` | Every cycle (optimized mode) |
+| `cheapest_hours` | list[str] | Today's `cheapest_hours_n` cheapest hours, chronological | `["03:00", "04:00"]` | Every cycle (optimized mode) |
 | `target_afternoon_charging` | float | Active afternoon charge target (P3) | `70.0` | Every cycle |
 | `target_peak_discharge` | float | Active evening peak sell-off target (P4) | `70.0` | Every cycle |
 | `target_morning_soc` | float | Active morning sell-off target (P5) | `30.0` | Every cycle |
@@ -140,6 +144,8 @@ When the strategy is in a manual or standby mode, the status sensor uses a simpl
 | Attribute | Data Type | Format | Notes |
 |---|---|---|---|
 | `active_branch` | string | lowercase_with_underscores | Always present |
+| `sessy_strategy` | string | Sessy option | Always present; live-updated on select change |
+| `cheapest_hours` | list of string | `HH:00` | Optimized mode only; empty if no price data |
 | `soc` | float | 0-100 | Rounded to 2 decimal places |
 | `price` | float | any | Rounded to 5 decimal places |
 | `target_afternoon_charging` | float | 0-100 | From live entity or apps.yaml |
