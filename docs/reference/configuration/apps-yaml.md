@@ -42,7 +42,8 @@ The configuration is organized into logical sections:
 | `target_morning_soc` | float | 30 | No | SOC to unload down to in the morning window (P6) | 0-100 | `30` |
 | `soc_floor` | float | 0 | No | SOC floor percentage — battery never discharges below this | 0-100 | `20` |
 | `cheap_soc_target` | float | 100 | No | SOC ceiling for cheap-price charging | 0-100 | `100` |
-| `cheapest_hours_n` | int | 2 | No | Number of cheapest hours per calendar day to charge at full power (P3) | ≥ 0 | `2` |
+| `cheapest_hours_n` | int | 2 | No | Charge at full power when the current hour ranks within the N cheapest of the 24h price window (P3) | ≥ 0 | `2` |
+| `cheapest_window_start_h` | int | 2 | No | Start hour of the 24h cheapest-hours window (02:00 to 02:00); shared with the boiler strategy | 0-23 | `2` |
 | **Pricing** |||||||
 | `surcharge` | float | 0.11 | No | Import surcharge €/kWh (raw export → import price conversion) | ≥ 0 | `0.11` |
 | `price_discharge` | float | 0.39 | No | Raw price threshold above which to force discharge | any | `0.39` |
@@ -102,7 +103,7 @@ These control how the battery is charged and discharged.
 - **`target_morning_soc`**: The SOC to unload down to during the morning sell-off window (Priority 6).
 - **`soc_floor`**: The minimum SOC level. The battery will never discharge below this percentage.
 - **`cheap_soc_target`**: The target SOC for cheap-price charging (Priority 2). Typically set to 100% to fully charge during cheap hours.
-- **`cheapest_hours_n`**: The number of cheapest hours **per calendar day** to charge at full power (Priority 3). The cheapest hours are selected within each day, not over a rolling look-ahead horizon.
+- **`cheapest_hours_n`**: Charge at full power (Priority 3) when the current hour's price rank (1 = cheapest) is `<= cheapest_hours_n`. Ranking happens in a 24h window starting at `cheapest_window_start_h` (default 02:00 to 02:00), computed by `cheapest_hours.py`, which the boiler strategy also uses. Deploy `cheapest_hours.py` next to the strategy files.
 
 ### Pricing
 

@@ -39,7 +39,8 @@ The boiler strategy configuration is organized into logical sections:
 | `economic_night_end` | int | 6 | No | End hour of the second economic window (night period) | 0-23 | `6` |
 | **Price-Based Strategies** |||||||
 | `market_price_threshold` | float | 0.1 | No | Maximum current price in €/kWh at which to run the heat pump | >= 0 | `0.1` |
-| `cheapest_hours_count` | int | 1 | No | Number of cheapest forecast hours per day to run the heat pump | 1-24 | `3` |
+| `cheapest_hours_count` | int | 1 | No | Run the heat pump when the current hour ranks within the N cheapest of the 24h price window (same ranking as the battery) | 1-24 | `3` |
+| `cheapest_window_start_h` | int | 2 | No | Start hour of the 24h window (02:00 to 02:00); keep equal to the battery value | 0-23 | `2` |
 | `rerun_debounce_s` | float | 2.0 | No | Delay in seconds before re-running after a live input changes. Prevents rapid re-runs during slider drags. | >= 0 | `2.0` |
 | **Entity IDs** |||||||
 | `temp_sensor` | str | `sensor.boiler_temperatuur` | **Yes** | Boiler water temperature sensor | valid entity ID | `sensor.boiler_temperature` |

@@ -38,6 +38,8 @@ to be pushed (boost, legionella warning); there is no separate user setpoint.
 import appdaemon.plugins.hass.hassapi as hass
 from datetime import datetime, timedelta
 
+import cheapest_hours as ch
+
 # Human-readable label per active_branch value, exposed as the
 # 'active_branch_label' attribute on the status sensor.
 BRANCH_LABELS = {
@@ -97,6 +99,9 @@ class BoilerStrategy(hass.Hass):
         # ── Cheapest hours strategy ──────────────────────────────────────────
         # Number of cheapest hours to use heat pump (default: 1)
         self.cheapest_hours_count = int(self.args.get("cheapest_hours_count", 1))
+        # Shared with the battery strategy: ranking window starts at this hour and
+        # spans 24h (default 02:00 to 02:00).
+        self.cheapest_window_start_h = int(self.args.get("cheapest_window_start_h", 2))
         self.cheapest_hours_count_entity = self.args.get("cheapest_hours_count_entity", "input_number.boiler_cheapest_hours_count")
 
         # Seconds to wait after a live input changes before re-running, so a
@@ -192,8 +197,8 @@ class BoilerStrategy(hass.Hass):
                 in_cheapest_period = current_price is not None and current_price <= live_threshold
                 cheapest_period_label = "below_threshold" if in_cheapest_period else "above_threshold"
             elif mode == "cheapest_hours":
-                cheapest_hours = self._find_cheapest_hours(prices, live_cheapest_count)
-                in_cheapest_period = self._is_current_hour_in_cheapest_list(now_hour, cheapest_hours)
+                in_cheapest_period = self._is_cheapest_hour(prices, live_cheapest_count)
+                cheapest_hours = self._cheapest_hours(prices, live_cheapest_count)
                 cheapest_period_label = f"cheapest_{len(cheapest_hours)}h"
 
             if in_cheapest_period:
@@ -247,13 +252,13 @@ class BoilerStrategy(hass.Hass):
         # ── Priority 6: cheapest hours ───────────────────────────────────────
         if mode == "cheapest_hours":
             live_cheapest_count = self._get_cheapest_hours_count()
-            cheapest_hours = self._find_cheapest_hours(prices, live_cheapest_count)
-            in_cheapest_period = self._is_current_hour_in_cheapest_list(now_hour, cheapest_hours)
+            cheapest_hours = self._cheapest_hours(prices, live_cheapest_count)
+            in_cheapest_period = self._is_cheapest_hour(prices, live_cheapest_count)
 
             cheapest_hours_str = ",".join(str(h) for h in sorted(cheapest_hours))
             price_fields = dict(
                 cheapest_hours=sorted(cheapest_hours),
-                cheapest_hours_count=self.cheapest_hours_count,
+                cheapest_hours_count=live_cheapest_count,
                 in_cheapest_window=in_cheapest_period,
                 **status_fields,
             )
@@ -330,63 +335,14 @@ class BoilerStrategy(hass.Hass):
 
     # ── Cheapest hours decision ─────────────────────────────────────────────
 
-    def _find_cheapest_hours(self, prices, n_hours):
-        """
-        Find the n cheapest hours in the calendar day based on forecast prices.
-        Returns a list of hour numbers (0-23) representing the cheapest hours.
-        """
-        if prices is None or n_hours <= 0:
-            return []
+    def _is_cheapest_hour(self, prices, n_hours):
+        """Whether the current hour ranks within the n cheapest of the shared price window."""
+        return ch.is_cheapest_hour(prices, self.datetime(), n_hours, self.cheapest_window_start_h)
 
-        # Calculate average price for each hour of the day
-        hourly_prices = {}
-
-        if isinstance(prices, dict):
-            # Sessy format: dict with ISO timestamp keys
-            for timestamp_str, price_val in prices.items():
-                hour = self._entry_hour(timestamp_str)
-                if hour is None:
-                    continue
-                try:
-                    price = float(price_val)
-                    if hour not in hourly_prices:
-                        hourly_prices[hour] = []
-                    hourly_prices[hour].append(price)
-                except (TypeError, ValueError):
-                    continue
-        else:
-            # FrankEnergy format: list of dicts
-            for entry in prices or []:
-                hour = self._entry_hour(entry)
-                if hour is None:
-                    continue
-                try:
-                    price = float(entry.get("price"))
-                    if hour not in hourly_prices:
-                        hourly_prices[hour] = []
-                    hourly_prices[hour].append(price)
-                except (TypeError, ValueError, AttributeError):
-                    continue
-
-        # Calculate average price for each hour
-        hourly_avg_prices = []
-        for hour, price_list in hourly_prices.items():
-            if price_list:
-                avg_price = sum(price_list) / len(price_list)
-                hourly_avg_prices.append((hour, avg_price))
-
-        if not hourly_avg_prices:
-            return []
-
-        # Sort by average price (cheapest first) and take top n
-        hourly_avg_prices.sort(key=lambda x: x[1])
-        cheapest_hours = [hour for hour, _ in hourly_avg_prices[:n_hours]]
-
-        return cheapest_hours
-
-    def _is_current_hour_in_cheapest_list(self, current_hour, cheapest_hours):
-        """Check if current hour is in the list of cheapest hours."""
-        return current_hour in cheapest_hours
+    def _cheapest_hours(self, prices, n_hours):
+        """Clock hours (0-23) of the n cheapest hours in the shared price window."""
+        hours = ch.cheapest_hours(prices, self.datetime(), n_hours, self.cheapest_window_start_h)
+        return [h.hour for h in hours]
 
     def _get_current_price(self):
         """Get the current market price."""

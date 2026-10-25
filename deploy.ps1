@@ -24,6 +24,7 @@ Write-Host "Deploying to ${HA_USER}@${HA_HOST}:${HA_PORT} ..."
 # -O forces the legacy SCP protocol; -P specifies the port.
 scp -O -P $HA_PORT files/sessy_strategy.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/sessy_strategy.py"
 scp -O -P $HA_PORT files/boiler_strategy.py "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/boiler_strategy.py"
+scp -O -P $HA_PORT files/cheapest_hours.py  "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/cheapest_hours.py"
 scp -O -P $HA_PORT files/apps.yaml          "${HA_USER}@${HA_HOST}:${APPDAEMON_APPS_DIR}/apps.yaml"
 
 # Home Battery custom integration (creates the device + entities).

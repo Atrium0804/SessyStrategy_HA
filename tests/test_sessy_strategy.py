@@ -237,11 +237,11 @@ class TestIsCheapestHour:
         values = [0.30] * 24
         values[14], values[3] = 0.01, 0.02   # cheaper slot later in the day
         app = self._app(self._mk_prices(values), now_hour=9)
-        assert app._cheapest_hours_today(2) == ["03:00", "14:00"]
+        assert app._cheapest_hours_in_window(2) == ["03:00", "14:00"]
 
     def test_cheapest_hours_today_empty_without_prices(self):
         app = self._app(None, now_hour=3)
-        assert app._cheapest_hours_today(2) == []
+        assert app._cheapest_hours_in_window(2) == []
 
     def test_cheapest_hours_published_in_status(self):
         app = make_app()

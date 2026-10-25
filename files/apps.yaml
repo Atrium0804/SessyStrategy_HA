@@ -16,8 +16,11 @@ sessy_strategy:
 
   # ── Cheapest-hours charge (P3) ──────────────────────────────────────
   # Charge at max power during the N cheapest hourly slots of the current
-  # calendar day, regardless of the absolute price level.
+  # price window, regardless of the absolute price level. The window is shared
+  # with the boiler strategy (files/cheapest_hours.py): 24h starting at
+  # cheapest_window_start_h, i.e. 02:00 to 02:00. Hour is cheap when rank <= N.
   cheapest_hours_n: 2          # Number of cheapest hours to charge in
+  cheapest_window_start_h: 2   # Window start hour (window = start to start next day)
 
   # ── Pricing ─────────────────────────────────────────────────────────
   # A single market price sensor is used for both charge and discharge
@@ -121,8 +124,10 @@ boiler_strategy:
   market_price_threshold: 0.1     # Price threshold in €/kWh (default: 0.1)
 
   # ── Cheapest hours strategy ────────────────────────────────────────
-  # 'cheapest_hours' finds N cheapest hours in calendar day and runs heat pump then
+  # 'cheapest_hours' runs the heat pump when the current hour ranks within the N
+  # cheapest of the shared 24h window (same ranking as the battery strategy)
   cheapest_hours_count: 1         # Number of cheapest hours to use heat pump
+  cheapest_window_start_h: 2      # Keep equal to the battery value (02:00 to 02:00)
 
   rerun_debounce_s: 2.0
 

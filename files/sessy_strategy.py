@@ -23,6 +23,8 @@ Strategy (priority order, each rule individually switchable from the GUI):
 import appdaemon.plugins.hass.hassapi as hass
 from datetime import timedelta
 
+import cheapest_hours as ch
+
 
 class SessyStrategy(hass.Hass):
     # Brief explanations for each rule/branch, keyed by active_branch name
@@ -58,8 +60,11 @@ class SessyStrategy(hass.Hass):
         self.soc_floor            = float(self.args.get("soc_floor", 20))
         self.cheap_soc_target     = float(self.args.get("cheap_soc_target", 100))
         # Cheapest-hours charge: charge at max power during the N cheapest hourly
-        # slots of the current calendar day, regardless of the absolute price level.
+        # slots of the current price window, regardless of the absolute price level.
+        # The window runs cheapest_window_start_h to the same hour next day (shared
+        # with the boiler strategy via cheapest_hours.py).
         self.cheapest_hours_n         = int(self.args.get("cheapest_hours_n", 2))
+        self.cheapest_window_start_h  = int(self.args.get("cheapest_window_start_h", 2))
         self.price_discharge      = float(self.args.get("price_discharge", 0.39))
         self.price_charge         = float(self.args.get("price_charge", -0.10))
         self.afternoon_start      = int(self.args.get("afternoon_start", 15))
@@ -255,7 +260,7 @@ class SessyStrategy(hass.Hass):
             soc_floor=soc_floor,
             cheap_soc_target=cheap_soc_target,
             cheapest_hours_n=cheapest_hours_n,
-            cheapest_hours=self._cheapest_hours_today(cheapest_hours_n),
+            cheapest_hours=self._cheapest_hours_in_window(cheapest_hours_n),
             price_discharge=price_discharge,
             price_charge=price_charge,
             min_arbitrage_margin=min_arbitrage_margin,
@@ -714,37 +719,17 @@ class SessyStrategy(hass.Hass):
         return prices
 
     def _is_cheapest_hour(self, n: int) -> bool:
-        """Whether the current hour is one of today's n cheapest hours."""
-        current = self.datetime().strftime("%H:00")
-        return current in self._cheapest_hours_today(n)
+        """Whether the current hour ranks within the n cheapest of its price window."""
+        return ch.is_cheapest_hour(
+            self._get_prices_dict(), self.datetime(), n, self.cheapest_window_start_h
+        )
 
-    def _cheapest_hours_today(self, n: int) -> list[str]:
-        """
-        The n cheapest hourly slots of the current calendar day, as "HH:00" in
-        chronological order. Picked within the current day only, so hours never
-        inherit "cheapest" status from prices climbing into the next day. Empty
-        when n <= 0 or no price data is available.
-        """
-        n = int(n)
-        if n <= 0:
-            return []
-        prices = self._get_prices_dict()
-        if not prices:
-            return []
-        current_date = self.datetime().strftime("%Y-%m-%d")
-
-        # Collect the current day's hourly slots (key format: YYYY-MM-DDTHH:00:00).
-        today_slots = []
-        for key, price_val in prices.items():
-            if key[:10] != current_date:
-                continue
-            try:
-                today_slots.append((float(price_val), key))
-            except (TypeError, ValueError):
-                pass
-
-        today_slots.sort(key=lambda kv: kv[0])
-        return sorted(key[11:16] for _, key in today_slots[:n])
+    def _cheapest_hours_in_window(self, n: int) -> list[str]:
+        """The n cheapest hours of the current price window as "HH:00", chronologically."""
+        hours = ch.cheapest_hours(
+            self._get_prices_dict(), self.datetime(), n, self.cheapest_window_start_h
+        )
+        return [h.strftime("%H:00") for h in hours]
 
     def _contiguous_price_hours(self, threshold: float, above: bool) -> float:
         """
