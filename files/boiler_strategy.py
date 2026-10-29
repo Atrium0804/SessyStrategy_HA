@@ -101,7 +101,7 @@ class BoilerStrategy(hass.Hass):
         self.cheapest_hours_count = int(self.args.get("cheapest_hours_count", 1))
         # Shared with the battery strategy: ranking window starts at this hour and
         # spans 24h (default 02:00 to 02:00).
-        self.cheapest_window_start_h = int(self.args.get("cheapest_window_start_h", 2))
+        self.cheapest_window_start_h = int(self.args.get("cheapest_window_start_h", 23))
         self.cheapest_hours_count_entity = self.args.get("cheapest_hours_count_entity", "input_number.boiler_cheapest_hours_count")
 
         # Seconds to wait after a live input changes before re-running, so a
