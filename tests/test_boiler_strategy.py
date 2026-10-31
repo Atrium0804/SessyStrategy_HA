@@ -223,6 +223,19 @@ class TestUpdateStrategyPriority:
             "select/select_option", entity_id="select.boiler_mode", option="boost"
         )
 
+    def test_boost_not_resent_when_already_boost(self):
+        # Re-sending boost restarts the Ariston boost/heat pump every cycle.
+        app = make_app()
+        app.get_state = _entity_states(
+            temp=50, mode="boost", legionella_last_ok="2024-06-14 14:00:00",
+            boiler_mode="boost",
+        )
+        app.update_strategy({})
+        assert not any(
+            c.args and c.args[0] == "select/select_option"
+            for c in app.call_service.call_args_list
+        )
+
     # ── Economic mode (fixed clock = 14:00, i.e. inside the 10-16 window) ────
     def test_economic_heatpump_when_now_in_cheapest_window(self):
         app = make_app()

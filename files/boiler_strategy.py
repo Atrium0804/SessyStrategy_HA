@@ -449,18 +449,16 @@ class BoilerStrategy(hass.Hass):
             return
         try:
             current = self.get_state(self.boiler_mode_select)
-            # 'boost' must be re-asserted every cycle: the Ariston BOOST mode is a
-            # one-shot heat cycle that reverts to GREEN at its own setpoint once done,
-            # while select.boiler_mode keeps reading 'boost' from the stored mode — so
-            # guarding on current != option would leave the boiler idling below max temp.
-            if current != option or option == "boost":
+            # Only send on change: re-selecting 'boost' restarts the Ariston boost
+            # sequence, and repeatedly restarting the heat pump damages it. The single
+            # retry after a dropped boost is handled in HA (Boiler Boost Retry automation).
+            if current != option:
                 self.call_service(
                     "select/select_option",
                     entity_id=self.boiler_mode_select,
                     option=option,
                 )
-                if current != option:
-                    self.log(f"Boiler mode → {option}")
+                self.log(f"Boiler mode → {option}")
         except Exception as e:
             self.log(f"Failed to set boiler mode: {e}", level="WARNING")
 
