@@ -15,6 +15,60 @@ The `sensor.sessy_strategy_status` entity is created and maintained by the Sessy
 
 ---
 
+## Boiler Cheapest-Hours Threshold
+
+The companion `sensor.boiler_strategy_status` publishes these attributes each
+successful cycle while the selected mode is `cheapest_hours`, including when
+legionella protection overrides the actuator:
+
+| Attribute | Type | Meaning |
+|---|---|---|
+| `cheapest_hours_price_threshold` | float or null | Highest average hourly market price among the selected N hours, in EUR/kWh; null if no hours are selected or no prices are available |
+| `cheapest_hours_window_start` | ISO timestamp or null | Inclusive start of the configured 24h ranking window |
+| `cheapest_hours_window_end` | ISO timestamp or null | Exclusive end of that window |
+
+All three become `null` in other modes. Live changes to N and forecast updates
+recalculate the threshold through the existing debounced strategy cycle.
+With a partial forecast, the threshold uses the available selected hours.
+Ties can put more than N hours at or below the threshold: the strategy still
+selects exactly the available N cheapest hours, breaking ties by earliest hour.
+Quarter-hour forecast slots are averaged per hour for ranking; the line is not
+a per-slot switching threshold and does not change strategy decisions.
+
+For an ApexCharts card, keep a single price column series with its unfiltered
+generator, disable stacking, and add this line under `series`:
+
+```yaml
+  - entity: sensor.boiler_strategy_status
+    attribute: cheapest_hours_price_threshold
+    name: Cheapest-hours grens
+    type: line
+    color: limegreen
+    stroke_width: 2
+    float_precision: 3
+    yaxis_id: price
+    extend_to: false
+    show:
+      in_header: false
+      legend_value: false
+    data_generator: |
+      const a = entity.attributes;
+      const threshold = a.cheapest_hours_price_threshold;
+      if (threshold == null || !a.cheapest_hours_window_start || !a.cheapest_hours_window_end) return [];
+      const start = new Date(a.cheapest_hours_window_start).getTime();
+      const end = new Date(a.cheapest_hours_window_end).getTime();
+      if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(threshold)) return [];
+      return [[start, threshold], [end - 1, threshold]];
+```
+
+Use `Object.entries(entity.attributes.energy_prices || {}).map(([t, v]) =>
+[new Date(t).getTime(), v])` for the price column generator. Remove the old green
+column series and set `apex_config.chart.stacked: false`. Remove the old
+`apex_config.stroke.width` array, or update it to match the new series order.
+The manually configured market-price threshold line can remain alongside this
+calculated cheapest-hours line. Deploy both `boiler_strategy.py` and
+`cheapest_hours.py`, then restart AppDaemon to expose the new attributes.
+
 ## Complete Attribute List
 
 ### Always Present Attributes

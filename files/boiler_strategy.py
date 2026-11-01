@@ -152,12 +152,26 @@ class BoilerStrategy(hass.Hass):
         # would otherwise make the counter appear stuck at legionella_hybrid_days.
         days_since_ok = 0.0 if just_reached else self._days_since_legionella_ok()
         mode = self._get_mode()
+        prices = self._get_prices()
 
         status_fields = dict(
             temp=temp,
             mode=mode,
             days_since_legionella_ok=days_since_ok,
+            cheapest_hours_price_threshold=None,
+            cheapest_hours_window_start=None,
+            cheapest_hours_window_end=None,
         )
+        if mode == "cheapest_hours":
+            now = self.datetime()
+            window_start, window_end = ch.price_window(now, self.cheapest_window_start_h)
+            status_fields.update(
+                cheapest_hours_price_threshold=ch.cheapest_hours_price_threshold(
+                    prices, now, self._get_cheapest_hours_count(), self.cheapest_window_start_h
+                ),
+                cheapest_hours_window_start=window_start.isoformat(),
+                cheapest_hours_window_end=window_end.isoformat(),
+            )
 
         # ── Priority 1: legionella boost deadline — always, unless user forced 'off' ──
         if days_since_ok >= self.legionella_boost_days and mode != "off":
@@ -176,7 +190,6 @@ class BoilerStrategy(hass.Hass):
 
         # Remaining branches are strategy-specific and price-driven
         now_hour = self.datetime().hour
-        prices = self._get_prices()
         current_price = self._get_current_price()
 
         self.log(f"Prices data: {type(prices).__name__} - {prices}", level="DEBUG")

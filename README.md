@@ -122,6 +122,19 @@ A companion AppDaemon app, `files/boiler_strategy.py` (config in `apps.yaml` und
 
 The user mode input is an `input_select` (`mode_select`, provided by the boiler package as `input_select.boiler_strategy_mode`) with options `off`, `heatpump`, `hybrid`, `boost`, `economic`, `market_price_threshold`, and `cheapest_hours`. The threshold strategy also reads `current_price_sensor`; leave `current_price_attribute` empty when the price is the sensor state. The app writes decisions to the logical `select.boiler_mode` actuator, which in turn pushes the Ariston integration's own `max_temp` whenever a temperature needs to be set (there is no separate user-controllable setpoint). The app only writes `select.boiler_mode` when the decision changes, so `boost` is started once per selection: the package switches the Ariston to IMEMORY, raises the setpoint to `max_temp` (GREEN caps it at 53 °C), then starts BOOST, and retries at most once if the boost resistor (boiler power ≥ 1000 W) isn't running while the water is still below the setpoint — repeated restarts wear the heat pump. The last-reached legionella timestamp is tracked in an `input_datetime` helper (`legionella_last_ok_entity`) that the app stamps itself.
 
+In `cheapest_hours` mode, `sensor.boiler_strategy_status` publishes the numeric
+`cheapest_hours_price_threshold`: the highest average hourly market price among
+the selected N hours. `cheapest_hours_window_start` and `cheapest_hours_window_end`
+are ISO timestamps delimiting the configured 24h window, so a chart can draw one
+threshold line only within that window instead of splitting price bars by color.
+The threshold is `null` without a selection; all three attributes are `null` in
+other modes. The threshold remains available during legionella overrides.
+Equal prices can put more than N hours on or below the line; actual selection
+still uses rank with earlier hours winning ties. Quarter-hour prices are averaged
+per hour, so individual slots need not fall below the hourly threshold.
+See [Status Sensor Attributes](docs/reference/status-sensor-attributes.md#boiler-cheapest-hours-threshold)
+for the chart example.
+
 See:
 - [Boiler Strategy Configuration Reference](docs/reference/configuration/boiler-strategy-config.md)
 - [Boiler Strategy Priority Chain Explained](docs/explanation/boiler-strategy-priority-chain.md)

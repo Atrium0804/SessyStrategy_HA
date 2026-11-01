@@ -88,3 +88,10 @@ def cheapest_hours(prices, now, n, window_start_h):
     if int(n) <= 0:
         return []
     return sorted(ranked_hours(prices, now, window_start_h)[: int(n)])
+
+
+def cheapest_hours_price_threshold(prices, now, n, window_start_h):
+    """Highest hourly average among the selected cheapest hours, or None."""
+    selected = cheapest_hours(prices, now, n, window_start_h)
+    hourly = _hourly_prices(prices)
+    return max((hourly[hour] for hour in selected), default=None)

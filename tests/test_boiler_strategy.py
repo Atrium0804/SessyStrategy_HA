@@ -324,6 +324,58 @@ class TestUpdateStrategyPriority:
             "select/select_option", entity_id="select.boiler_mode", option="off"
         )
 
+    @pytest.mark.parametrize("last_ok, branch", [
+        ("2024-06-14 14:00:00", "cheapest_hours_heatpump"),
+        ("2024-06-09 14:00:00", "legionella_hybrid"),
+        ("2024-06-07 14:00:00", "legionella_boost"),
+    ])
+    def test_cheapest_threshold_published_even_during_legionella_override(self, last_ok, branch):
+        app = make_app(cheapest_hours_count=2, cheapest_window_start_h=2)
+        app.get_state = _entity_states(
+            temp=50, mode="cheapest_hours",
+            prices=_sessy_prices(0.30, range(24)) | {
+                "2024-06-15T14:00:00": 0.01,
+                "2024-06-16T00:00:00": 0.02,
+            },
+            legionella_last_ok=last_ok,
+        )
+        app.update_strategy({})
+        status = app.set_state.call_args.kwargs
+        assert status["state"] == branch
+        assert status["attributes"]["cheapest_hours_price_threshold"] == 0.02
+        assert status["attributes"]["cheapest_hours_window_start"] == "2024-06-15T02:00:00"
+        assert status["attributes"]["cheapest_hours_window_end"] == "2024-06-16T02:00:00"
+
+    def test_cheapest_threshold_updates_with_live_count_and_clears_on_mode_change(self):
+        app = make_app(cheapest_hours_count=1)
+        app.get_state = _entity_states(
+            temp=50, mode="cheapest_hours",
+            prices=_sessy_prices(0.30, range(24)) | {"2024-06-15T14:00:00": 0.01},
+            legionella_last_ok="2024-06-14 14:00:00",
+        )
+        original_get_state = app.get_state
+        app.get_state = lambda entity_id=None, attribute=None: (
+            "2" if entity_id == app.cheapest_hours_count_entity
+            else original_get_state(entity_id, attribute)
+        )
+        app.update_strategy({})
+        assert app.set_state.call_args.kwargs["attributes"]["cheapest_hours_price_threshold"] == 0.30
+        app.get_state = _entity_states(temp=50, mode="off")
+        app.update_strategy({})
+        attributes = app.set_state.call_args.kwargs["attributes"]
+        assert attributes["cheapest_hours_price_threshold"] is None
+        assert attributes["cheapest_hours_window_start"] is None
+        assert attributes["cheapest_hours_window_end"] is None
+
+    def test_cheapest_threshold_is_none_without_forecast(self):
+        app = make_app()
+        app.get_state = _entity_states(
+            temp=50, mode="cheapest_hours", prices=None,
+            legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        assert app.set_state.call_args.kwargs["attributes"]["cheapest_hours_price_threshold"] is None
+
     def test_unset_mode_defaults_to_economic(self):
         app = make_app()
         app.get_state = _entity_states(

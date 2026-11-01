@@ -4,6 +4,7 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 import cheapest_hours as ch
+import pytest
 
 import test_boiler_strategy as tb
 import test_sessy_strategy as ts
@@ -72,6 +73,32 @@ class TestRank:
             datetime(2024, 6, 15, 5), datetime(2024, 6, 15, 20)
         ]
         assert ch.cheapest_hours(prices, now, 0, 2) == []
+
+
+class TestPriceThreshold:
+    def test_threshold_uses_hourly_averages_inside_current_window(self):
+        prices = {
+            "2024-06-15T01:00:00": -1.0,
+            "2024-06-15T10:00:00": 0.02,
+            "2024-06-15T10:15:00": 0.18,
+            "2024-06-15T11:00:00": 0.08,
+            "2024-06-16T00:00:00": 0.20,
+            "2024-06-16T02:00:00": -2.0,
+        }
+        assert ch.cheapest_hours_price_threshold(prices, datetime(2024, 6, 15, 14), 2, 2) == pytest.approx(0.10)
+
+    def test_no_selection_has_no_threshold(self):
+        now = datetime(2024, 6, 15, 14)
+        assert ch.cheapest_hours_price_threshold(None, now, 2, 2) is None
+        assert ch.cheapest_hours_price_threshold({}, now, 2, 2) is None
+        assert ch.cheapest_hours_price_threshold(_two_days(), now, 0, 2) is None
+
+    def test_partial_forecast_and_ties_keep_existing_selection(self):
+        now = datetime(2024, 6, 15, 14)
+        prices = _prices({(15, 10): -0.10, (15, 11): -0.10, (15, 12): -0.10})
+        assert ch.cheapest_hours_price_threshold(prices, now, 2, 2) == -0.10
+        assert len(ch.cheapest_hours(prices, now, 2, 2)) == 2
+        assert ch.cheapest_hours_price_threshold(prices, now, 5, 2) == -0.10
 
 
 class TestMaxPriceAfterNow:
