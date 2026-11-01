@@ -245,10 +245,12 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 2. **Checks the peak-shaving margin:** Ensures that the evening peak import price beats the current import price by at least `afternoon_margin`
 3. **Charges at full power:** Drives the battery at `max_power_w` until `target_afternoon_charging` is reached
 4. **Sets battery setpoint:** Uses `api` mode (direct battery power control), negative = charge
+5. **Holds at target:** Once SOC reaches `target_afternoon_charging`, sets battery setpoint 0W (`api` mode). A grid setpoint 0W would let the battery discharge to cover household load and then recharge in the next cycle.
 
 **Formula:**
 
 ```
+if soc >= target_afternoon_charging:                         hold battery 0W
 evening_peak_buy = max(buy price over evening_peak_start..evening_peak_end)
 if evening_peak_buy - current_buy_price < afternoon_margin:  hold grid 0W
 else:                                                        charge_w = max_power_w

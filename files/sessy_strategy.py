@@ -358,10 +358,10 @@ class SessyStrategy(hass.Hass):
             if soc >= target_afternoon_charging:
                 self.log(
                     f"AFTERNOON: SOC {soc:.0f}% already at target {target_afternoon_charging:.0f}% — "
-                    f"holding grid setpoint 0W"
+                    f"holding battery setpoint 0W"
                 )
                 self._publish_status("afternoon_full", **status_fields)
-                self._set_grid_setpoint(0)
+                self._set_battery_setpoint(0)
                 return
 
             # Break-even guard: only top up if the evening peak price is at least

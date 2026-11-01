@@ -83,7 +83,7 @@ The `active_branch` attribute indicates which priority rule matched. Each branch
 
 **Variants:**
 - `afternoon_charge`: Actively charging toward `target_afternoon_charging` to avoid net import at the evening peak
-- `afternoon_full`: SOC already at target, holding at grid 0W
+- `afternoon_full`: SOC already at target, holding battery setpoint 0W (no discharge, no recharge)
 - `afternoon_skip`: Evening peak import barely above current import, not worth topping up
 
 ### Priority 4: Evening Peak Sell-off Discharge (`active_branch: "evening_peak_selloff"`)

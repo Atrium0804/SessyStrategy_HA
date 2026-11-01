@@ -448,12 +448,12 @@ class TestUpdateStrategyBranches:
         app._set_grid_setpoint.assert_called_once_with(0)
         app._set_battery_setpoint.assert_not_called()
 
-    def test_priority3_afternoon_at_target_holds_grid_zero(self):
-        # SOC already at target_afternoon_charging during afternoon window → no charge needed
+    def test_priority3_afternoon_at_target_holds_battery_zero(self):
+        # At target: battery setpoint 0 so it neither discharges nor recharges
         app = self._make_app_with_sensors(soc=90, price=0.10, now_hour=17)
         app.update_strategy({})
-        app._set_grid_setpoint.assert_called_once_with(0)
-        app._set_battery_setpoint.assert_not_called()
+        app._set_battery_setpoint.assert_called_once_with(0)
+        app._set_grid_setpoint.assert_not_called()
 
     def test_rule_disabled_skips_price_spike(self):
         # Price-spike rule off → high price no longer discharges, falls through

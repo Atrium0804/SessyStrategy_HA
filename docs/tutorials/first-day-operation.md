@@ -169,12 +169,12 @@ INFO sessy_strategy: AFTERNOON CHARGE: battery setpoint -850W (SOC 62% → targe
 **Case B: SOC already at target**
 ```
 INFO sessy_strategy: Hour=16  SOC=72%  Raw price=0.15678  Import price=0.26678
-INFO sessy_strategy: AFTERNOON: SOC 72% already at target 70% — holding grid setpoint 0W
+INFO sessy_strategy: AFTERNOON: SOC 72% already at target 70% — holding battery setpoint 0W
 ```
 
 - **Status Sensor:** `afternoon_full`
-- **Strategy Select:** `nom`
-- **Grid Target:** `0`
+- **Strategy Select:** `api`
+- **Battery Setpoint:** `0`
 
 **Case C: Evening peak not enough more expensive**
 ```
