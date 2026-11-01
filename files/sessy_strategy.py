@@ -9,8 +9,9 @@ Strategy (priority order, each rule individually switchable from the GUI):
   0. Grid-connection guard: every setpoint is clamped to max_grid_w * grid_utilization
   1. Price-spike discharge (price > price_discharge): battery setpoint, discharge toward SOC floor
   2. Cheap/negative price (price < price_charge): battery setpoint, charge toward ceiling
-  3. Cheapest hours: current hour is one of the N cheapest in its calendar day:
-     battery setpoint, charge at max power toward ceiling regardless of price level.
+  3. Cheapest hours: current hour is one of the N cheapest in its price window and
+     a later hour in that window beats the current price by cheapest_hours_margin:
+     battery setpoint, charge at max power toward ceiling.
   4. Afternoon charge, SOC < target_afternoon_charging, and the evening peak price
      beats the current price by afternoon_margin: battery setpoint, charge at max power.
      Peak-shaving (avoid net import at the evening peak), not grid trading.
@@ -60,11 +61,14 @@ class SessyStrategy(hass.Hass):
         self.soc_floor            = float(self.args.get("soc_floor", 20))
         self.cheap_soc_target     = float(self.args.get("cheap_soc_target", 100))
         # Cheapest-hours charge: charge at max power during the N cheapest hourly
-        # slots of the current price window, regardless of the absolute price level.
-        # The window runs cheapest_window_start_h to the same hour next day (shared
-        # with the boiler strategy via cheapest_hours.py).
+        # slots of the current price window. The window runs cheapest_window_start_h
+        # to the same hour next day (shared with the boiler strategy via
+        # cheapest_hours.py).
         self.cheapest_hours_n         = int(self.args.get("cheapest_hours_n", 2))
         self.cheapest_window_start_h  = int(self.args.get("cheapest_window_start_h", 2))
+        # Cheapest-hours break-even: min €/kWh by which the most expensive later
+        # hour in the window must exceed the current price before charging.
+        self.cheapest_hours_margin    = float(self.args.get("cheapest_hours_margin", 0.05))
         self.price_discharge      = float(self.args.get("price_discharge", 0.39))
         self.price_charge         = float(self.args.get("price_charge", -0.10))
         self.afternoon_start      = int(self.args.get("afternoon_start", 15))
@@ -129,7 +133,8 @@ class SessyStrategy(hass.Hass):
         self.price_charge_entity         = self.args.get("price_charge_entity")
         self.min_arbitrage_margin_entity = self.args.get("min_arbitrage_margin_entity")
         self.afternoon_margin_entity     = self.args.get("afternoon_margin_entity")
-        self.cheap_soc_target_entity     = self.args.get("cheap_soc_target_entity")
+        self.cheapest_hours_margin_entity = self.args.get("cheapest_hours_margin_entity")
+        self.cheap_soc_target_entity      = self.args.get("cheap_soc_target_entity")
         self.cheapest_hours_n_entity     = self.args.get("cheapest_hours_n_entity")
         # Optional per-rule enable switches. When unset, a rule is always enabled.
         self.rule_price_spike_entity     = self.args.get("rule_price_spike_entity")
@@ -164,6 +169,7 @@ class SessyStrategy(hass.Hass):
             self.price_charge_entity,
             self.min_arbitrage_margin_entity,
             self.afternoon_margin_entity,
+            self.cheapest_hours_margin_entity,
             self.rule_price_spike_entity,
             self.rule_cheap_charge_entity,
             self.rule_cheapest_hours_entity,
@@ -247,6 +253,7 @@ class SessyStrategy(hass.Hass):
         price_charge         = self._tunable(self.price_charge, self.price_charge_entity)
         min_arbitrage_margin = self._tunable(self.min_arbitrage_margin, self.min_arbitrage_margin_entity)
         afternoon_margin     = self._tunable(self.afternoon_margin, self.afternoon_margin_entity)
+        cheapest_hours_margin = self._tunable(self.cheapest_hours_margin, self.cheapest_hours_margin_entity)
         afternoon_start = self.afternoon_start
         afternoon_end   = self.afternoon_end
 
@@ -265,6 +272,7 @@ class SessyStrategy(hass.Hass):
             price_charge=price_charge,
             min_arbitrage_margin=min_arbitrage_margin,
             afternoon_margin=afternoon_margin,
+            cheapest_hours_margin=cheapest_hours_margin,
             afternoon_start=afternoon_start,
             afternoon_end=afternoon_end,
         )
@@ -311,11 +319,22 @@ class SessyStrategy(hass.Hass):
 
         # ── Priority 3: cheapest-hours charge ───────────────────────────────
         # Charge at max power when the current hour is one of the N cheapest in
-        # its calendar day, regardless of the absolute price level. Holds at the
-        # ceiling once full so it does not discharge and re-trigger.
+        # its price window. Holds at the ceiling once full so it does not
+        # discharge and re-trigger. Break-even guard: only charge if a later hour
+        # in the window is at least cheapest_hours_margin more expensive, so a
+        # flat-price day does not buy energy that cannot cover round-trip losses.
+        # Without later price data the guard does not block (fail-open).
         if self._rule_enabled(self.rule_cheapest_hours_entity) and \
                 self._is_cheapest_hour(cheapest_hours_n):
-            if soc >= cheap_soc_target:
+            later_max_price = self._max_price_later_in_window()
+            if later_max_price is not None and \
+                    (later_max_price - price) < cheapest_hours_margin:
+                self.log(
+                    f"CHEAPEST HOURS SKIP: highest later price {later_max_price:.3f} vs current "
+                    f"{price:.3f} (spread < margin {cheapest_hours_margin}) — "
+                    f"falling through to lower priorities"
+                )
+            elif soc >= cheap_soc_target:
                 self.log(
                     f"CHEAPEST HOURS: SOC {soc:.0f}% already at ceiling "
                     f"{cheap_soc_target:.0f}% — holding battery setpoint 0W"
@@ -323,13 +342,14 @@ class SessyStrategy(hass.Hass):
                 self._publish_status("cheapest_hours_full", **status_fields)
                 self._set_battery_setpoint(0)
                 return
-            self.log(
-                f"CHEAPEST HOURS: hour is among the {cheapest_hours_n} cheapest — "
-                f"charging at max {self.max_power_w:.0f}W (SOC {soc:.0f}% → {cheap_soc_target:.0f}%)"
-            )
-            self._publish_status("cheapest_hours", **status_fields)
-            self._set_battery_setpoint(-self.max_power_w)
-            return
+            else:
+                self.log(
+                    f"CHEAPEST HOURS: hour is among the {cheapest_hours_n} cheapest — "
+                    f"charging at max {self.max_power_w:.0f}W (SOC {soc:.0f}% → {cheap_soc_target:.0f}%)"
+                )
+                self._publish_status("cheapest_hours", **status_fields)
+                self._set_battery_setpoint(-self.max_power_w)
+                return
 
         # ── Priority 4: afternoon charge window ──────────────────────────────
         # Peak-shaving, not trading: top up cheaply in the afternoon so the
@@ -730,6 +750,12 @@ class SessyStrategy(hass.Hass):
             self._get_prices_dict(), self.datetime(), n, self.cheapest_window_start_h
         )
         return [h.strftime("%H:00") for h in hours]
+
+    def _max_price_later_in_window(self) -> float | None:
+        """Highest hourly price after the current hour in the current price window."""
+        return ch.max_price_after_now(
+            self._get_prices_dict(), self.datetime(), self.cheapest_window_start_h
+        )
 
     def _contiguous_price_hours(self, threshold: float, above: bool) -> float:
         """

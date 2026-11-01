@@ -44,6 +44,7 @@ The configuration is organized into logical sections:
 | `cheap_soc_target` | float | 100 | No | SOC ceiling for cheap-price charging | 0-100 | `100` |
 | `cheapest_hours_n` | int | 2 | No | Charge at full power when the current hour ranks within the N cheapest of the 24h price window (P3) | ≥ 0 | `2` |
 | `cheapest_window_start_h` | int | 2 | No | Start hour of the 24h cheapest-hours window (02:00 to 02:00); shared with the boiler strategy | 0-23 | `2` |
+| `cheapest_hours_margin` | float | 0.05 | No | Minimum €/kWh by which the highest later price in the window must beat the current price to justify cheapest-hours charge (P3) | ≥ 0 | `0.05` |
 | **Pricing** |||||||
 | `surcharge` | float | 0.11 | No | Import surcharge €/kWh (raw export → import price conversion) | ≥ 0 | `0.11` |
 | `price_discharge` | float | 0.39 | No | Raw price threshold above which to force discharge | any | `0.39` |
@@ -82,6 +83,7 @@ The configuration is organized into logical sections:
 | `price_charge_entity` | str | null | No | Live charge threshold override (input_number) | valid entity ID | `number.home_battery_price_charge` |
 | `min_arbitrage_margin_entity` | str | null | No | Live arbitrage margin override, P4 (input_number) | valid entity ID | `number.home_battery_min_arbitrage_margin` |
 | `afternoon_margin_entity` | str | null | No | Live afternoon margin override (input_number) | valid entity ID | `number.home_battery_afternoon_margin` |
+| `cheapest_hours_margin_entity` | str | null | No | Live cheapest hours margin override, P3 | valid entity ID | `number.home_battery_cheapest_hours_margin` |
 
 ---
 
@@ -104,6 +106,7 @@ These control how the battery is charged and discharged.
 - **`soc_floor`**: The minimum SOC level. The battery will never discharge below this percentage.
 - **`cheap_soc_target`**: The target SOC for cheap-price charging (Priority 2). Typically set to 100% to fully charge during cheap hours.
 - **`cheapest_hours_n`**: Charge at full power (Priority 3) when the current hour's price rank (1 = cheapest) is `<= cheapest_hours_n`. Ranking happens in a 24h window starting at `cheapest_window_start_h` (default 02:00 to 02:00), computed by `cheapest_hours.py`, which the boiler strategy also uses. Deploy `cheapest_hours.py` next to the strategy files.
+- **`cheapest_hours_margin`**: Break-even guard for Priority 3. The rule only charges when the highest hourly price after the current hour (up to the window end) is at least this many €/kWh above the current price. On flat-price days the rule is skipped and evaluation falls through to Priority 4. Without later price data the guard does not block.
 
 ### Pricing
 

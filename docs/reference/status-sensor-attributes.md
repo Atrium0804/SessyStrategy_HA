@@ -39,6 +39,7 @@ These attributes are updated on every strategy cycle, regardless of the active b
 | `price_charge` | float | Active charge price threshold | `-0.10` | Every cycle |
 | `min_arbitrage_margin` | float | Active minimum arbitrage margin (P4) | `0.05` | Every cycle |
 | `afternoon_margin` | float | Active afternoon charge margin (P3) | `0.05` | Every cycle |
+| `cheapest_hours_margin` | float | Active cheapest hours charge margin (P3) | `0.05` | Every cycle (optimized mode) |
 | `afternoon_start` | int | Active afternoon start hour | `16` | Every cycle |
 | `afternoon_end` | int | Active afternoon end hour | `18` | Every cycle |
 | `afternoon_window_h` | float | Active afternoon spread window | `2.0` | Every cycle |
@@ -157,6 +158,7 @@ When the strategy is in a manual or standby mode, the status sensor uses a simpl
 | `price_charge` | float | any | From live entity or apps.yaml |
 | `min_arbitrage_margin` | float | ≥ 0 | From live entity or apps.yaml |
 | `afternoon_margin` | float | 0-0.5 | From live entity or apps.yaml |
+| `cheapest_hours_margin` | float | 0-0.5 | From live entity or apps.yaml |
 | `afternoon_start` | integer | 0-23 | From apps.yaml |
 | `afternoon_end` | integer | 0-23 | From apps.yaml |
 | `afternoon_window_h` | float | > 0 | Derived spread window |
@@ -183,6 +185,7 @@ attributes:
   price_charge: -0.10
   min_arbitrage_margin: 0.05
   afternoon_margin: 0.05
+  cheapest_hours_margin: 0.05
   afternoon_start: 16
   afternoon_end: 18
 ```

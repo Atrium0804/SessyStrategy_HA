@@ -82,6 +82,10 @@ _NUMBERS: tuple[_Spec, ...] = (
         "afternoon_margin", "Afternoon margin", "mdi:scale-balance",
         0, 0.5, 0.01, "€/kWh", 0.05, NumberMode.BOX,
     ),
+    _Spec(
+        "cheapest_hours_margin", "Cheapest hours margin", "mdi:scale-balance",
+        0, 0.5, 0.01, "€/kWh", 0.05, NumberMode.BOX,
+    ),
 )
 
 

@@ -74,6 +74,26 @@ class TestRank:
         assert ch.cheapest_hours(prices, now, 0, 2) == []
 
 
+class TestMaxPriceAfterNow:
+    def test_highest_later_hour_up_to_window_end(self):
+        prices = _two_days()
+        prices["2024-06-15T20:00:00"] = 0.50
+        prices["2024-06-16T01:00:00"] = 0.60   # still in window (ends 02:00)
+        prices["2024-06-16T03:00:00"] = 0.90   # next window — ignored
+        assert ch.max_price_after_now(prices, datetime(2024, 6, 15, 14, 30), 2) == 0.60
+
+    def test_current_and_past_hours_ignored(self):
+        prices = _two_days(default=0.10)
+        prices["2024-06-15T14:00:00"] = 0.90
+        prices["2024-06-15T10:00:00"] = 0.80
+        assert ch.max_price_after_now(prices, datetime(2024, 6, 15, 14), 2) == 0.10
+
+    def test_none_when_no_later_prices(self):
+        assert ch.max_price_after_now(None, datetime(2024, 6, 15, 14), 2) is None
+        prices = {"2024-06-16T01:00:00": 0.20}
+        assert ch.max_price_after_now(prices, datetime(2024, 6, 16, 1), 2) is None
+
+
 class TestStrategiesAgree:
     def test_battery_and_boiler_agree_across_midnight(self):
         prices = _two_days()

@@ -111,6 +111,7 @@ soc_floor: 0                # Current SOC floor
 cheap_soc_target: 100        # Current cheap charge ceiling
 min_arbitrage_margin: 0.05   # Current arbitrage margin (P5)
 afternoon_margin: 0.05       # Current afternoon margin (P4)
+cheapest_hours_margin: 0.05  # Current cheapest hours margin (P3)
 afternoon_start: 16         # Current afternoon window start
 afternoon_end: 18           # Current afternoon window end
 afternoon_window_h: 2.0     # Current afternoon charge window
@@ -176,12 +177,13 @@ If this condition is **NOT met**, check Priority 3.
 #### Priority 3: Cheapest Hours Charge
 ```
 Condition 1: current hour is among the N cheapest hours of the current day
-Condition 2: soc < cheap_soc_target
-Your values: cheapest_hours_n = 2, hour = 14, soc = 65.3, cheap_soc_target = 100
+Condition 2: (max_later_price - price) >= cheapest_hours_margin
+Condition 3: soc < cheap_soc_target
+Your values: cheapest_hours_n = 2, hour = 14, cheapest_hours_margin = 0.05, soc = 65.3, cheap_soc_target = 100
 Evaluation: hour 14 among today's 2 cheapest? depends on the day's prices
 ```
 
-If this condition is **NOT met**, check Priority 4.
+If this condition is **NOT met**, check Priority 4. When condition 1 holds but condition 2 fails, the log shows `CHEAPEST HOURS SKIP` and evaluation falls through. `max_later_price` is the highest hourly price after the current hour up to the end of the price window.
 
 #### Priority 4: Afternoon Charge Window
 ```

@@ -75,6 +75,14 @@ def is_cheapest_hour(prices, now, n, window_start_h):
     return rank is not None and rank <= int(n)
 
 
+def max_price_after_now(prices, now, window_start_h):
+    """Highest hourly price after the current hour, up to the window end, or None."""
+    _, end = price_window(now, window_start_h)
+    current = now.replace(minute=0, second=0, microsecond=0)
+    later = [price for hour, price in _hourly_prices(prices).items() if current < hour < end]
+    return max(later) if later else None
+
+
 def cheapest_hours(prices, now, n, window_start_h):
     """The n cheapest hour starts of the current window, in chronological order."""
     if int(n) <= 0:

@@ -249,7 +249,7 @@ class TestIsCheapestHour:
             app.soc_sensor: "60", app.price_sensor: "0.30",
         }.get(e))
         app._get_soc = MagicMock(return_value=60.0)
-        app._current_price = MagicMock(return_value=0.30)
+        app._current_price = MagicMock(return_value=0.05)
         app.datetime = MagicMock(return_value=datetime(2024, 6, 15, 3, 0, 0))
         app._get_prices_dict = MagicMock(return_value=self._profile())
         app._publish_status = MagicMock()
@@ -259,6 +259,18 @@ class TestIsCheapestHour:
         fields = app._publish_status.call_args.kwargs
         assert app._publish_status.call_args.args[0] == "cheapest_hours"
         assert fields["cheapest_hours"] == ["03:00", "04:00"]
+        assert fields["cheapest_hours_margin"] == pytest.approx(0.05)
+
+    def test_max_price_later_in_window_ignores_current_and_past_hours(self):
+        values = [0.20] * 24
+        values[2], values[3] = 0.90, 0.80   # earlier / current hour — ignored
+        values[20] = 0.40
+        app = self._app(self._mk_prices(values), now_hour=3)
+        assert app._max_price_later_in_window() == pytest.approx(0.40)
+
+    def test_max_price_later_in_window_none_without_prices(self):
+        app = self._app(None, now_hour=3)
+        assert app._max_price_later_in_window() is None
 
 
 # ===========================================================================
@@ -336,6 +348,42 @@ class TestUpdateStrategyBranches:
         app.update_strategy({})
         app._set_grid_setpoint.assert_called_once_with(0)
         app._set_battery_setpoint.assert_not_called()
+
+    def test_priority3_cheapest_hours_charges_when_spread_meets_margin(self):
+        app = self._make_app_with_sensors(soc=60, price=0.15)
+        app._is_cheapest_hour = MagicMock(return_value=True)
+        app._max_price_later_in_window = MagicMock(return_value=0.20)
+        app.update_strategy({})
+        app._set_battery_setpoint.assert_called_once_with(-app.max_power_w)
+        assert app._publish_status.call_args.args[0] == "cheapest_hours"
+
+    def test_priority3_cheapest_hours_skips_when_spread_below_margin(self):
+        app = self._make_app_with_sensors(soc=60, price=0.15)
+        app._is_cheapest_hour = MagicMock(return_value=True)
+        app._max_price_later_in_window = MagicMock(return_value=0.19)
+        app.update_strategy({})
+        app._set_battery_setpoint.assert_not_called()
+        app._set_grid_setpoint.assert_called_once_with(0)
+        assert app._publish_status.call_args.args[0] == "default"
+
+    def test_priority3_cheapest_hours_skip_at_ceiling_falls_through(self):
+        app = self._make_app_with_sensors(soc=100, price=0.15)
+        app._is_cheapest_hour = MagicMock(return_value=True)
+        app._max_price_later_in_window = MagicMock(return_value=0.16)
+        app.update_strategy({})
+        app._set_battery_setpoint.assert_not_called()
+        assert app._publish_status.call_args.args[0] == "default"
+
+    def test_priority3_cheapest_hours_margin_live_entity_overrides(self):
+        app = self._make_app_with_sensors(soc=60, price=0.15)
+        app.cheapest_hours_margin_entity = "number.home_battery_cheapest_hours_margin"
+        base = app.get_state.side_effect
+        app.get_state = MagicMock(side_effect=lambda e, **kw: "0.01"
+                                  if e == app.cheapest_hours_margin_entity else base(e, **kw))
+        app._is_cheapest_hour = MagicMock(return_value=True)
+        app._max_price_later_in_window = MagicMock(return_value=0.17)
+        app.update_strategy({})
+        app._set_battery_setpoint.assert_called_once_with(-app.max_power_w)
 
     def test_priority3_afternoon_window_charges(self):
         # 17:00, SOC below target, spread > margin

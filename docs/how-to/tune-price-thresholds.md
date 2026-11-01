@@ -258,6 +258,31 @@ sessy_strategy:
   afternoon_margin: 0.05  # Default
 ```
 
+### Step 7: Configure Cheapest Hours Margin (Optional)
+
+The `cheapest_hours_margin` governs the **Priority 3 cheapest-hours charge**. It stops the battery from charging in the day's cheapest hours when prices are so flat that the stored energy is not worth more later.
+
+**What it does:** When the current hour is among the `cheapest_hours_n` cheapest of the price window, the strategy charges only if:
+```
+(max_later_price - current_price) >= cheapest_hours_margin
+```
+
+`max_later_price` is the highest hourly price after the current hour, up to the end of the price window (default 02:00 next day). If the margin is not met, the rule is skipped (log: `CHEAPEST HOURS SKIP`) and lower priorities are evaluated. Without later price data the guard does not block.
+
+**Default:** €0.05/kWh
+
+**Recommendations:**
+- **Conservative (€0.08-0.15)**: Only fill on days with a clear price peak
+- **Moderate (€0.05-0.08)**: Default — covers typical round-trip losses
+- **Aggressive (€0-0.03)**: Fill in the cheapest hours almost every day (`0` restores the old unconditional behaviour, apart from strictly falling prices)
+
+**Configuration:**
+```yaml
+sessy_strategy:
+  cheapest_hours_margin: 0.05  # Default
+  cheapest_hours_margin_entity: number.home_battery_cheapest_hours_margin  # Live override
+```
+
 ---
 
 ## Verification

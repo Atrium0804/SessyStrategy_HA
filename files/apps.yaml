@@ -16,11 +16,13 @@ sessy_strategy:
 
   # ── Cheapest-hours charge (P3) ──────────────────────────────────────
   # Charge at max power during the N cheapest hourly slots of the current
-  # price window, regardless of the absolute price level. The window is shared
+  # price window, but only when a later hour in that window is at least
+  # cheapest_hours_margin more expensive than now. The window is shared
   # with the boiler strategy (files/cheapest_hours.py): 24h starting at
   # cheapest_window_start_h, i.e. 02:00 to 02:00. Hour is cheap when rank <= N.
   cheapest_hours_n: 2          # Number of cheapest hours to charge in
   cheapest_window_start_h: 2   # Window start hour (window = start to start next day)
+  cheapest_hours_margin: 0.05  # Min €/kWh by which a later hour in the window beats now to justify charging (P3)
 
   # ── Pricing ─────────────────────────────────────────────────────────
   # A single market price sensor is used for both charge and discharge
@@ -92,6 +94,7 @@ sessy_strategy:
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
   afternoon_margin_entity: number.home_battery_afternoon_margin
+  cheapest_hours_margin_entity: number.home_battery_cheapest_hours_margin
 
   # Per-rule enable switches (Home Battery integration). Omit to keep a rule
   # always enabled. The grid guard and default fall-through are always active.

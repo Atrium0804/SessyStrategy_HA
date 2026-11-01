@@ -43,6 +43,7 @@ The app runs every 5 minutes, and **immediately whenever a live input changes** 
 | `number.home_battery_price_charge` | `price_charge_entity` | Price threshold for charging | any | `price_charge` from apps.yaml | €/kWh |
 | `number.home_battery_min_arbitrage_margin` | `min_arbitrage_margin_entity` | Minimum spread for the evening peak hold-vs-sell decision (P5) | ≥ 0 | `min_arbitrage_margin` from apps.yaml | €/kWh |
 | `number.home_battery_afternoon_margin` | `afternoon_margin_entity` | Minimum import-price reduction (evening peak vs now) to justify afternoon charge (P4) | 0-0.5 | `afternoon_margin` from apps.yaml | €/kWh |
+| `number.home_battery_cheapest_hours_margin` | `cheapest_hours_margin_entity` | Minimum spread (highest later price in window vs now) to justify cheapest-hours charge (P3) | 0-0.5 | `cheapest_hours_margin` from apps.yaml | €/kWh |
 
 ---
 
@@ -70,6 +71,7 @@ Use Home Assistant's UI to create the helpers:
 | Price Charge | `number.home_battery_price_charge` | -1 | 1 | 0.01 | €/kWh | mdi:lightning-bolt |
 | Min Arbitrage Margin | `number.home_battery_min_arbitrage_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:swap-horizontal |
 | Afternoon Margin | `number.home_battery_afternoon_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:scale-balance |
+| Cheapest Hours Margin | `number.home_battery_cheapest_hours_margin` | 0 | 0.5 | 0.01 | €/kWh | mdi:scale-balance |
 
 ### Step 2: Link to apps.yaml
 
@@ -90,6 +92,7 @@ sessy_strategy:
   price_discharge: 0.39
   price_charge: -0.10
   min_arbitrage_margin: 0.05
+  cheapest_hours_margin: 0.05
 
   # Live tuning entity links
   target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
@@ -101,6 +104,7 @@ sessy_strategy:
   price_discharge_entity: number.home_battery_price_discharge
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
+  cheapest_hours_margin_entity: number.home_battery_cheapest_hours_margin
 ```
 
 ### Step 3: Create a Dashboard

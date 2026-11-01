@@ -185,32 +185,36 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 
 **Conditions (all must be true):**
 
-1. The current hour is one of the **N cheapest hours of the current calendar day** (`cheapest_hours_n`, default: 2)
-2. SOC < `cheap_soc_target` (default: 100%); at or above the ceiling it holds grid 0W
-3. Rule can be disabled from the GUI (`rule_cheapest_hours`)
+1. The current hour is one of the **N cheapest hours of the current price window** (`cheapest_hours_n`, default: 2)
+2. **Break-even guard passes:** `max_later_price - current_price >= cheapest_hours_margin` (default: €0.05/kWh), where `max_later_price` is the highest hourly price after the current hour up to the window end. Without later price data the guard does not block. If the guard fails, the rule is skipped and evaluation falls through to Priority 4
+3. SOC < `cheap_soc_target` (default: 100%); at or above the ceiling it holds battery setpoint 0W
+4. Rule can be disabled from the GUI (`rule_cheapest_hours`)
 
 **Example (buy prices for the day):**
 
-- Cheapest two hours today: 14:00 (−€0.0001/kWh) and 15:00 (€0.00/kWh)
-- Current hour: 14:00 → among the two cheapest today → **charge at full power**
+- Cheapest two hours today: 14:00 (−€0.0001/kWh) and 15:00 (€0.00/kWh), evening peak €0.30/kWh
+- Current hour: 14:00 → among the two cheapest, later peak beats now by €0.30 ≥ €0.05 → **charge at full power**
 - Current hour: 17:00 (€0.11/kWh) → not among the two cheapest today → does not fire
+- Flat day (all hours €0.20–€0.22/kWh): spread €0.02 < €0.05 → **skipped**, battery is not filled for a gain that cannot cover round-trip losses
 
 ### What It Does
 
 1. **Groups prices by calendar day:** All hourly slots are bucketed by their date
 2. **Selects the N cheapest hours of today only:** The `cheapest_hours_n` lowest-priced hours within the current day are chosen
-3. **Charges at full power:** Drives the battery at `max_power_w` while below `cheap_soc_target`; holds at the ceiling once full so it does not discharge and re-trigger
-4. **Sets battery setpoint:** Uses `api` mode (direct battery power control), negative = charge
+3. **Checks the break-even margin:** Ensures that a later hour in the window is at least `cheapest_hours_margin` more expensive than now; otherwise the rule is skipped
+4. **Charges at full power:** Drives the battery at `max_power_w` while below `cheap_soc_target`; holds at the ceiling once full so it does not discharge and re-trigger
+5. **Sets battery setpoint:** Uses `api` mode (direct battery power control), negative = charge
 
 **Parameters:**
 
 - `cheapest_hours_n`: Number of cheapest hours per day to charge in (default: 2)
+- `cheapest_hours_margin`: Minimum €/kWh by which a later hour must beat the current price (default: €0.05/kWh)
 - `cheap_soc_target`: SOC ceiling for charging (default: 100%)
 - `max_power_w`: Charge power (default: 2200W)
 
 ### Why It's Priority #3
 
-**Rationale:** Even when prices never drop below the `price_charge` threshold (Priority 2), the cheapest hours of the day are still the best moment to top up the battery. Selecting the cheapest hours guarantees the battery fills at the lowest available cost each day.
+**Rationale:** Even when prices never drop below the `price_charge` threshold (Priority 2), the cheapest hours of the day are still the best moment to top up the battery. Selecting the cheapest hours guarantees the battery fills at the lowest available cost each day. The `cheapest_hours_margin` guard keeps it from charging on flat-price days, where the stored energy is worth no more later than now and round-trip losses would make charging a net loss.
 
 **Per-day, not a sliding window:** The cheapest hours are computed **within the current calendar day** rather than over a rolling look-ahead horizon. A sliding window would keep flagging the current/upcoming hours as "cheapest" whenever prices climb into the next day, charging the battery during expensive evening hours. Bucketing by day anchors the selection to the genuine daily lows.
 
@@ -382,7 +386,7 @@ This covers the **bulk of the day** — typically daytime hours with moderate pr
 | 0        | Grid-connection guard | Always (final clamp)                                                                        | Both          | —   | Never exceed the grid limit                |
 | 1        | Price-spike discharge | sell_price > price_discharge                                                                | Battery       | api  | Sell into peaks / avoid imports            |
 | 2        | Cheap price charge    | buy_price < price_charge                                                                    | Battery       | api  | Capture cheap energy                       |
-| 3        | Cheapest hours charge | Hour among N cheapest of today + SOC < cheap_soc_target                                     | Battery       | api  | Fill at the daily lows regardless of level |
+| 3        | Cheapest hours charge | Hour among N cheapest of today + cheapest hours margin met + SOC < cheap_soc_target         | Battery       | api  | Fill at the daily lows                     |
 | 4        | Afternoon charge      | In afternoon window + SOC < target_afternoon_charging + afternoon margin met                | Battery       | api  | Prepare for evening peak                   |
 | 5        | Evening peak sell-off | In evening peak + SOC > target_peak_discharge + no spikes remaining + evening beats morning | Grid          | nom  | Monetize excess SOC, reserve for morning   |
 | 6        | Morning sell-off      | In morning window + SOC > target_morning_soc                                                | Grid          | nom  | Sell the reserved morning energy           |

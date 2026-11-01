@@ -65,6 +65,7 @@ SessyStrategy supports live tuning for these parameters:
 | `price_charge_entity` | input_number | Raw price threshold for charging | `price_charge: -0.10` |
 | `min_arbitrage_margin_entity` | input_number | Minimum price spread for the evening peak hold-vs-sell decision (P5) | `min_arbitrage_margin: 0.05` |
 | `afternoon_margin_entity` | input_number | Minimum import-price reduction to justify afternoon charge (P4) | `afternoon_margin: 0.05` |
+| `cheapest_hours_margin_entity` | input_number | Minimum spread (highest later price vs now) to justify cheapest-hours charge (P3) | `cheapest_hours_margin: 0.05` |
 
 **Note:** The `mode_select` entity is also live-tuned and controls the operating mode.
 
@@ -94,6 +95,7 @@ Decide which parameters you want to make adjustable:
 - `cheap_soc_target_entity` — Adjust cheap charge ceiling
 - `min_arbitrage_margin_entity` — Adjust evening peak hold-vs-sell spread requirement (P4)
 - `afternoon_margin_entity` — Adjust afternoon charge import-price reduction requirement (P3)
+- `cheapest_hours_margin_entity` — Adjust cheapest-hours charge spread requirement (P3)
 
 ### Step 2: Create Input Number Entities
 
@@ -192,6 +194,18 @@ initial: 0.05  # Match your static value
 mode: box
 ```
 
+#### Cheapest Hours Margin
+```yaml
+name: "Cheapest hours margin"
+entity_id: number.home_battery_cheapest_hours_margin
+min: 0.0
+max: 0.5
+step: 0.01
+unit: "€/kWh"
+initial: 0.05  # Match your static value
+mode: box
+```
+
 ### Step 3: Link Entities to Strategy
 
 **What to do:** Configure the entity links in your `apps.yaml`.
@@ -213,6 +227,7 @@ sessy_strategy:
   price_charge: -0.10
   min_arbitrage_margin: 0.05
   afternoon_margin: 0.05
+  cheapest_hours_margin: 0.05
 
   # Live entity overrides
   target_afternoon_charging_entity: number.home_battery_target_afternoon_charging
@@ -224,6 +239,7 @@ sessy_strategy:
   price_charge_entity: number.home_battery_price_charge
   min_arbitrage_margin_entity: number.home_battery_min_arbitrage_margin
   afternoon_margin_entity: number.home_battery_afternoon_margin
+  cheapest_hours_margin_entity: number.home_battery_cheapest_hours_margin
 ```
 
 **Expected result:** Restart AppDaemon, and the strategy will now read from your entities each cycle.
@@ -281,6 +297,11 @@ Set up a dedicated dashboard for tuning your strategy.
     - type: entity
       entity: number.home_battery_afternoon_margin
       name: Afternoon margin
+      icon: mdi:margin
+
+    - type: entity
+      entity: number.home_battery_cheapest_hours_margin
+      name: Cheapest hours margin
       icon: mdi:margin
 
     # SOC Targets Section
