@@ -72,8 +72,8 @@ class SessyStrategy(hass.Hass):
         self.cheapest_hours_margin    = float(self.args.get("cheapest_hours_margin", 0.05))
         self.price_discharge      = float(self.args.get("price_discharge", 0.39))
         self.price_charge         = float(self.args.get("price_charge", -0.10))
-        self.afternoon_start      = int(self.args.get("afternoon_start", 15))
-        self.afternoon_end        = int(self.args.get("afternoon_end", 17))
+        self.afternoon_start      = int(self.args.get("afternoon_start", 14))
+        self.afternoon_end        = int(self.args.get("afternoon_end", 16))
         self.afternoon_window_h   = float(self.args.get("afternoon_window_h", 2.0))
         # Adaptive spread window: charge/discharge is spread over the contiguous run
         # of hours the price stays past the threshold, floored at min_window_h.
@@ -82,7 +82,7 @@ class SessyStrategy(hass.Hass):
         # Seconds to wait after a live input changes before re-running, so a slider
         # drag coalesces into a single run instead of one per intermediate value.
         self.rerun_debounce_s     = float(self.args.get("rerun_debounce_s", 2.0))
-        self.evening_peak_start   = int(self.args.get("evening_peak_start", 18))
+        self.evening_peak_start   = int(self.args.get("evening_peak_start", 16))
         self.evening_peak_end     = int(self.args.get("evening_peak_end", 23))
         self.morning_selloff_start = int(self.args.get("morning_selloff_start", 7))
         self.morning_selloff_end   = int(self.args.get("morning_selloff_end", 9))
