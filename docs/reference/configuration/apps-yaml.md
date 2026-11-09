@@ -106,7 +106,7 @@ These control how the battery is charged and discharged.
 - **`soc_floor`**: The minimum SOC level. The battery will never discharge below this percentage.
 - **`cheap_soc_target`**: The target SOC for cheap-price charging (Priority 2). Typically set to 100% to fully charge during cheap hours.
 - **`cheapest_hours_n`**: Charge at full power (Priority 3) when the current hour's price rank (1 = cheapest) is `<= cheapest_hours_n`. Ranking happens in a 24h window starting at `cheapest_window_start_h` (default 02:00 to 02:00), computed by `cheapest_hours.py`, which the boiler strategy also uses. Deploy `cheapest_hours.py` next to the strategy files.
-- **`cheapest_hours_margin`**: Break-even guard for Priority 3. The rule only charges when the highest hourly price after the current hour (up to the window end) is at least this many €/kWh above the current price. On flat-price days the rule is skipped and evaluation falls through to Priority 4. Without later price data the guard does not block.
+- **`cheapest_hours_margin`**: Break-even guard for Priority 3. The rule only charges when the highest hourly price after the current hour (up to the window end) is at least this many €/kWh above the current price. On flat-price days the rule is skipped and evaluation falls through to Priority 4. Without later price data the guard blocks (fail-closed).
 
 ### Pricing
 

@@ -186,7 +186,7 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 **Conditions (all must be true):**
 
 1. The current hour is one of the **N cheapest hours of the current price window** (`cheapest_hours_n`, default: 2)
-2. **Break-even guard passes:** `max_later_price - current_price >= cheapest_hours_margin` (default: €0.05/kWh), where `max_later_price` is the highest hourly price after the current hour up to the window end. Without later price data the guard does not block. If the guard fails, the rule is skipped and evaluation falls through to Priority 4
+2. **Break-even guard passes:** `max_later_price - current_price >= cheapest_hours_margin` (default: €0.05/kWh), where `max_later_price` is the highest hourly price after the current hour up to the window end. Without later price data the guard blocks (fail-closed). If the guard fails, the rule is skipped and evaluation falls through to Priority 4
 3. SOC < `cheap_soc_target` (default: 100%); at or above the ceiling it holds battery setpoint 0W
 4. Rule can be disabled from the GUI (`rule_cheapest_hours`)
 
@@ -199,8 +199,8 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 
 ### What It Does
 
-1. **Groups prices by calendar day:** All hourly slots are bucketed by their date
-2. **Selects the N cheapest hours of today only:** The `cheapest_hours_n` lowest-priced hours within the current day are chosen
+1. **Groups prices into one 24h window:** Hourly slots are ranked inside the window that starts at `cheapest_window_start_h` (default 02:00 → 02:00), so the cheap night hours around midnight are not split across two days
+2. **Selects the N cheapest hours of the current window:** The `cheapest_hours_n` lowest-priced hours within the window are chosen. `cheapest_hours.py` does this ranking for both the battery and the boiler, so both use the identical window
 3. **Checks the break-even margin:** Ensures that a later hour in the window is at least `cheapest_hours_margin` more expensive than now; otherwise the rule is skipped
 4. **Charges at full power:** Drives the battery at `max_power_w` while below `cheap_soc_target`; holds at the ceiling once full so it does not discharge and re-trigger
 5. **Sets battery setpoint:** Uses `api` mode (direct battery power control), negative = charge
@@ -216,7 +216,7 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 
 **Rationale:** Even when prices never drop below the `price_charge` threshold (Priority 2), the cheapest hours of the day are still the best moment to top up the battery. Selecting the cheapest hours guarantees the battery fills at the lowest available cost each day. The `cheapest_hours_margin` guard keeps it from charging on flat-price days, where the stored energy is worth no more later than now and round-trip losses would make charging a net loss.
 
-**Per-day, not a sliding window:** The cheapest hours are computed **within the current calendar day** rather than over a rolling look-ahead horizon. A sliding window would keep flagging the current/upcoming hours as "cheapest" whenever prices climb into the next day, charging the battery during expensive evening hours. Bucketing by day anchors the selection to the genuine daily lows.
+**Per-window, not a sliding window:** The cheapest hours are computed **within the current fixed 24h price window** (from `cheapest_window_start_h`) rather than over a rolling look-ahead horizon. A sliding window would keep flagging the current/upcoming hours as "cheapest" whenever prices climb into the next day, charging the battery during expensive evening hours. A fixed window anchors the selection to the genuine daily lows.
 
 ---
 
@@ -228,7 +228,7 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 
 1. Current hour is within `afternoon_start` to `afternoon_end` (default: 16:00-18:00)
 2. SOC < `target_afternoon_charging` (default: 70%)
-3. **Peak-shaving guard passes:** `evening_peak_buy_price - current_buy_price >= afternoon_margin`
+3. **Peak-shaving guard passes:** `evening_peak_buy_price - current_buy_price >= afternoon_margin`. Without evening peak price data the guard blocks (fail-closed): the rule skips rather than charging blind
 
 **Example:**
 
@@ -252,6 +252,7 @@ charge_w = max_power_w  (when soc < cheap_soc_target)
 ```
 if soc >= target_afternoon_charging:                         hold battery 0W
 evening_peak_buy = max(buy price over evening_peak_start..evening_peak_end)
+if evening_peak_buy is None:                                 hold grid 0W  (fail-closed)
 if evening_peak_buy - current_buy_price < afternoon_margin:  hold grid 0W
 else:                                                        charge_w = max_power_w
 ```
@@ -270,6 +271,8 @@ else:                                                        charge_w = max_powe
 **Peak-shaving, not trading:** Both prices compared are **buy/import** prices (raw + surcharge). The rule tops up self-consumed energy at a low afternoon import price to avoid a more expensive grid import during the evening peak. It is explicitly **not** grid trading — when trading, export taxes and fees paid are a loss, so this rule only manages energy you will consume yourself. The separate `min_arbitrage_margin` governs the Priority 5 evening peak hold-vs-sell (trading) decision.
 
 **The peak-shaving guard is critical:** charging now only pays off if the avoided evening import is meaningfully more expensive than the current import. The `afternoon_margin` prevents topping up for a negligible import-price reduction after round-trip losses.
+
+**Price hours are local time:** The Sessy `energy_prices` keys are UTC with an offset (`"2026-11-09T16:00:00+00:00"` = 17:00 CET). They are converted to the AppDaemon timezone before the windows above are applied. Before this conversion the evening window never matched, the guard saw no peak and the battery charged at the day's most expensive hour. The current evening peak is published as the `evening_peak_price` attribute of the status sensor.
 
 ---
 

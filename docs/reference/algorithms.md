@@ -169,7 +169,7 @@ result = max(50, min(666.67, 2200)) = 666.67 W ≈ 667 W
 2. If no prices: return 1 (minimum)
 3. Start at current hour, rounded down to hour boundary
 4. For up to 48 hours forward:
-   a. If hour key not in prices: break
+   a. If the local hour has no price: break
    b. Get price for that hour
    c. If above=True: check if price > threshold
       If below=True: check if price < threshold
@@ -221,22 +221,27 @@ result = max(run_h, min_window_h)
 
 **Method:** `_max_price_in_window(start_hour: int, end_hour: int) -> float | None`
 
-**Purpose:** Find the maximum raw price in a given hour range.
+**Purpose:** Find the maximum price in a given local hour range.
 
 **Algorithm:**
 ```
 1. Get prices dict
-2. If no prices: return None
-3. For hour in range(start_hour, end_hour):
-   a. Build key: f"{today}T{hour:02d}:00:00"
-   b. If key in prices: parse and add to values list
+2. Convert every key to a local clock hour (see "Price key format" below)
+   and average the slots per hour
+3. Keep hours from today start_hour up to (not including) end_hour
 4. If values not empty: return max(values)
 5. Else: return None
 ```
 
 **Use cases:**
-- Afternoon charge: Check if the evening peak import price > current import price + afternoon_margin
+- Afternoon charge: Check if the evening peak import price >= current import price + afternoon_margin (no evening prices: skip, fail-closed)
 - Evening peak sell-off: Check if any remaining hour exceeds discharge threshold
+
+**Price key format:** The Sessy sensor sends `energy_prices` keys in UTC with an
+offset, for example `"2026-11-09T16:00:00+00:00"` (= 17:00 CET). The shared
+`cheapest_hours.py` helpers convert every key with an offset to the AppDaemon
+timezone (`get_timezone()`, fallback `Europe/Amsterdam`) before comparing it with
+local clock hours. Naive keys (`"2026-11-09T17:00:00"`) are taken as local time.
 
 **Example:**
 - `start_hour = 18`, `end_hour = 24`

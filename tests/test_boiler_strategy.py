@@ -65,10 +65,6 @@ _DEFAULTS = dict(
     legionella_temp=65,
     legionella_hybrid_days=6,
     legionella_boost_days=7,
-    economic_day_start=10,
-    economic_day_end=16,
-    economic_night_start=0,
-    economic_night_end=6,
 )
 
 
@@ -131,7 +127,7 @@ def _sessy_prices(price, hours):
     return {f"2024-06-15T{h:02d}:00:00": price for h in hours}
 
 
-def _entity_states(temp, mode="economic", prices=None, legionella_last_ok=None,
+def _entity_states(temp, mode="cheapest_hours", prices=None, legionella_last_ok=None,
                    boiler_mode="init", current_price=None):
     states = {
         "sensor.boiler_temperatuur": str(temp),
@@ -151,10 +147,8 @@ def _entity_states(temp, mode="economic", prices=None, legionella_last_ok=None,
     return _get_state
 
 
-# Cheaper morning window (0-6) vs pricier midday window (10-16).
-_MORNING_CHEAP = {**_sessy_prices(0.05, range(0, 6)), **_sessy_prices(0.30, range(10, 16))}
-# Cheaper midday window (10-16) vs pricier morning window (0-6).
-_MIDDAY_CHEAP = {**_sessy_prices(0.30, range(0, 6)), **_sessy_prices(0.05, range(10, 16))}
+# 14:00 is the single cheapest hour of the 2024-06-15 window.
+_CHEAP_AT_14 = {**_sessy_prices(0.30, range(24)), "2024-06-15T14:00:00": 0.01}
 
 
 class TestUpdateStrategyPriority:
@@ -162,7 +156,7 @@ class TestUpdateStrategyPriority:
     def test_legionella_boost_forces_boost_mode(self):
         app = make_app()
         app.get_state = _entity_states(
-            temp=50, mode="economic",
+            temp=50, mode="cheapest_hours",
             legionella_last_ok="2024-06-07 14:00:00",  # 8 days ago
         )
         app.update_strategy({})
@@ -173,8 +167,8 @@ class TestUpdateStrategyPriority:
     def test_legionella_hybrid_warning_forces_hybrid_mode(self):
         app = make_app()
         app.get_state = _entity_states(
-            temp=50, mode="economic", prices=_MIDDAY_CHEAP,
-            legionella_last_ok="2024-06-09 14:00:00",  # 6 days ago; clock=14:00 is inside the cheaper midday window
+            temp=50, mode="cheapest_hours", prices=_CHEAP_AT_14,
+            legionella_last_ok="2024-06-09 14:00:00",  # 6 days ago; clock=14:00 is the cheapest hour
         )
         app.update_strategy({})
         app.call_service.assert_any_call(
@@ -234,40 +228,6 @@ class TestUpdateStrategyPriority:
         assert not any(
             c.args and c.args[0] == "select/select_option"
             for c in app.call_service.call_args_list
-        )
-
-    # ── Economic mode (fixed clock = 14:00, i.e. inside the 10-16 window) ────
-    def test_economic_heatpump_when_now_in_cheapest_window(self):
-        app = make_app()
-        app.get_state = _entity_states(
-            temp=50, mode="economic", prices=_MIDDAY_CHEAP,
-            legionella_last_ok="2024-06-14 14:00:00",
-        )
-        app.update_strategy({})
-        app.call_service.assert_any_call(
-            "select/select_option", entity_id="select.boiler_mode", option="heatpump"
-        )
-
-    def test_economic_off_when_now_outside_cheapest_window(self):
-        app = make_app()
-        app.get_state = _entity_states(
-            temp=50, mode="economic", prices=_MORNING_CHEAP,
-            legionella_last_ok="2024-06-14 14:00:00",
-        )
-        app.update_strategy({})
-        app.call_service.assert_any_call(
-            "select/select_option", entity_id="select.boiler_mode", option="off"
-        )
-
-    def test_economic_off_when_no_forecast(self):
-        app = make_app()
-        app.get_state = _entity_states(
-            temp=50, mode="economic", prices=None,
-            legionella_last_ok="2024-06-14 14:00:00",
-        )
-        app.update_strategy({})
-        app.call_service.assert_any_call(
-            "select/select_option", entity_id="select.boiler_mode", option="off"
         )
 
     def test_market_price_threshold_includes_price_equal_to_threshold(self):
@@ -376,16 +336,16 @@ class TestUpdateStrategyPriority:
         app.update_strategy({})
         assert app.set_state.call_args.kwargs["attributes"]["cheapest_hours_price_threshold"] is None
 
-    def test_unset_mode_defaults_to_economic(self):
-        app = make_app()
+    @pytest.mark.parametrize("raw_mode", ["unknown", "economic"])
+    def test_unset_or_retired_mode_runs_cheapest_hours(self, raw_mode):
+        app = make_app(cheapest_hours_count=1)
         app.get_state = _entity_states(
-            temp=50, mode="unknown", prices=_MIDDAY_CHEAP,
+            temp=50, mode=raw_mode,
+            prices=_sessy_prices(0.30, range(24)) | {"2024-06-15T14:00:00": 0.01},
             legionella_last_ok="2024-06-14 14:00:00",
         )
         app.update_strategy({})
-        app.call_service.assert_any_call(
-            "select/select_option", entity_id="select.boiler_mode", option="heatpump"
-        )
+        assert app.set_state.call_args.kwargs["state"] == "cheapest_hours_heatpump"
 
     def test_skips_cycle_when_temp_unavailable(self):
         app = make_app()
@@ -395,50 +355,22 @@ class TestUpdateStrategyPriority:
 
 
 # ===========================================================================
-# Economic window helpers
+# Price readers
 # ===========================================================================
 
-class TestEconomicDecision:
-    def test_window_average_ignores_out_of_window_hours(self):
-        app = make_app()
-        avg = app._window_average(_MIDDAY_CHEAP, 10, 16)
-        assert avg == pytest.approx(0.05)
-
-    def test_window_average_none_when_no_entries(self):
-        app = make_app()
-        assert app._window_average([], 10, 16) is None
-
-    def test_entry_hour_parses_iso_timestamp(self):
-        assert BoilerStrategy._entry_hour({"from": "2024-06-15T10:00:00+02:00"}) == 10
-        assert BoilerStrategy._entry_hour("2024-06-15T10:00:00") == 10
-
-    def test_entry_hour_none_for_malformed(self):
-        assert BoilerStrategy._entry_hour({"from": "not-a-date"}) is None
-        assert BoilerStrategy._entry_hour({}) is None
-        assert BoilerStrategy._entry_hour("nope") is None
-
-    def test_decision_picks_cheaper_window(self):
-        app = make_app()
-        # now=8 is outside both windows; day (midday) cheaper → not in window
-        in_window, avg1, avg2, chosen = app._cheapest_window_info(8, _MIDDAY_CHEAP)
-        assert chosen == "day"
-        assert avg1 == pytest.approx(0.05)
-        assert avg2 == pytest.approx(0.30)
-        assert in_window is False
-
-    def test_decision_heatpump_inside_chosen_window(self):
-        app = make_app()
-        in_window, _, _, chosen = app._cheapest_window_info(3, _MORNING_CHEAP)
-        assert chosen == "night"
-        assert in_window is True
-
-    def test_decision_off_without_forecast(self):
-        app = make_app()
-        in_window, avg1, avg2, chosen = app._cheapest_window_info(14, None)
-        assert in_window is False
-        assert chosen == "none"
-        assert avg1 is None and avg2 is None
-
+class TestPriceReaders:
+    def test_current_price_comes_from_shared_price_data_with_utc_keys(self):
+        # 14:00 CEST = 12:00 UTC; the fallback sensor must not be used.
+        app = make_app(market_price_threshold=0.1, current_price_sensor="sensor.current_energy_price")
+        app.get_state = _entity_states(
+            temp=50, mode="market_price_threshold", current_price=0.50,
+            prices={"2024-06-15T12:00:00+00:00": 0.05, "2024-06-15T13:00:00+00:00": 0.40},
+            legionella_last_ok="2024-06-14 14:00:00",
+        )
+        app.update_strategy({})
+        attributes = app.set_state.call_args.kwargs["attributes"]
+        assert app.set_state.call_args.kwargs["state"] == "market_price_heatpump"
+        assert attributes["current_price"] == "0.05"
     def test_current_price_reads_sensor_state_when_attribute_is_empty(self):
         app = make_app(
             current_price_sensor="sensor.current_energy_price",

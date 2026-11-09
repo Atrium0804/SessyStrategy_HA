@@ -10,8 +10,17 @@ To use the new boiler strategies, you need to make the following updates:
 
 - Added `market_price_threshold: 0.1` configuration
 - Added `cheapest_hours_count: 1` configuration
-- Added `current_price_sensor` and `current_price_attribute` entities
+- Added `cheapest_window_start_h: *cheapest_window_start_h` (alias of the battery's anchor; both apps use the same 24h window, default 02:00 → 02:00)
+- Added `current_price_sensor` and `current_price_attribute` entities (fallback only for the market price threshold)
 - Updated mode_select comment to include new strategy options
+- Removed the retired `economic` mode and its `economic_*` keys
+
+#### ⚠️ `economic` mode retired
+
+- Use `cheapest_hours` (new default) or `market_price_threshold` instead
+- Remove any `economic_*` keys from your own `apps.yaml`
+- Remove `economic` from the input_select options (see step 2). A leftover `economic` selection runs as `cheapest_hours`; the app switches the input_select and logs a WARNING
+- Prices must use the Sessy format (`energy_prices` dict); the Frank Energie list format is no longer supported
 
 ### 2. ⚠️ **Home Assistant Configuration** - Manual Update Required
 
@@ -26,17 +35,18 @@ input_select:
       - heatpump
       - hybrid
       - boost
-      - economic
       - market_price_threshold      # NEW
-      - cheapest_hours              # NEW
-    initial: economic
+      - cheapest_hours              # NEW (default)
+    initial: cheapest_hours
     icon: mdi:thermostat
 ```
 
-### 3. ⚠️ **Current Price Sensor** - Manual Setup Required
+### 3. ⚠️ **Current Price Sensor** - Optional Fallback
 
-The market price threshold strategy requires a current price sensor.
-You have several options:
+The market price threshold strategy reads the current local hour's price from
+`price_forecast_sensor` (the same Sessy `energy_prices` data the battery uses).
+A current price sensor is only a fallback when that data has no price for the
+current hour. You have several options:
 
 #### Option A: Use existing Sessy current price
 
@@ -100,14 +110,14 @@ cheapest_hours_count: 3  # Use heat pump during 3 cheapest hours
 
 ### For Market Price Threshold Strategy:
 
-1. Set up current price sensor (see above)
+1. Optionally set up a fallback current price sensor (see above)
 2. Configure threshold in apps.yaml
 3. Select `market_price_threshold` in your strategy mode
 4. The boiler will switch to heat pump whenever price ≤ threshold
 
 ### For Cheapest Hours Strategy:
 
-1. Ensure your price forecast sensor provides full day data
+1. Ensure your price forecast sensor provides data for the whole 24h window (from `cheapest_window_start_h`, default 02:00 → 02:00)
 2. Set the number of cheapest hours in apps.yaml
 3. Select `cheapest_hours` in your strategy mode
 4. The boiler will switch to heat pump only during the N cheapest hours
@@ -129,9 +139,9 @@ cheapest_hours_count: 3  # Use heat pump during 3 cheapest hours
 The `sensor.boiler_strategy_status` provides detailed information about the current operation:
 
 - **All Strategies**: temp, mode, days_since_legionella_ok
-- **Economic**: avg_price_day, avg_price_night, cheapest_period, in_cheapest_window
+- **Legionella Warning**: cheapest_period, in_cheapest_window
 - **Market Price**: current_price, threshold
-- **Cheapest Hours**: cheapest_hours, cheapest_hours_count, in_cheapest_window
+- **Cheapest Hours**: cheapest_hours, cheapest_hours_count, in_cheapest_window, cheapest_hours_price_threshold, cheapest_hours_window_start, cheapest_hours_window_end
 
 Use this for debugging and creating informative dashboards.
 
@@ -145,13 +155,13 @@ Use this for debugging and creating informative dashboards.
 
 ### Market Price Strategy Not Working
 
-- **Check**: Current price sensor exists and returns numeric values
-- **Check**: `current_price_sensor` and `current_price_attribute` are correctly configured
+- **Check**: Status sensor `current_price` shows a numeric value
+- **Check**: `price_forecast_sensor` has a price for the current hour; otherwise `current_price_sensor` and `current_price_attribute` must be correctly configured
 - **Check**: Price is numeric (not string) and within expected range
 
 ### Cheapest Hours Strategy Not Working
 
-- **Check**: Price forecast sensor provides full day data (24+ hours)
+- **Check**: Price forecast sensor covers the whole 24h window (24+ hours)
 - **Check**: `cheapest_hours_count` is set to a reasonable value (1-24)
 - **Check**: Status sensor shows the identified cheapest hours
 

@@ -21,31 +21,25 @@ boiler_strategy:
   legionella_boost_days: 7
 
   # ============================================================================
-  # ECONOMIC STRATEGY SETTINGS (day/night window comparison)
-  # ============================================================================
-  
-  # Day period for economic strategy (default: 10:00-16:00)
-  economic_day_start: 10
-  economic_day_end: 16
-  
-  # Night period for economic strategy (default: 00:00-06:00)
-  economic_night_start: 0
-  economic_night_end: 6
-
-  # ============================================================================
   # MARKET PRICE THRESHOLD STRATEGY SETTINGS
   # ============================================================================
   
-  # Price threshold (default: 0.1) - when current price is below this, use heat pump
+  # Price threshold (default: 0.1) - when current price is at or below this, use heat pump
   market_price_threshold: 0.1
 
   # ============================================================================
-  # CHEAPEST HOURS STRATEGY SETTINGS
+  # CHEAPEST HOURS STRATEGY SETTINGS (default mode)
   # ============================================================================
   
   # Number of cheapest hours to use heat pump (default: 1)
   # Set to higher values like 3, 4, 6, etc. to use heat pump during more hours
   cheapest_hours_count: 3
+
+  # Start hour of the 24h price window (default: 2 = 02:00 -> 02:00).
+  # Shared with sessy_strategy: in apps.yaml replace the number with the alias
+  # of the battery's anchor (cheapest_window_start_h: *cheapest_window_start_h)
+  # so both apps rank the identical window.
+  cheapest_window_start_h: 2
 
   # ============================================================================
   # DEBOUNCE AND TIMING SETTINGS
@@ -62,16 +56,18 @@ boiler_strategy:
   # Boiler temperature sensor
   temp_sensor: "sensor.boiler_temperatuur"
   
-  # Price forecast sensor (Sessy format: dict with ISO timestamps as keys)
+  # Price forecast sensor (Sessy format: dict with UTC ISO timestamps as keys,
+  # e.g. '2026-11-09T16:00:00+00:00': 0.60945 = 17:00 CET)
   price_forecast_sensor: "sensor.sessy_dnhh_energy_price"
   price_forecast_attribute: "energy_prices"
   
-  # Current price sensor (for market price threshold strategy)
+  # Current price sensor (fallback for market price threshold strategy, only
+  # used when the price forecast has no price for the current hour)
   current_price_sensor: "sensor.current_energy_price"
   current_price_attribute: "price"
   
   # Strategy mode selector - this determines which strategy to use
-  # Options: off, heatpump, hybrid, boost, economic, market_price_threshold, cheapest_hours
+  # Options: off, heatpump, hybrid, boost, market_price_threshold, cheapest_hours
   mode_select: "input_select.boiler_strategy_mode"
   
   # Boiler mode selector - this is the output that controls your boiler
@@ -93,9 +89,11 @@ boiler_strategy:
 # - heatpump: Force heat pump only
 # - hybrid: Force hybrid mode
 # - boost: Force boost mode
-# - economic: Use day/night window comparison (default)
-# - market_price_threshold: Use heat pump when price is below threshold
-# - cheapest_hours: Use heat pump during N cheapest hours of the day
+# - market_price_threshold: Use heat pump when price is at or below threshold
+# - cheapest_hours: Use heat pump during N cheapest hours of the price window (default)
+#
+# The retired 'economic' mode is no longer an option. A leftover 'economic'
+# selection runs as cheapest_hours and the app switches the input_select.
 #
 # Example for configuration.yaml:
 # input_select:
@@ -106,30 +104,26 @@ boiler_strategy:
 #       - heatpump
 #       - hybrid
 #       - boost
-#       - economic
 #       - market_price_threshold
 #       - cheapest_hours
-#     initial: economic
+#     initial: cheapest_hours
 
 # ============================================================================
 # USAGE EXAMPLES
 # ============================================================================
 #
-# 1. Economic strategy (default):
-#    - Compares average price of day vs night periods
-#    - Uses heat pump during the cheaper period
-#    - Configuration: economic_day_start, economic_day_end, economic_night_start, economic_night_end
-#
-# 2. Market price threshold strategy:
-#    - Uses heat pump whenever current price is below threshold
+# 1. Market price threshold strategy:
+#    - Uses heat pump whenever the current price is at or below threshold
+#    - Current price: current local hour from price_forecast_sensor
+#      (current_price_sensor is only a fallback)
 #    - Configuration: market_price_threshold
-#    - Requires: current_price_sensor
 #
-# 3. Cheapest hours strategy:
-#    - Finds N cheapest hours in the calendar day
+# 2. Cheapest hours strategy (default):
+#    - Finds N cheapest hours in the 24h window from cheapest_window_start_h
+#      (default 02:00 -> 02:00), the same window the battery strategy uses
 #    - Uses heat pump only during those hours
-#    - Configuration: cheapest_hours_count
-#    - Requires: price_forecast_sensor with full day forecast
+#    - Configuration: cheapest_hours_count, cheapest_window_start_h
+#    - Requires: price_forecast_sensor with the full window forecast
 
 # ============================================================================
 # NOTES
@@ -138,4 +132,5 @@ boiler_strategy:
 # - All strategies respect legionella prevention (priority 1: boost, priority 3: hybrid)
 # - User mode selection (off, heatpump, hybrid, boost) always takes precedence
 # - The status sensor provides detailed information about the current decision
-# - Prices can be in Sessy format (dict) or FrankEnergy format (list of dicts)
+# - Prices must be in Sessy format (dict); cheapest_hours.py reads them for
+#   both the battery and the boiler. The list format is no longer supported.

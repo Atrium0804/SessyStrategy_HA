@@ -1,6 +1,6 @@
 # Set Up Boiler Strategy
 
-*Last updated: 2026-09-14 | Part of [How-to Documentation](../index.md)*
+*Last updated: 2026-11-09 | Part of [How-to Documentation](../index.md)*
 
 ---
 
@@ -28,7 +28,7 @@ Before you start, ensure you have:
 - [x] AppDaemon 4.x installed and configured
 - [x] Ariston hybrid boiler integrated with Home Assistant (via Ariston integration or similar)
 - [x] A temperature sensor for your boiler water (`sensor.boiler_*`) or equivalent
-- [x] An energy price forecast sensor (e.g., Frank Energie, aEM, or other energy price integration)
+- [x] The Sessy energy price sensor (e.g., `sensor.sessy_dnhh_energy_price` with an `energy_prices` attribute) — the same sensor the battery strategy uses
 
 ---
 
@@ -55,7 +55,8 @@ Create an input select for the user mode selection:
 2. Click **Add Helper** → **Input select**
 3. Configure:
    - Name: `Boiler Strategy Mode`
-   - Options: `economic, off, heatpump, hybrid, boost`
+   - Options: `cheapest_hours, market_price_threshold, off, heatpump, hybrid, boost`
+   - Initial option: `cheapest_hours`
    - Icon: `mdi:boiler` (optional)
 4. Note the entity ID (e.g., `input_select.boiler_strategy_mode`)
 
@@ -88,7 +89,7 @@ Locate the following entities in your Home Assistant:
 | Entity Type | Purpose | Example Entity ID | How to Find |
 |-------------|---------|-------------------|-------------|
 | Temperature sensor | Boiler water temperature | `sensor.boiler_temperature` | Developer Tools → States, filter for `temperature` |
-| Price forecast sensor | Energy price forecast | `sensor.frankenergy_current_electricity_market_price` | Check your energy price integration |
+| Price forecast sensor | Energy price forecast (`energy_prices` attribute) | `sensor.sessy_dnhh_energy_price` | Check your Sessy integration |
 | Status sensor | App status output | `sensor.boiler_strategy_status` | Will be created by the app |
 
 ### Step 4: Configure apps.yaml
@@ -104,8 +105,8 @@ boiler_strategy:
 
   # REQUIRED: Map to your entities
   temp_sensor: sensor.boiler_temperature
-  price_forecast_sensor: sensor.frankenergy_current_electricity_market_price
-  price_forecast_attribute: prices
+  price_forecast_sensor: sensor.sessy_dnhh_energy_price
+  price_forecast_attribute: energy_prices
   mode_select: input_select.boiler_strategy_mode
   boiler_mode_select: select.boiler_mode
   legionella_last_ok_entity: input_datetime.boiler_legionella_last_ok
@@ -124,24 +125,30 @@ boiler_strategy:
   legionella_hybrid_days: 6       # Days before hybrid warning
   legionella_boost_days: 7        # Days before boost forced
 
-  # Economic mode windows (local hours, [start, end))
-  economic_day_start: 10
-  economic_day_end: 16
-  economic_night_start: 0
-  economic_night_end: 6
+  # Market price threshold mode
+  market_price_threshold: 0.1     # Heat pump runs when price <= this (€/kWh)
+
+  # Cheapest hours mode (default)
+  cheapest_hours_count: 1         # N cheapest hours of the price window
+  cheapest_window_start_h: *cheapest_window_start_h   # Shared with sessy_strategy (default 2 = 02:00 → 02:00)
 
   # Delay before re-running after input changes
   rerun_debounce_s: 2.0
 
   # Entity IDs
   temp_sensor: sensor.boiler_temperature
-  price_forecast_sensor: sensor.frankenergy_current_electricity_market_price
-  price_forecast_attribute: prices
+  price_forecast_sensor: sensor.sessy_dnhh_energy_price
+  price_forecast_attribute: energy_prices
+  current_price_sensor: sensor.sessy_dnhh_energy_price   # Fallback only
+  current_price_attribute: ""
   mode_select: input_select.boiler_strategy_mode
   boiler_mode_select: select.boiler_mode
   legionella_last_ok_entity: input_datetime.boiler_legionella_last_ok
   status_sensor: sensor.boiler_strategy_status
 ```
+
+!!! note
+    `*cheapest_window_start_h` is a YAML alias for the anchor `&cheapest_window_start_h` in the `sessy_strategy` section. The anchor must appear earlier in the same `apps.yaml`. Without the battery section, set a number instead (for example `2`).
 
 ### Step 5: Restart AppDaemon
 
@@ -168,7 +175,7 @@ Check that the app is running and producing output:
 2. **Check the status sensor:**
    - In Home Assistant, go to **Developer Tools → States**
    - Look for `sensor.boiler_strategy_status`
-   - It should show the current active branch (e.g., `economic_off`, `legionella_boost`, etc.)
+   - It should show the current active branch (e.g., `cheapest_hours_off`, `legionella_boost`, etc.)
    - Click on the entity to see all attributes including temperature, mode, and days since last legionella OK
 
 3. **Test the mode select:**
@@ -227,15 +234,15 @@ Alternatively, you can manually set it:
 3. Verify `legionella_last_ok_entity` entity ID is correct
 4. Check logs for `Failed to stamp legionella_last_ok` errors
 
-### Issue: Economic mode doesn't consider prices
+### Issue: Price mode doesn't consider prices
 
-❌ **Error:** Boiler runs at wrong times, not respecting price windows
+❌ **Error:** Boiler runs at wrong times, not respecting cheap hours
 
 ✅ **Fix:**
 1. Verify `price_forecast_sensor` entity ID is correct
-2. Check that the sensor has a `prices` (or your configured) attribute
-3. Verify the price entries have `from`, `till`, and `price` fields
-4. Check the economic window configuration matches your intended periods
+2. Check that the sensor has an `energy_prices` (or your configured) attribute
+3. Verify it is a dict of ISO timestamps to prices in the Sessy format, e.g. `'2026-11-09T16:00:00+00:00': 0.60945` (UTC keys; 17:00 CET). The list-of-`{from, till, price}` format is no longer supported
+4. Check `cheapest_window_start_h` and `cheapest_hours_count` match your intended window and N
 
 !!! tip
     Use **Developer Tools → States** to inspect your price forecast sensor and verify it has the expected structure.
@@ -248,6 +255,18 @@ Alternatively, you can manually set it:
 1. This is expected behavior if `legionella_last_ok_entity` has never been set
 2. The app defaults to `legionella_hybrid_days` (6) when the entity is unset
 3. Initialize the timestamp as described in Step 7 above
+
+### Migrating from the `economic` mode
+
+The `economic` mode (day/night window comparison) is retired. To migrate:
+
+1. Use `cheapest_hours` (the default) or `market_price_threshold` instead.
+2. Remove all `economic_*` keys (the day and night window start/end hours) from `apps.yaml`.
+3. Remove `economic` from the `input_select.boiler_strategy_mode` options and set the initial option to `cheapest_hours`.
+4. Use the Sessy price format (`energy_prices` dict). The Frank Energie format (list of `{from, till, price}`) is no longer supported.
+
+!!! note
+    Until you remove it, a leftover `economic` selection runs as `cheapest_hours`. The app switches the `input_select` to `cheapest_hours` and logs a WARNING.
 
 ---
 

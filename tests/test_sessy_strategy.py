@@ -300,6 +300,7 @@ class TestUpdateStrategyBranches:
         app._count_cheap_hours = MagicMock(return_value=2)
         app._max_price_in_window = MagicMock(return_value=0.50)
         app._max_price_in_hour_range_tomorrow = MagicMock(return_value=None)
+        app._max_price_later_in_window = MagicMock(return_value=0.50)
         app._get_prices_dict = MagicMock(return_value=None)
         app._publish_status = MagicMock()
         app._set_battery_setpoint = MagicMock()

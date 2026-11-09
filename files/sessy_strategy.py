@@ -15,6 +15,7 @@ Strategy (priority order, each rule individually switchable from the GUI):
   4. Afternoon charge, SOC < target_afternoon_charging, and the evening peak price
      beats the current price by afternoon_margin: battery setpoint, charge at max power.
      Peak-shaving (avoid net import at the evening peak), not grid trading.
+     Both break-even guards fail closed: no later price data means no charge.
   5. Evening peak sell-off, SOC > target_peak_discharge, no spike remaining and evening
      beats tomorrow's morning peak: grid setpoint export
   6. Morning sell-off, SOC > target_morning_soc: grid setpoint export spread over the window
@@ -65,7 +66,7 @@ class SessyStrategy(hass.Hass):
         # to the same hour next day (shared with the boiler strategy via
         # cheapest_hours.py).
         self.cheapest_hours_n         = int(self.args.get("cheapest_hours_n", 2))
-        self.cheapest_window_start_h  = int(self.args.get("cheapest_window_start_h", 2))
+        self.cheapest_window_start_h  = int(self.args.get("cheapest_window_start_h", ch.DEFAULT_WINDOW_START_H))
         # Cheapest-hours break-even: min €/kWh by which the most expensive later
         # hour in the window must exceed the current price before charging.
         self.cheapest_hours_margin    = float(self.args.get("cheapest_hours_margin", 0.05))
@@ -256,6 +257,8 @@ class SessyStrategy(hass.Hass):
         cheapest_hours_margin = self._tunable(self.cheapest_hours_margin, self.cheapest_hours_margin_entity)
         afternoon_start = self.afternoon_start
         afternoon_end   = self.afternoon_end
+        evening_peak_price = self._max_price_in_window(
+            self.evening_peak_start, self.evening_peak_end)
 
         # Common status fields; the decided branch is attached at each return.
         status_fields = dict(
@@ -275,6 +278,7 @@ class SessyStrategy(hass.Hass):
             cheapest_hours_margin=cheapest_hours_margin,
             afternoon_start=afternoon_start,
             afternoon_end=afternoon_end,
+            evening_peak_price=evening_peak_price,
         )
 
         # ── Priority 1: price-spike discharge (sell price) ──────────────────
@@ -323,14 +327,14 @@ class SessyStrategy(hass.Hass):
         # discharge and re-trigger. Break-even guard: only charge if a later hour
         # in the window is at least cheapest_hours_margin more expensive, so a
         # flat-price day does not buy energy that cannot cover round-trip losses.
-        # Without later price data the guard does not block (fail-open).
+        # Without later price data the guard blocks (fail-closed).
         if self._rule_enabled(self.rule_cheapest_hours_entity) and \
                 self._is_cheapest_hour(cheapest_hours_n):
             later_max_price = self._max_price_later_in_window()
-            if later_max_price is not None and \
-                    (later_max_price - price) < cheapest_hours_margin:
+            if not ch.beats_by_margin(later_max_price, price, cheapest_hours_margin):
+                later_txt = "n/a" if later_max_price is None else f"{later_max_price:.3f}"
                 self.log(
-                    f"CHEAPEST HOURS SKIP: highest later price {later_max_price:.3f} vs current "
+                    f"CHEAPEST HOURS SKIP: highest later price {later_txt} vs current "
                     f"{price:.3f} (spread < margin {cheapest_hours_margin}) — "
                     f"falling through to lower priorities"
                 )
@@ -365,13 +369,12 @@ class SessyStrategy(hass.Hass):
                 return
 
             # Break-even guard: only top up if the evening peak price is at least
-            # afternoon_margin per kWh above the current price.
-            evening_peak_price = self._max_price_in_window(
-                self.evening_peak_start, self.evening_peak_end)
-            if evening_peak_price is not None and \
-                    (evening_peak_price - price) < afternoon_margin:
+            # afternoon_margin per kWh above the current price. Without evening
+            # price data the guard blocks (fail-closed).
+            if not ch.beats_by_margin(evening_peak_price, price, afternoon_margin):
+                peak_txt = "n/a" if evening_peak_price is None else f"{evening_peak_price:.3f}"
                 self.log(
-                    f"AFTERNOON SKIP: evening peak {evening_peak_price:.3f} vs current "
+                    f"AFTERNOON SKIP: evening peak {peak_txt} vs current "
                     f"{price:.3f} (spread < margin {afternoon_margin}) — "
                     f"holding grid setpoint 0W"
                 )
@@ -712,22 +715,21 @@ class SessyStrategy(hass.Hass):
 
     def _current_price(self) -> float | None:
         """
-        Read the current hour's price from the energy_prices attribute, falling
-        back to the sensor state.
+        Read the current local hour's price from the energy_prices attribute,
+        falling back to the sensor state.
         """
         try:
             prices = self.get_state(self.price_sensor, attribute="energy_prices")
-            value = None
-            if prices:
-                now_key = self.datetime().strftime("%Y-%m-%dT%H:00:00")
-                if now_key in prices:
-                    value = float(prices[now_key])
+            value = ch.price_at(prices, self.datetime(), self._local_tz())
             if value is None:
                 value = float(self.get_state(self.price_sensor))
             return value
         except (TypeError, ValueError, KeyError):
             return None
 
+    def _local_tz(self):
+        """Local timezone that energy_prices keys (UTC with offset) are converted to."""
+        return ch.app_timezone(self)
     def _get_prices_dict(self):
         """Return the energy_prices dict, or None if unavailable."""
         try:
@@ -741,88 +743,55 @@ class SessyStrategy(hass.Hass):
     def _is_cheapest_hour(self, n: int) -> bool:
         """Whether the current hour ranks within the n cheapest of its price window."""
         return ch.is_cheapest_hour(
-            self._get_prices_dict(), self.datetime(), n, self.cheapest_window_start_h
+            self._get_prices_dict(), self.datetime(), n, self.cheapest_window_start_h,
+            self._local_tz(),
         )
 
     def _cheapest_hours_in_window(self, n: int) -> list[str]:
         """The n cheapest hours of the current price window as "HH:00", chronologically."""
         hours = ch.cheapest_hours(
-            self._get_prices_dict(), self.datetime(), n, self.cheapest_window_start_h
+            self._get_prices_dict(), self.datetime(), n, self.cheapest_window_start_h,
+            self._local_tz(),
         )
         return [h.strftime("%H:00") for h in hours]
 
     def _max_price_later_in_window(self) -> float | None:
         """Highest hourly price after the current hour in the current price window."""
         return ch.max_price_after_now(
-            self._get_prices_dict(), self.datetime(), self.cheapest_window_start_h
+            self._get_prices_dict(), self.datetime(), self.cheapest_window_start_h,
+            self._local_tz(),
         )
 
     def _contiguous_price_hours(self, threshold: float, above: bool) -> float:
         """
         Fractional hours remaining (from now) that price stays past threshold —
-        above it when above=True, below it when above=False. Counts whole hourly
-        slots, then subtracts the elapsed part of the current hour so the result
-        reflects time actually left, not a full extra hour for a partial one.
-        The run stops at the first hour that crosses back.
+        above it when above=True, below it when above=False. 1.0 without a run.
         """
-        prices = self._get_prices_dict()
-        if not prices:
-            return 1.0
-        now = self.datetime()
-        cursor = now.replace(minute=0, second=0, microsecond=0)
-        count  = 0
-        for _ in range(48):
-            key = cursor.strftime("%Y-%m-%dT%H:00:00")
-            if key not in prices:
-                break
-            try:
-                price = float(prices[key])
-            except (TypeError, ValueError):
-                break
-            if (price > threshold) if above else (price < threshold):
-                count += 1
-            else:
-                break
-            cursor += timedelta(hours=1)
-        if count == 0:
-            return 1.0
-        elapsed_h = (now - now.replace(minute=0, second=0, microsecond=0)).total_seconds() / 3600.0
-        return max(count - elapsed_h, 0.0)
+        return ch.contiguous_hours(
+            self._get_prices_dict(), self.datetime(), threshold, above, self._local_tz()
+        )
+
+    def _max_price_in_day_hours(self, day_offset: int, start_hour: int, end_hour: int) -> float | None:
+        """Max hourly price over local [start_hour, end_hour) of today + day_offset, or None."""
+        midnight = self.datetime().replace(hour=0, minute=0, second=0, microsecond=0) \
+            + timedelta(days=day_offset)
+        return ch.max_price_between(
+            self._get_prices_dict(),
+            midnight + timedelta(hours=start_hour),
+            midnight + timedelta(hours=end_hour),
+            self._local_tz(),
+        )
 
     def _max_price_in_window(self, start_hour: int, end_hour: int) -> float | None:
         """
-        Return the maximum price across today's [start_hour, end_hour) slots,
-        or None if no price data is available for that window.
+        Return the maximum price across today's local [start_hour, end_hour)
+        slots, or None if no price data is available for that window.
         """
-        prices = self._get_prices_dict()
-        if not prices:
-            return None
-        today  = self.datetime().strftime("%Y-%m-%d")
-        values = []
-        for hour in range(start_hour, end_hour):
-            key = f"{today}T{hour:02d}:00:00"
-            if key in prices:
-                try:
-                    values.append(float(prices[key]))
-                except (TypeError, ValueError):
-                    continue
-        return max(values) if values else None
+        return self._max_price_in_day_hours(0, start_hour, end_hour)
 
     def _max_price_in_hour_range_tomorrow(self, start_hour: int, end_hour: int) -> float | None:
         """
-        Return the maximum price across tomorrow's [start_hour, end_hour) slots,
-        or None if tomorrow's prices are not yet available.
+        Return the maximum price across tomorrow's local [start_hour, end_hour)
+        slots, or None if tomorrow's prices are not yet available.
         """
-        prices = self._get_prices_dict()
-        if not prices:
-            return None
-        tomorrow = (self.datetime() + timedelta(days=1)).strftime("%Y-%m-%d")
-        values = []
-        for hour in range(start_hour, end_hour):
-            key = f"{tomorrow}T{hour:02d}:00:00"
-            if key in prices:
-                try:
-                    values.append(float(prices[key]))
-                except (TypeError, ValueError):
-                    continue
-        return max(values) if values else None
+        return self._max_price_in_day_hours(1, start_hour, end_hour)

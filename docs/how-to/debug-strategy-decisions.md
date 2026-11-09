@@ -290,11 +290,16 @@ entity_id: sensor.sessy_dnhh_energy_price
 state: 0.25
 attributes:
   energy_prices:
-    "2026-08-01T00:00:00": 0.15
-    "2026-08-01T01:00:00": 0.12
-    "2026-08-01T02:00:00": 0.08
+    "2026-08-01T00:00:00+00:00": 0.15   # UTC key = 02:00 CEST
+    "2026-08-01T01:00:00+00:00": 0.12
+    "2026-08-01T02:00:00+00:00": 0.08
     # ... all 24 hours
 ```
+
+Keys with an offset (Sessy sends UTC, `+00:00`) are converted to the AppDaemon
+timezone before use; keys without an offset are read as local time. If the
+strategy's hours look shifted by 1 hour (winter) or 2 hours (summer), check the
+AppDaemon `time_zone` setting.
 
 If `energy_prices` is missing or incomplete:
 - Check your energy price integration (ha-dsmr, Nordic Energy, etc.)
@@ -396,6 +401,7 @@ soc_floor: 5  # Keep at least 5% charge
 
 - [ ] Are price forecasts available?
   - Check: `energy_prices` attribute exists and has future prices
+  - Check: the status sensor's `evening_peak_price` attribute is not empty. Without evening prices the rule skips (fail-closed); the log shows `AFTERNOON SKIP: evening peak n/a`
   - Fix: Verify price sensor integration
 
 **Example fix:**

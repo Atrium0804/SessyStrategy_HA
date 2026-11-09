@@ -267,7 +267,7 @@ The `cheapest_hours_margin` governs the **Priority 3 cheapest-hours charge**. It
 (max_later_price - current_price) >= cheapest_hours_margin
 ```
 
-`max_later_price` is the highest hourly price after the current hour, up to the end of the price window (default 02:00 next day). If the margin is not met, the rule is skipped (log: `CHEAPEST HOURS SKIP`) and lower priorities are evaluated. Without later price data the guard does not block.
+`max_later_price` is the highest hourly price after the current hour, up to the end of the price window (default 02:00 next day). If the margin is not met, the rule is skipped (log: `CHEAPEST HOURS SKIP`) and lower priorities are evaluated. Without later price data the guard blocks (fail-closed).
 
 **Default:** €0.05/kWh
 

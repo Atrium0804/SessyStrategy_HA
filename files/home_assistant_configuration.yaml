@@ -12,10 +12,9 @@ input_select:
       - heatpump
       - hybrid
       - boost
-      - economic
       - market_price_threshold
       - cheapest_hours
-    initial: economic
+    initial: cheapest_hours
     icon: mdi:thermostat
 
 # ============================================================================
@@ -29,7 +28,9 @@ input_datetime:
     icon: mdi:calendar-check
 
 # ============================================================================
-# OPTION A: Current Price Sensor (for market_price_threshold strategy)
+# OPTION A: Current Price Sensor (fallback for market_price_threshold strategy)
+# The app reads the current price from price_forecast_sensor (energy_prices);
+# current_price_sensor is only used when that has no price for the current hour.
 # If your energy provider offers a current price sensor directly
 # ============================================================================
 # Example using Sessy integration (if available):
@@ -38,7 +39,7 @@ input_datetime:
 #     current_price_sensor: true
 
 # ============================================================================
-# OPTION B: Template Sensor for Current Price
+# OPTION B: Template Sensor for Current Price (fallback only)
 # Create from existing forecast sensor
 # ============================================================================
 template:
@@ -87,7 +88,6 @@ template:
           {% elif mode == 'heatpump' %}Forced Heat Pump
           {% elif mode == 'hybrid' %}Forced Hybrid
           {% elif mode == 'boost' %}Forced Boost
-          {% elif mode == 'economic' %}Economic Mode
           {% elif mode == 'market_price_threshold' %}Price Threshold Mode
           {% elif mode == 'cheapest_hours' %}Cheapest Hours Mode
           {% else %}Unknown ({{ mode }})

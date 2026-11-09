@@ -1,6 +1,6 @@
 # Boiler Strategy Configuration Reference
 
-*Last updated: 2026-09-14 | Part of [Reference Documentation](../../index.md)*
+*Last updated: 2026-11-09 | Part of [Reference Documentation](../../index.md)*
 
 ---
 
@@ -19,7 +19,7 @@ The Boiler Strategy app (`files/boiler_strategy.py`) is a companion AppDaemon ap
 The boiler strategy configuration is organized into logical sections:
 
 1. **Legionella Prevention** — Health and safety temperature thresholds and deadlines
-2. **Economic Mode Windows** — Day/night period definitions for cost optimization
+2. **Price-Based Strategies** — Market price threshold and cheapest hours (shared price window)
 3. **Entity IDs** — Home Assistant entity mappings
 
 ---
@@ -32,23 +32,18 @@ The boiler strategy configuration is organized into logical sections:
 | `legionella_temp` | float | 65 | No | Target temperature in °C that the boiler must reach periodically to prevent legionella bacteria growth | > 0 | `65` |
 | `legionella_hybrid_days` | float | 6 | No | Days without reaching `legionella_temp` before forcing hybrid mode during cheapest period | > 0 | `6` |
 | `legionella_boost_days` | float | 7 | No | Days without reaching `legionella_temp` before forcing boost mode regardless of period | > `legionella_hybrid_days` | `7` |
-| **Economic Mode Windows (local hours, [start, end))** |||||||
-| `economic_day_start` | int | 10 | No | Start hour of the first economic window (day period) | 0-23 | `10` |
-| `economic_day_end` | int | 16 | No | End hour of the first economic window (day period) | 0-23 | `16` |
-| `economic_night_start` | int | 0 | No | Start hour of the second economic window (night period) | 0-23 | `0` |
-| `economic_night_end` | int | 6 | No | End hour of the second economic window (night period) | 0-23 | `6` |
 | **Price-Based Strategies** |||||||
 | `market_price_threshold` | float | 0.1 | No | Maximum current price in €/kWh at which to run the heat pump | >= 0 | `0.1` |
 | `cheapest_hours_count` | int | 1 | No | Run the heat pump when the current hour ranks within the N cheapest of the 24h price window (same ranking as the battery) | 1-24 | `3` |
-| `cheapest_window_start_h` | int | 2 | No | Start hour of the 24h window (02:00 to 02:00); keep equal to the battery value | 0-23 | `2` |
+| `cheapest_window_start_h` | int | 2 | No | Start hour of the 24h window (02:00 to 02:00), shared with the battery. In `apps.yaml` set it with the alias `*cheapest_window_start_h` so both apps use the same value | 0-23 | `*cheapest_window_start_h` |
 | `rerun_debounce_s` | float | 2.0 | No | Delay in seconds before re-running after a live input changes. Prevents rapid re-runs during slider drags. | >= 0 | `2.0` |
 | **Entity IDs** |||||||
 | `temp_sensor` | str | `sensor.boiler_temperatuur` | **Yes** | Boiler water temperature sensor | valid entity ID | `sensor.boiler_temperature` |
-| `price_forecast_sensor` | str | `sensor.frankenergy_current_electricity_market_price` | **Yes** | Energy price forecast sensor exposing a `prices` attribute | valid entity ID | `sensor.electricity_price_forecast` |
-| `price_forecast_attribute` | str | `prices` | No | Attribute name on `price_forecast_sensor` containing the price list | string | `prices` |
-| `current_price_sensor` | str | `sensor.current_energy_price` | Required for `market_price_threshold` | Current-price sensor | valid entity ID | `sensor.current_energy_price` |
-| `current_price_attribute` | str | `price` | No | Attribute containing the current price; use an empty string when the sensor state is the price | string or empty | `price` |
-| `mode_select` | str | `input_select.boiler_strategy_mode` | **Yes** | User-selected strategy mode input select (`off`, `heatpump`, `hybrid`, `boost`, `economic`, `market_price_threshold`, `cheapest_hours`) | valid entity ID | `input_select.boiler_mode_strategy` |
+| `price_forecast_sensor` | str | `sensor.sessy_dnhh_energy_price` | **Yes** | Sessy energy price sensor exposing an `energy_prices` dict (same sensor as the battery) | valid entity ID | `sensor.sessy_dnhh_energy_price` |
+| `price_forecast_attribute` | str | `energy_prices` | No | Attribute name on `price_forecast_sensor` containing the `{timestamp: price}` dict | string | `energy_prices` |
+| `current_price_sensor` | str | `sensor.current_energy_price` | No | Fallback current-price sensor for `market_price_threshold`, used only when the shared price data has no price for the current hour | valid entity ID | `sensor.sessy_dnhh_energy_price` |
+| `current_price_attribute` | str | `price` | No | Attribute containing the fallback current price; use an empty string when the sensor state is the price | string or empty | `""` |
+| `mode_select` | str | `input_select.boiler_strategy_mode` | **Yes** | User-selected strategy mode input select (`off`, `heatpump`, `hybrid`, `boost`, `market_price_threshold`, `cheapest_hours`) | valid entity ID | `input_select.boiler_mode_strategy` |
 | `boiler_mode_select` | str | `select.boiler_mode` | **Yes** | Logical actuator for boiler mode (off/heatpump/hybrid/boost/ariston_app) | valid entity ID | `select.boiler_operating_mode` |
 | `legionella_last_ok_entity` | str | `input_datetime.boiler_legionella_last_ok` | **Yes** | input_datetime helper that the app stamps whenever the boiler reaches `legionella_temp` | valid entity ID | `input_datetime.boiler_last_legionella_ok` |
 | `status_sensor` | str | `sensor.boiler_strategy_status` | **Yes** | Status sensor published by the app with current state and attributes | valid entity ID | `sensor.boiler_strategy_status` |
@@ -67,24 +62,22 @@ Legionella bacteria can grow in water systems at temperatures between 20-45°C. 
 
 - **`legionella_boost_days`**: The number of days without reaching `legionella_temp` before the app forces boost mode. This is the final safety stage that runs the boiler in full electric boost mode regardless of cost, ensuring the water is heated to the target temperature. Default is 7 days. Must be greater than `legionella_hybrid_days`.
 
-### Economic Mode Windows
+### Price-Based Strategies
 
-When the user-selected mode is `economic` (the default), the app compares the average forecast price of two configured day/night periods and runs the heat pump only during whichever period is cheaper.
+The default mode is `cheapest_hours`. An unset mode, or a leftover `economic` selection (that mode is retired), runs as `cheapest_hours`; the app also switches `mode_select` to `cheapest_hours` and logs a WARNING.
 
-- **Day window** (`economic_day_start` to `economic_day_end`): The first period to evaluate. Default is 10:00-16:00.
-- **Night window** (`economic_night_start` to `economic_night_end`): The second period to evaluate. Default is 00:00-06:00.
-
-The app calculates the average price for each window from the price forecast sensor and selects the cheaper window to run the heat pump. Outside the selected window, the boiler stays off.
+- **`cheapest_hours`**: Runs the heat pump when the current hour ranks within the N cheapest (`cheapest_hours_count`) of the 24h price window from `cheapest_window_start_h` (default 02:00 → 02:00). `files/cheapest_hours.py` does this ranking for both the battery and the boiler, so both use the identical window. Only N differs: `cheapest_hours_n` (battery) versus `cheapest_hours_count` (boiler).
+- **`market_price_threshold`**: Runs the heat pump when the current price is at or below `market_price_threshold`. The current price is the current local hour's price from the shared price data (`price_forecast_sensor`). `current_price_sensor` / `current_price_attribute` are only a fallback when that data has no price for the current hour.
 
 ### Entity IDs
 
 - **`temp_sensor`**: Provides the current boiler water temperature in °C. Required for all operations.
 
-- **`price_forecast_sensor`**: Provides the energy price forecast as a list of entries with `from`, `till`, and `price` fields under the `price_forecast_attribute` (default: `prices`). Used only when mode is `economic`.
+- **`price_forecast_sensor`**: The Sessy energy price sensor. Provides a dict of `{ISO_timestamp: price}` under the `price_forecast_attribute` (default: `energy_prices`). See [Price Forecast Format](#price-forecast-format).
 
-- **`price_forecast_attribute`**: The attribute name on `price_forecast_sensor` that contains the forecast price list.
+- **`price_forecast_attribute`**: The attribute name on `price_forecast_sensor` that contains the price dict.
 
-- **`mode_select`**: User input select for choosing the boiler strategy mode. Options: `economic`, `off`, `heatpump`, `hybrid`, `boost`.
+- **`mode_select`**: User input select for choosing the boiler strategy mode. Options: `cheapest_hours`, `market_price_threshold`, `off`, `heatpump`, `hybrid`, `boost`.
 
 - **`boiler_mode_select`**: The actuator entity that the app writes to. The boiler package translates this to the Ariston integration's own `max_temp`.
 
@@ -107,7 +100,7 @@ boiler_strategy:
 
   # REQUIRED: Map to your entities
   temp_sensor: sensor.boiler_temperature
-  price_forecast_sensor: sensor.electricity_price_forecast
+  price_forecast_sensor: sensor.sessy_dnhh_energy_price
   mode_select: input_select.boiler_strategy_mode
   boiler_mode_select: select.boiler_mode
   legionella_last_ok_entity: input_datetime.boiler_legionella_last_ok
@@ -126,18 +119,19 @@ boiler_strategy:
   legionella_hybrid_days: 6       # Days before hybrid warning triggers
   legionella_boost_days: 7        # Days before boost mode triggers
 
-  # Economic mode windows (local hours)
-  economic_day_start: 10
-  economic_day_end: 16
-  economic_night_start: 0
-  economic_night_end: 6
+  # Price-based strategies
+  market_price_threshold: 0.1
+  cheapest_hours_count: 1
+  cheapest_window_start_h: *cheapest_window_start_h   # Alias of the anchor in sessy_strategy
 
   rerun_debounce_s: 2.0
 
   # Entity IDs
   temp_sensor: sensor.boiler_temperature
-  price_forecast_sensor: sensor.electricity_price_forecast
-  price_forecast_attribute: prices
+  price_forecast_sensor: sensor.sessy_dnhh_energy_price
+  price_forecast_attribute: energy_prices
+  current_price_sensor: sensor.sessy_dnhh_energy_price   # Fallback only
+  current_price_attribute: ""
   mode_select: input_select.boiler_strategy_mode
   boiler_mode_select: select.boiler_mode
   legionella_last_ok_entity: input_datetime.boiler_legionella_last_ok
@@ -154,8 +148,9 @@ The boiler strategy evaluates conditions in priority order (first match wins):
 |----------|-----------|--------|---------------|
 | **P1** | Days since last `legionella_temp` >= `legionella_boost_days` AND mode != `off` | Force mode `boost` | Always |
 | **P2** | User selected `off`, `heatpump`, `hybrid`, or `boost` | Force that mode directly | Always |
-| **P3** | Mode is `economic` AND days since last `legionella_temp` >= `legionella_hybrid_days` | Force mode `hybrid` | Only during cheapest window |
-| **P4** | Mode is `economic` | Run heat pump during cheaper of the two configured windows; off otherwise | N/A |
+| **P3** | Mode is `market_price_threshold` or `cheapest_hours` AND days since last `legionella_temp` >= `legionella_hybrid_days` | Force mode `hybrid` | Only during the mode's cheapest period |
+| **P4** | Mode is `market_price_threshold` | Run heat pump when current price <= `market_price_threshold`; off otherwise | N/A |
+| **P5** | Mode is `cheapest_hours` (default) | Run heat pump during the N cheapest hours of the shared price window; off otherwise | N/A |
 
 ---
 
@@ -175,26 +170,21 @@ The app automatically tracks when the boiler reaches the target temperature:
 
 ## Price Forecast Format
 
-The `price_forecast_sensor` must expose a list of price entries under the configured attribute. Each entry should have:
-
-- `from`: ISO 8601 datetime string for the start of the period
-- `till`: ISO 8601 datetime string for the end of the period  
-- `price`: Numeric price value in €/kWh
+The `price_forecast_sensor` must expose the Sessy format: a dict of `{ISO_timestamp: price}` under the configured attribute (default `energy_prices`). Keys are UTC with an offset; prices are in €/kWh.
 
 Example format:
 
 ```yaml
-prices:
-  - from: "2026-09-14T00:00:00+02:00"
-    till: "2026-09-14T01:00:00+02:00"
-    price: 0.254
-  - from: "2026-09-14T01:00:00+02:00"
-    till: "2026-09-14T02:00:00+02:00"
-    price: 0.189
+energy_prices:
+  '2026-11-09T16:00:00+00:00': 0.60945   # = 17:00 CET
+  '2026-11-09T17:00:00+00:00': 0.52310   # = 18:00 CET
   # ... more entries
 ```
 
-The app uses the `from` field's hour component to determine which window each price belongs to.
+`files/cheapest_hours.py` converts each key to the AppDaemon local timezone and averages the slots per local clock hour. Keys without an offset are read as local time. The same reader serves the battery and the boiler.
+
+!!! warning
+    The Frank Energie format (a list of `{from, till, price}` entries) is no longer supported.
 
 ---
 
@@ -204,11 +194,23 @@ The app uses the `from` field's hour component to determine which window each pr
 
 2. **Positive values**: `legionella_temp`, `legionella_hybrid_days`, `legionella_boost_days`, `rerun_debounce_s` must be > 0.
 
-3. **Window ordering**: `economic_day_start` < `economic_day_end`, `economic_night_start` < `economic_night_end`.
+3. **Window start**: `cheapest_window_start_h` must equal the battery's value; use the `*cheapest_window_start_h` alias in `apps.yaml`.
 
 4. **Threshold ordering**: `legionella_boost_days` must be > `legionella_hybrid_days` for proper escalation.
 
-5. **Time values**: All hour values (economic window start/end) must be in range 0-23.
+5. **Time values**: `cheapest_window_start_h` must be in range 0-23.
+
+---
+
+## Migration from `economic` mode
+
+The `economic` mode is retired. Use `cheapest_hours` (default) or `market_price_threshold` instead.
+
+1. Remove all `economic_*` keys from the `boiler_strategy` section in `apps.yaml`.
+2. Remove `economic` from the `input_select.boiler_strategy_mode` options; set `initial: cheapest_hours`.
+3. Switch `price_forecast_sensor` to the Sessy sensor (`energy_prices`); the Frank Energie format is dropped.
+
+A leftover `economic` selection runs as `cheapest_hours`, and the app switches the `input_select` to `cheapest_hours` (WARNING in the log). See [Set Up Boiler Strategy](../../how-to/setup-boiler-strategy.md#migrating-from-the-economic-mode).
 
 ---
 
@@ -216,7 +218,7 @@ The app uses the `from` field's hour component to determine which window each pr
 
 1. **Start with defaults**: The default values work well for most installations with weekly legionella prevention cycles.
 
-2. **Adjust windows to match your usage**: If your energy prices follow a different pattern, adjust the `economic_day_*` and `economic_night_*` windows to match your cheaper and more expensive periods.
+2. **Tune N, not the window**: Change `cheapest_hours_count` (or the live `input_number.boiler_cheapest_hours_count`) to run the heat pump longer or shorter. Change `cheapest_window_start_h` only together with the battery, through the shared anchor.
 
 3. **Legionella thresholds**: If local regulations require different legionella prevention intervals, adjust `legionella_hybrid_days` and `legionella_boost_days` accordingly. The 6/7 day defaults follow common European guidelines.
 
